@@ -1,0 +1,7 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/date-core" },
+    { "path": "./packages/date-react" }
+  ]
+}

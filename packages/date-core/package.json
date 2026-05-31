@@ -1,0 +1,25 @@
+{
+  "name": "@calchemy/date-core",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Natural language date parsing with Temporal values.",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --sourcemap --tsconfig tsconfig.build.json --external @js-temporal/polyfill && tsc -p tsconfig.build.json --emitDeclarationOnly",
+    "test": "pnpm run build && vitest run --root ../.. --config vitest.config.ts packages/date-core/tests",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo"
+  },
+  "dependencies": {
+    "@js-temporal/polyfill": "^0.5.1"
+  }
+}

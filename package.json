@@ -1,0 +1,27 @@
+{
+  "name": "calchemy",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.4.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "parse:date": "node scripts/parse-date.mjs",
+    "test": "pnpm -r test",
+    "lint": "pnpm typecheck",
+    "typecheck": "tsc -b",
+    "clean": "pnpm -r clean"
+  },
+  "devDependencies": {
+    "@js-temporal/polyfill": "^0.5.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^29.1.1",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
+  }
+}
