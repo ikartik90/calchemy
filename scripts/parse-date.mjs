@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-const DEFAULT_ANCHOR = "2026-05-27T12:00:00-04:00[America/New_York]";
 const DEFAULT_LOCALE = "en-US";
+const DEFAULT_TIME_ZONE = "America/New_York";
 const DEFAULT_WEEK_STARTS_ON = 0;
 const DEFAULT_DATE_ORDER = ["DMY", "MDY", "YMD"];
 
@@ -17,31 +17,30 @@ const moduleUrl = new URL(
   import.meta.url,
 );
 const calchemyModule = await importBuiltCore(moduleUrl);
-const baseCalchemy = await calchemyModule.createCalchemy();
-const { Temporal } = baseCalchemy;
+const namedDatesVocabulary = [
+  {
+    value: "christmas",
+    shortcuts: ["xmas"],
+    isHoliday: true,
+    resolveDate({ year, context }) {
+      return context.anchor.toPlainDate().with({ year, month: 12, day: 25 });
+    },
+  },
+  {
+    value: "independence day",
+    shortcuts: [],
+    isHoliday: true,
+    resolveDate({ year, context }) {
+      return context.anchor.toPlainDate().with({ year, month: 7, day: 4 });
+    },
+  },
+];
 const calchemy = await calchemyModule.createCalchemy({
-  namedDatesVocabulary: [
-    {
-      value: "christmas",
-      shortcuts: ["xmas"],
-      resolveDate({ year, context }) {
-        return context.anchor.toPlainDate().with({ year, month: 12, day: 25 });
-      },
-    },
-    {
-      value: "easter",
-      shortcuts: [],
-      resolveDate({ year }) {
-        return getEasterDate(year, Temporal);
-      },
-    },
-  ],
+  namedDatesVocabulary,
 });
 
-const context = {
-  anchor: calchemy.Temporal.ZonedDateTime.from(
-    options.anchor ?? process.env.CALCHEMY_ANCHOR ?? DEFAULT_ANCHOR,
-  ),
+const contextBase = {
+  anchor: resolveAnchor(calchemy.Temporal, options),
   locale: options.locale ?? process.env.CALCHEMY_LOCALE ?? DEFAULT_LOCALE,
   weekStartsOn: parseWeekStartsOn(
     options.weekStartsOn ?? process.env.CALCHEMY_WEEK_STARTS_ON,
@@ -49,16 +48,31 @@ const context = {
   dateOrderPreference: parseDateOrder(
     options.dateOrder ?? process.env.CALCHEMY_DATE_ORDER,
   ),
-  holidays: {
-    id: "dev-common-holidays",
-    label: "Dev common holidays",
-    includes(date) {
-      return date.month === 12 && date.day === 25;
-    },
-  },
+};
+const context = {
+  ...contextBase,
+  holidays: createNamedDateHolidayProvider(namedDatesVocabulary, contextBase),
 };
 
 const result = calchemy.parseDate(input, context);
+const expectedKind = parseExpectedKind(options.expect);
+const resolvedResult = expectedKind
+  ? calchemyModule.resolveExpectedDateValue(result, expectedKind)
+  : result;
+const serializedResult = serializeResult(resolvedResult, calchemy);
+
+if (expectedKind) {
+  console.dir(
+    resolvedResult.status === "valid"
+      ? serializedResult.value
+      : serializedResult,
+    {
+      depth: null,
+      colors: process.stdout.isTTY,
+    },
+  );
+  process.exit(0);
+}
 
 console.dir(
   {
@@ -69,7 +83,7 @@ console.dir(
       weekStartsOn: context.weekStartsOn,
       dateOrderPreference: context.dateOrderPreference,
     },
-    result: serializeResult(result, calchemy),
+    result: serializedResult,
   },
   { depth: null, colors: process.stdout.isTTY },
 );
@@ -140,8 +154,10 @@ function parseCliArgs(args) {
     if (
       flag === "--anchor" ||
       flag === "--locale" ||
+      flag === "--time-zone" ||
       flag === "--week-starts-on" ||
-      flag === "--date-order"
+      flag === "--date-order" ||
+      flag === "--expect"
     ) {
       const value = inlineValue ?? args[++index];
       if (!value) {
@@ -150,8 +166,10 @@ function parseCliArgs(args) {
 
       if (flag === "--anchor") options.anchor = value;
       if (flag === "--locale") options.locale = value;
+      if (flag === "--time-zone") options.timeZone = value;
       if (flag === "--week-starts-on") options.weekStartsOn = value;
       if (flag === "--date-order") options.dateOrder = value;
+      if (flag === "--expect") options.expect = value;
       continue;
     }
 
@@ -161,6 +179,46 @@ function parseCliArgs(args) {
   return {
     input: inputParts.join(" ").trim(),
     options,
+  };
+}
+
+function parseExpectedKind(value) {
+  if (value === undefined) {
+    return null;
+  }
+
+  if (value === "single" || value === "multiple" || value === "range") {
+    return value;
+  }
+
+  throw new Error("--expect must be one of: single, multiple, range.");
+}
+
+function resolveAnchor(Temporal, options) {
+  const anchor = options.anchor ?? process.env.CALCHEMY_ANCHOR;
+  if (anchor) {
+    return Temporal.ZonedDateTime.from(anchor);
+  }
+
+  return Temporal.Now.zonedDateTimeISO(
+    options.timeZone ?? process.env.CALCHEMY_TIME_ZONE ?? DEFAULT_TIME_ZONE,
+  );
+}
+
+function createNamedDateHolidayProvider(namedDatesVocabulary, context) {
+  const holidayEntries = namedDatesVocabulary.filter(
+    (entry) => entry.isHoliday,
+  );
+
+  return {
+    id: "dev-named-date-holidays",
+    label: "Dev named-date holidays",
+    includes(date) {
+      return holidayEntries.some((entry) => {
+        const holiday = entry.resolveDate({ year: date.year, context });
+        return holiday?.equals(date) ?? false;
+      });
+    },
   };
 }
 
@@ -196,34 +254,18 @@ function parseDateOrder(value) {
   return orders;
 }
 
-function getEasterDate(year, Temporal) {
-  const a = year % 19;
-  const b = Math.floor(year / 100);
-  const c = year % 100;
-  const d = Math.floor(b / 4);
-  const e = b % 4;
-  const f = Math.floor((b + 8) / 25);
-  const g = Math.floor((b - f + 1) / 3);
-  const h = (19 * a + b - d - g + 15) % 30;
-  const i = Math.floor(c / 4);
-  const k = c % 4;
-  const l = (32 + 2 * e + 2 * i - h - k) % 7;
-  const m = Math.floor((a + 11 * h + 22 * l) / 451);
-  const month = Math.floor((h + l - 7 * m + 114) / 31);
-  const day = ((h + l - 7 * m + 114) % 31) + 1;
-
-  return Temporal.PlainDate.from({ year, month, day });
-}
-
 function printUsage() {
   console.log(`Usage:
-  pnpm parse:date -- "next friday"
-  pnpm parse:date -- --anchor "2026-05-27T12:00:00-04:00[America/New_York]" "last 90 days"
+  pnpm parse-date:single -- "next friday"
+  pnpm parse-date:multiple -- "first 10 days of the next month excluding holidays"
+  pnpm parse-date:range -- --anchor "2026-05-27T12:00:00-04:00[America/New_York]" "last 90 days"
 
 Options:
   --anchor <zoned-date-time>   Temporal ZonedDateTime anchor.
+  --time-zone <iana-zone>       Time zone for the default current-time anchor. Defaults to America/New_York.
   --locale <locale>            Parser locale. Defaults to en-US.
   --week-starts-on <0-6>       0 is Sunday, 1 is Monday. Defaults to 0.
   --date-order <orders>        Comma-separated preference. Defaults to DMY,MDY,YMD.
+  --expect <kind>               Internal script mode: single, multiple, or range.
 `);
 }

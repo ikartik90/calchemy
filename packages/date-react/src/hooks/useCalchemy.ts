@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
-import type { Calchemy, DateValue, ParseDateContext, ParseDateResult } from "@calchemy/date-core";
+import { resolveExpectedDateValue } from "@calchemy/date-core";
+import type { Calchemy, DateValue, ExpectedDateValue, ParseDateContext, ParseDateResult } from "@calchemy/date-core";
 
-export type UseDateInputOptions = {
+export type UseCalchemyOptions = {
   calchemy: Calchemy;
+  expectedValue?: ExpectedDateValue;
   value?: DateValue | null;
   defaultValue?: DateValue | null;
   onValueChange?: (value: DateValue | null, result: ParseDateResult) => void;
@@ -12,10 +14,12 @@ export type UseDateInputOptions = {
   onInputValueChange?: (value: string) => void;
 };
 
-export type DateInputState = {
+export type CalchemyState = {
   inputValue: string;
   value: DateValue | null;
   result: ParseDateResult;
+  expectedValue: ExpectedDateValue | null;
+  valueKindMismatch: boolean;
   inlineCompletion: ReturnType<Calchemy["getInlineCompletion"]>;
   setInputValue(value: string): void;
   acceptCompletion(): void;
@@ -26,11 +30,13 @@ export type DateInputState = {
     onChange(event: { currentTarget: { value: string } }): void;
     onKeyDown(event: { key: string; preventDefault(): void }): void;
     "aria-invalid": boolean;
-    "data-status": ParseDateResult["status"];
+    "data-status": ParseDateResult["status"] | "kind-mismatch";
+    "data-expected-value": ExpectedDateValue | undefined;
+    "data-value-kind": ExpectedDateValue | undefined;
   };
 };
 
-export function useDateInput(options: UseDateInputOptions): DateInputState {
+export function useCalchemy(options: UseCalchemyOptions): CalchemyState {
   const [uncontrolledInputValue, setUncontrolledInputValue] = useState(options.defaultInputValue ?? "");
   const [uncontrolledValue, setUncontrolledValue] = useState<DateValue | null>(options.defaultValue ?? null);
   const inputValue = options.inputValue ?? uncontrolledInputValue;
@@ -39,6 +45,9 @@ export function useDateInput(options: UseDateInputOptions): DateInputState {
     () => options.calchemy.parseDate(inputValue, options.parseContext),
     [inputValue, options.calchemy, options.parseContext],
   );
+  const expectedValue = options.expectedValue ?? null;
+  const expectedResult = expectedValue ? resolveExpectedDateValue(result, expectedValue) : result;
+  const valueKindMismatch = expectedResult.status === "invalid" && result.status === "valid";
   const inlineCompletion = useMemo(
     () => options.calchemy.getInlineCompletion(inputValue),
     [inputValue, options.calchemy],
@@ -51,8 +60,9 @@ export function useDateInput(options: UseDateInputOptions): DateInputState {
     options.onInputValueChange?.(nextValue);
 
     const nextResult = options.calchemy.parseDate(nextValue, options.parseContext);
-    if (nextResult.status === "valid") {
-      updateValue(nextResult.value, nextResult);
+    const nextExpectedResult = expectedValue ? resolveExpectedDateValue(nextResult, expectedValue) : nextResult;
+    if (nextExpectedResult.status === "valid") {
+      updateValue(nextExpectedResult.value, nextExpectedResult);
     }
   }
 
@@ -81,19 +91,37 @@ export function useDateInput(options: UseDateInputOptions): DateInputState {
       return;
     }
 
-    updateValue(candidate.value, {
+    const candidateResult = {
       status: "valid",
       input: inputValue,
       value: candidate.value,
       candidates: [candidate],
       corrections: result.corrections,
-    });
+    } satisfies ParseDateResult;
+    const resolvedCandidateResult = expectedValue ? resolveExpectedDateValue(candidateResult, expectedValue) : candidateResult;
+    if (resolvedCandidateResult.status !== "valid") {
+      return;
+    }
+
+    updateValue(resolvedCandidateResult.value, resolvedCandidateResult);
   }
 
   function selectDate(nextValue: DateValue) {
-    updateValue(nextValue);
-    if (nextValue.kind === "single") {
-      updateInputValue(nextValue.date.toString());
+    const nextResult = {
+      status: "valid",
+      input: inputValue,
+      value: nextValue,
+      candidates: [],
+      corrections: [],
+    } satisfies ParseDateResult;
+    const resolvedResult = expectedValue ? resolveExpectedDateValue(nextResult, expectedValue) : nextResult;
+    if (resolvedResult.status !== "valid") {
+      return;
+    }
+
+    updateValue(resolvedResult.value, resolvedResult);
+    if (resolvedResult.value.kind === "single") {
+      updateInputValue(resolvedResult.value.date.toString());
     }
   }
 
@@ -101,6 +129,8 @@ export function useDateInput(options: UseDateInputOptions): DateInputState {
     inputValue,
     value,
     result,
+    expectedValue,
+    valueKindMismatch,
     inlineCompletion,
     setInputValue: updateInputValue,
     acceptCompletion,
@@ -118,9 +148,12 @@ export function useDateInput(options: UseDateInputOptions): DateInputState {
             acceptCompletion();
           }
         },
-        "aria-invalid": result.status === "invalid",
-        "data-status": result.status,
+        "aria-invalid": expectedResult.status === "invalid",
+        "data-status": valueKindMismatch ? "kind-mismatch" : result.status,
+        "data-expected-value": expectedValue ?? undefined,
+        "data-value-kind": result.status === "valid" ? result.value.kind : undefined,
       };
     },
   };
 }
+

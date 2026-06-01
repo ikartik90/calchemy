@@ -5,7 +5,9 @@
   "packageManager": "pnpm@11.4.0",
   "scripts": {
     "build": "pnpm -r build",
-    "parse:date": "node scripts/parse-date.mjs",
+    "parse-date:single": "node scripts/parse-date.mjs --expect single",
+    "parse-date:multiple": "node scripts/parse-date.mjs --expect multiple",
+    "parse-date:range": "node scripts/parse-date.mjs --expect range",
     "test": "pnpm -r test",
     "lint": "pnpm typecheck",
     "typecheck": "tsc -b",

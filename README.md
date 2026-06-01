@@ -13,11 +13,21 @@ The parser returns structured results:
 ## Packages
 
 ```txt
-@calchemy/date-core   parser, Temporal values, ambiguity, JSON, and form values
-@calchemy/date-react  headless React primitives and hooks
+@calchemy/date-core
+@calchemy/date-react
 ```
 
 `date-holidays` and `date-fuzzy` will become separate packages when those areas need independent ownership.
+
+## Architecture
+
+Calchemy keeps parsing and UI separate. `@calchemy/date-core` owns parser semantics, Temporal values, ambiguity, JSON, and form serialization. `@calchemy/date-react` renders parsed results through `useCalchemy` and the `Calchemy` primitives.
+
+The parser follows an inspectable pipeline:
+
+```txt
+normalize -> tokenize -> correct -> parse -> resolve context -> expand -> rank -> detect ambiguity -> return result
+```
 
 ## Core usage
 
@@ -40,13 +50,13 @@ if (result.status === "valid") {
 }
 ```
 
-`createCalchemy()` returns a Promise immediately. It uses native `globalThis.Temporal` when the runtime supports Temporal. When Temporal is missing, `@js-temporal/polyfill` is dynamically imported as a fallback.
+`createCalchemy()` uses native `globalThis.Temporal` when the runtime supports Temporal and returns a Promise immediately. When Temporal is missing, `@js-temporal/polyfill` is dynamically imported as a fallback.
 
 After setup, `calchemy.parseDate()` is synchronous.
 
 ## Ambiguity
 
-Calchemy treats ambiguity as a result, not an error.
+Calchemy returns ambiguous parses with the choices your UI needs.
 
 ```ts
 const result = calchemy.parseDate("03/04/25");
@@ -64,24 +74,73 @@ That input can mean March 4, 2025, or April 3, 2025. Your UI can show both choic
 
 ```tsx
 import { createCalchemy } from "@calchemy/date-core";
-import { DateInput } from "@calchemy/date-react";
+import { Calchemy } from "@calchemy/date-react";
 
 const calchemy = await createCalchemy();
 
 export function InvoiceFilter() {
   return (
-    <DateInput.Root calchemy={calchemy}>
-      <DateInput.Field placeholder="Try 'last 90 days'" />
-      <DateInput.Candidates />
-      <DateInput.Calendar />
-    </DateInput.Root>
+    <Calchemy.Root calchemy={calchemy}>
+      <Calchemy.Field placeholder="Try 'last 90 days'" />
+      <Calchemy.Candidates />
+      <Calchemy.Calendar />
+    </Calchemy.Root>
   );
 }
 ```
 
-`DateInput.Field` owns inline tab completion. `DateInput.Candidates` renders choices for ambiguous parses. `DateInput.Calendar` is optional.
+`Calchemy.Field` owns inline tab completion. `Calchemy.Candidates` renders parse choices. `Calchemy.Calendar` is optional.
 
-The components are unstyled. Use vanilla CSS, Panda CSS, Tailwind, CSS Modules, or your own system.
+## Styling examples
+
+Style the headless primitives with plain CSS, recipes, utility classes, CSS Modules, or your own system.
+
+### Vanilla CSS
+
+```tsx
+<Calchemy.Root calchemy={calchemy}>
+  <Calchemy.Field className="date-field" />
+  <div className="date-popover">
+    <Calchemy.Candidates />
+    <Calchemy.Calendar />
+  </div>
+</Calchemy.Root>
+```
+
+```css
+.date-field {
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+[data-calchemy-candidate],
+[data-calchemy-calendar-day] {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+```
+
+### Panda CSS
+
+```tsx
+<Calchemy.Root calchemy={calchemy}>
+  <Calchemy.Field className={dateInputRecipe()} />
+  <Calchemy.Candidates className={candidateListRecipe()} />
+  <Calchemy.Calendar className={calendarRecipe()} />
+</Calchemy.Root>
+```
+
+### Tailwind
+
+```tsx
+<Calchemy.Root calchemy={calchemy}>
+  <Calchemy.Field className="rounded-md border px-3 py-2" />
+  <Calchemy.Candidates className="mt-2 grid gap-1" />
+  <Calchemy.Calendar className="mt-2 grid grid-cols-7 gap-1" />
+</Calchemy.Root>
+```
 
 ## Form and JSON values
 
@@ -111,7 +170,7 @@ type DateValueJSON =
 
 ## Bring your own schema validator
 
-Calchemy does not depend on Zod, Valibot, or another schema library.
+Use Zod, Valibot, or your app's schema library for product rules.
 
 The package validates its own wire format with lightweight guards:
 

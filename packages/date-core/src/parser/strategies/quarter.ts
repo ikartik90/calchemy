@@ -1,4 +1,4 @@
-import { endOfMonth } from "./date-math";
+import { endOfMonth, expandTwoDigitYear } from "./date-math";
 import { parseOrdinal } from "./ordinal";
 import { parseAmount } from "./shared";
 import type { PlainDate, TemporalApi } from "../../temporal/types";
@@ -72,7 +72,7 @@ function resolveQuarterYear(relativeYear: string | undefined, explicitYear: stri
   }
 
   if (explicitYear) {
-    return Number(explicitYear);
+    return expandTwoDigitYear(Number(explicitYear), anchorYear);
   }
 
   return anchorYear;

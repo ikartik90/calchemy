@@ -9,7 +9,7 @@ import {
   startOfWeek,
   startOfYear,
 } from "./date-math";
-import { parseAmount, toDuration } from "./shared";
+import { comparePlainDate, parseAmount, toDuration } from "./shared";
 import type { PlainDate } from "../../temporal/types";
 import type { DateValue, DurationUnit, ResolvedParseDateContext } from "../../types";
 import type { DateVocabularyLookups } from "../vocabulary";
@@ -27,9 +27,9 @@ export function parseRelativeExpression(
   context: ResolvedParseDateContext,
   lookups: DateVocabularyLookups,
 ): DateValue | null {
-  const relative = parseRelativeDate(input, anchorDate, lookups);
-  if (relative) {
-    return { kind: "single", date: relative };
+  const rangeSubset = parseLeadingOrTrailingDaysOfRange(input, anchorDate, context, lookups);
+  if (rangeSubset) {
+    return rangeSubset;
   }
 
   const relativeMatch = /^(\w+|\d+) ([a-z]+) from now$/.exec(input);
@@ -52,27 +52,73 @@ export function parseRelativeExpression(
   return parseRelativeModifierExpression(input, anchorDate, context, lookups);
 }
 
-// Parses bare relative words into a single PlainDate.
-export function parseRelativeDate(
+// Parses subranges such as "last 20 days of next month" or "first ten days of next quarter".
+function parseLeadingOrTrailingDaysOfRange(
   input: string,
   anchorDate: PlainDate,
+  context: ResolvedParseDateContext,
   lookups: DateVocabularyLookups,
-): PlainDate | null {
-  if (!lookups.relatives.has(input as never)) {
+): DateValue | null {
+  const skipHolidays = /\s+(?:excluding|skip) holidays$/.test(input);
+  const rangeInput = skipHolidays ? input.replace(/\s+(?:excluding|skip) holidays$/, "") : input;
+  const singularMatch = /^(first|last) day (?:of|in) (?:the )?(.+)$/.exec(rangeInput);
+  if (singularMatch?.[1] && singularMatch[2]) {
+    const range = parseRelativeModifierExpression(singularMatch[2], anchorDate, context, lookups);
+    if (range?.kind !== "range") {
+      return null;
+    }
+
+    const date = singularMatch[1] === "first" ? range.start : range.end;
+    return skipHolidays && context.holidays?.includes(date) ? { kind: "multiple", dates: [] } : { kind: "single", date };
+  }
+
+  const match = /^(first|last) (.+) ([a-z]+) (?:of|in) (?:the )?(.+)$/.exec(rangeInput);
+  if (!match?.[1] || !match[2] || !match[3] || !match[4]) {
     return null;
   }
 
-  switch (input) {
-    case "today":
-    case "now":
-      return anchorDate;
-    case "tomorrow":
-      return anchorDate.add({ days: 1 });
-    case "yesterday":
-      return anchorDate.subtract({ days: 1 });
-    default:
-      return null;
+  const count = parseAmount(match[2]);
+  const unit = lookups.durationUnits.get(match[3]);
+  const range = parseRelativeModifierExpression(match[4], anchorDate, context, lookups);
+  if (!count || count < 1 || unit !== "day" || range?.kind !== "range") {
+    return null;
   }
+
+  if (match[1] === "first") {
+    const end = range.start.add({ days: count - 1 });
+    return comparePlainDate(end, range.end) <= 0 ? applyHolidayExclusion({ kind: "range", start: range.start, end }, skipHolidays, context) : null;
+  }
+
+  const start = range.end.subtract({ days: count - 1 });
+  return comparePlainDate(range.start, start) <= 0
+    ? applyHolidayExclusion({ kind: "range", start, end: range.end }, skipHolidays, context)
+    : null;
+}
+
+// Converts a range into discrete dates when the phrase excludes configured holidays.
+function applyHolidayExclusion(
+  value: Extract<DateValue, { kind: "range" }>,
+  skipHolidays: boolean,
+  context: ResolvedParseDateContext,
+): DateValue {
+  if (!skipHolidays) {
+    return value;
+  }
+
+  return { kind: "multiple", dates: expandDatesBetween(value.start, value.end).filter((date) => !context.holidays?.includes(date)) };
+}
+
+// Expands every calendar date in an inclusive range.
+function expandDatesBetween(start: PlainDate, end: PlainDate): PlainDate[] {
+  const dates: PlainDate[] = [];
+  let cursor = start;
+
+  while (comparePlainDate(cursor, end) <= 0) {
+    dates.push(cursor);
+    cursor = cursor.add({ days: 1 });
+  }
+
+  return dates;
 }
 
 // Parses modifier-based relative phrases such as "next friday" or "previous month".
@@ -281,7 +327,7 @@ function resolveCalendarUnitRange(
   const date = anchorDate.add(toDuration(offset, unit));
 
   if (unit === "day") {
-    return { kind: "range", start: date, end: date };
+    return { kind: "single", date };
   }
 
   if (unit === "week") {

@@ -147,17 +147,17 @@ Known grammar and phrase support should remain distinct from broad fuzzy matchin
 
 React should provide headless primitives and hooks:
 
-- `DateInput.Root`
-- `DateInput.Field`
-- `DateInput.Candidates`
-- `DateInput.Calendar`
-- `useDateInput`
+- `Calchemy.Root`
+- `Calchemy.Field`
+- `Calchemy.Candidates`
+- `Calchemy.Calendar`
+- `useCalchemy`
 
-Inline autocomplete belongs in `DateInput.Field`. Pressing `Tab` should accept the active inline completion. `Candidates` and `Calendar` may be rendered inside popovers, but must not require a specific popover implementation.
+Inline autocomplete belongs in `Calchemy.Field`. Pressing `Tab` should accept the active inline completion. `Candidates` and `Calendar` may be rendered inside popovers, but must not require a specific popover implementation.
 
 ## Effect Usage
 
-Do not use `useEffect` to derive parser output, inline completion, candidates, calendar state, or form values from props/state. Calculate those during render or in `useDateInput`, and use event handlers for typing, `Tab` completion, candidate selection, and calendar clicks. Effects are appropriate only for external synchronization such as DOM focus/measurement, global event listeners, timers, or integrations with non-React popover/positioning code; those Effects must include cleanup.
+Do not use `useEffect` to derive parser output, inline completion, candidates, calendar state, or form values from props/state. Calculate those during render or in `useCalchemy`, and use event handlers for typing, `Tab` completion, candidate selection, and calendar clicks. Effects are appropriate only for external synchronization such as DOM focus/measurement, global event listeners, timers, or integrations with non-React popover/positioning code; those Effects must include cleanup.
 
 ## Styling
 
@@ -177,8 +177,8 @@ Do not require Tailwind CSS. Components should be unstyled and expose state thro
 Prefer simple public names:
 
 - `parseDate`
-- `DateInput`
-- `useDateInput`
+- `Calchemy`
+- `useCalchemy`
 - `DateValue`
 - `ParseDateResult`
 

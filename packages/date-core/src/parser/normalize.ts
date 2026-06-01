@@ -97,6 +97,7 @@ export function normalizeInput(input: string, lookups: DateVocabularyLookups = D
   const normalized = input
     .trim()
     .toLowerCase()
+    .replace(/[’]/g, "'")
     .replace(/\+/g, " plus ")
     .replace(/[–—]/g, "-")
     .replace(/\s+/g, " ");
@@ -106,6 +107,11 @@ export function normalizeInput(input: string, lookups: DateVocabularyLookups = D
   const corrected = tokens.map((token) => {
     if (token.kind !== "word") {
       return token.normalized;
+    }
+
+    const possessiveBase = stripKnownPossessive(token.normalized, lookups);
+    if (possessiveBase) {
+      return possessiveBase;
     }
 
     const alias = lookups.aliases.get(token.normalized);
@@ -155,6 +161,39 @@ function tokenize(input: string): Token[] {
       end: start + raw.length,
     };
   });
+}
+
+function stripKnownPossessive(value: string, lookups: DateVocabularyLookups): string | null {
+  const base = getPossessiveBase(value);
+  if (!base) {
+    return null;
+  }
+
+  return isKnownWord(base, lookups) ? base : null;
+}
+
+function getPossessiveBase(value: string): string | null {
+  if (value.endsWith("'s")) {
+    return value.slice(0, -2);
+  }
+
+  if (value.endsWith("'")) {
+    return value.slice(0, -1);
+  }
+
+  return null;
+}
+
+function isKnownWord(value: string, lookups: DateVocabularyLookups): boolean {
+  return (
+    GRAMMAR_WORDS.has(value) ||
+    lookups.aliases.has(value) ||
+    lookups.months.has(value) ||
+    lookups.weekdays.has(value) ||
+    lookups.durationUnits.has(value) ||
+    lookups.relatives.has(value as never) ||
+    lookups.fuzzyValues.includes(value)
+  );
 }
 
 function findFuzzyMatch(value: string, vocabulary: readonly string[]): string | null {

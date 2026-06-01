@@ -75,6 +75,7 @@ export type RecurrenceFrequencyVocabularyEntry = {
 export type NamedDatesVocabularyEntry = {
   value: string;
   shortcuts?: readonly string[];
+  isHoliday?: boolean;
   resolveDate(args: { year: number; context: ResolvedParseDateContext }): PlainDate | null;
 };
 
@@ -154,7 +155,7 @@ export type AmbiguityOption = {
 };
 
 export type ParseDateError = {
-  code: "empty-input" | "unsupported-expression" | "invalid-date" | "invalid-context";
+  code: "empty-input" | "unsupported-expression" | "invalid-date" | "invalid-context" | "unexpected-value-kind";
   message: string;
   token?: Token;
 };

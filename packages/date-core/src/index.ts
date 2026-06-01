@@ -5,6 +5,7 @@ export {
   type CreateCalchemyOptions,
 } from "./temporal/create";
 export { parseDateWithTemporal } from "./parser/parse";
+export { coerceExpectedDateValue, resolveExpectedDateValue, type ExpectedDateValue } from "./expected-value";
 export {
   assertDateValueJSON,
   fromFormValueWithTemporal,

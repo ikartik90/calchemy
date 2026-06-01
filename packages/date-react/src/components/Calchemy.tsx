@@ -1,27 +1,27 @@
 import { createContext, useContext } from "react";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
-import type { Calchemy, DateValue } from "@calchemy/date-core";
-import { useDateInput, type DateInputState, type UseDateInputOptions } from "../hooks/useDateInput";
+import type { DateValue } from "@calchemy/date-core";
+import { useCalchemy, type CalchemyState, type UseCalchemyOptions } from "../hooks/useCalchemy";
 
-const DateInputContext = createContext<DateInputState | null>(null);
+const CalchemyContext = createContext<CalchemyState | null>(null);
 
-export type DateInputRootProps = UseDateInputOptions & {
+export type CalchemyRootProps = UseCalchemyOptions & {
   children: ReactNode;
 };
 
-function Root(props: DateInputRootProps) {
+function Root(props: CalchemyRootProps) {
   const { children, ...options } = props;
-  const state = useDateInput(options);
+  const state = useCalchemy(options);
 
-  return <DateInputContext.Provider value={state}>{children}</DateInputContext.Provider>;
+  return <CalchemyContext.Provider value={state}>{children}</CalchemyContext.Provider>;
 }
 
-export type DateInputFieldProps = Omit<ComponentPropsWithoutRef<"input">, "value" | "onChange" | "onKeyDown"> & {
+export type CalchemyFieldProps = Omit<ComponentPropsWithoutRef<"input">, "value" | "onChange" | "onKeyDown"> & {
   renderInlineCompletion?: boolean;
 };
 
-function Field({ renderInlineCompletion = true, ...props }: DateInputFieldProps) {
-  const state = useDateInputContext();
+function Field({ renderInlineCompletion = true, ...props }: CalchemyFieldProps) {
+  const state = useCalchemyContext();
   const inputProps = state.getInputProps();
 
   return (
@@ -36,18 +36,26 @@ function Field({ renderInlineCompletion = true, ...props }: DateInputFieldProps)
   );
 }
 
-export type DateInputCandidatesProps = ComponentPropsWithoutRef<"div">;
+export type CalchemyCandidatesProps = ComponentPropsWithoutRef<"div">;
 
-function Candidates(props: DateInputCandidatesProps) {
-  const state = useDateInputContext();
+function Candidates(props: CalchemyCandidatesProps) {
+  const state = useCalchemyContext();
 
   if (state.result.status !== "ambiguous") {
     return null;
   }
 
+  const candidates = state.expectedValue
+    ? state.result.candidates.filter((candidate) => candidate.value.kind === state.expectedValue)
+    : state.result.candidates;
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
   return (
     <div {...props} data-calchemy-candidates="">
-      {state.result.candidates.map((candidate) => (
+      {candidates.map((candidate) => (
         <button
           type="button"
           key={candidate.id}
@@ -61,13 +69,18 @@ function Candidates(props: DateInputCandidatesProps) {
   );
 }
 
-export type DateInputCalendarProps = Omit<ComponentPropsWithoutRef<"div">, "onSelect"> & {
+export type CalchemyCalendarProps = Omit<ComponentPropsWithoutRef<"div">, "onSelect"> & {
   month?: DateValue;
 };
 
-function Calendar(props: DateInputCalendarProps) {
+function Calendar(props: CalchemyCalendarProps) {
   const { month: _month, ...divProps } = props;
-  const state = useDateInputContext();
+  const state = useCalchemyContext();
+
+  if (state.expectedValue && state.expectedValue !== "single") {
+    return null;
+  }
+
   const selected = state.value?.kind === "single" ? state.value.date : null;
   const baseDate =
     selected ??
@@ -97,21 +110,19 @@ function Calendar(props: DateInputCalendarProps) {
   );
 }
 
-export function useDateInputContext(): DateInputState {
-  const state = useContext(DateInputContext);
+export function useCalchemyContext(): CalchemyState {
+  const state = useContext(CalchemyContext);
 
   if (!state) {
-    throw new Error("DateInput components must be rendered inside DateInput.Root.");
+    throw new Error("Calchemy components must be rendered inside Calchemy.Root.");
   }
 
   return state;
 }
 
-export const DateInput = {
+export const Calchemy = {
   Root,
   Field,
   Candidates,
   Calendar,
 };
-
-export type { Calchemy };

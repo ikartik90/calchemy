@@ -1,4 +1,5 @@
-export { DateInput, useDateInputContext } from "./components/DateInput";
-export type { DateInputCandidatesProps, DateInputFieldProps, DateInputRootProps } from "./components/DateInput";
-export { useDateInput } from "./hooks/useDateInput";
-export type { DateInputState, UseDateInputOptions } from "./hooks/useDateInput";
+export { Calchemy, useCalchemyContext } from "./components/Calchemy";
+export type { CalchemyCalendarProps, CalchemyCandidatesProps, CalchemyFieldProps, CalchemyRootProps } from "./components/Calchemy";
+export { useCalchemy } from "./hooks/useCalchemy";
+export type { ExpectedDateValue } from "@calchemy/date-core";
+export type { CalchemyState, UseCalchemyOptions } from "./hooks/useCalchemy";

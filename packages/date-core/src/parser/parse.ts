@@ -1,4 +1,6 @@
 import { normalizeInput } from "./normalize";
+import { parseBareDateAnchor, parseDateAnchor, parseDateRangeAnchor } from "./strategies/anchors";
+import { parseMonthRange } from "./strategies/month";
 import { parseMonthDayNumberSelection } from "./strategies/month-day-selection";
 import { parseNamedDate } from "./strategies/named-date";
 import { parseNumericCandidates } from "./strategies/numeric";
@@ -141,9 +143,29 @@ function parseKnownExpression(
   Temporal: TemporalApi,
   lookups: DateVocabularyLookups,
 ): DateValue | null {
+  const exclusion = parseHolidayExclusion(input, anchorDate, context, Temporal, lookups);
+  if (exclusion) {
+    return exclusion;
+  }
+
+  const bareAnchor = parseBareDateAnchor(input, anchorDate, lookups);
+  if (bareAnchor) {
+    return { kind: "single", date: bareAnchor };
+  }
+
   const relative = parseRelativeExpression(input, anchorDate, context, lookups);
   if (relative) {
     return relative;
+  }
+
+  const dateAnchor = parseDateAnchor(input, anchorDate, Temporal, lookups, context);
+  if (dateAnchor) {
+    return { kind: "single", date: dateAnchor };
+  }
+
+  const dateRangeAnchor = parseDateRangeAnchor(input, anchorDate, Temporal, context, lookups);
+  if (dateRangeAnchor) {
+    return dateRangeAnchor;
   }
 
   const weekdaySelection = parseWeekdaySelectionBetween(input, anchorDate, Temporal, lookups, context);
@@ -176,6 +198,11 @@ function parseKnownExpression(
     return monthDayNumberSelection;
   }
 
+  const monthRange = parseMonthRange(input, anchorDate, Temporal);
+  if (monthRange) {
+    return monthRange;
+  }
+
   const quarterRange = parseQuarterRange(input, anchorDate, Temporal);
   if (quarterRange) {
     return quarterRange;
@@ -202,4 +229,38 @@ function parseKnownExpression(
   }
 
   return null;
+}
+
+// Applies trailing holiday exclusions to any parsed range expression.
+function parseHolidayExclusion(
+  input: string,
+  anchorDate: PlainDate,
+  context: ResolvedParseDateContext,
+  Temporal: TemporalApi,
+  lookups: DateVocabularyLookups,
+): DateValue | null {
+  const baseInput = input.replace(/\s+(?:excluding|skip) holidays$/, "");
+  if (baseInput === input) {
+    return null;
+  }
+
+  const baseValue = parseKnownExpression(baseInput, anchorDate, context, Temporal, lookups);
+  if (baseValue?.kind !== "range") {
+    return null;
+  }
+
+  return { kind: "multiple", dates: expandDatesBetween(baseValue.start, baseValue.end).filter((date) => !context.holidays?.includes(date)) };
+}
+
+// Expands every calendar date in an inclusive range.
+function expandDatesBetween(start: PlainDate, end: PlainDate): PlainDate[] {
+  const dates: PlainDate[] = [];
+  let cursor = start;
+
+  while (cursor.toString().localeCompare(end.toString()) <= 0) {
+    dates.push(cursor);
+    cursor = cursor.add({ days: 1 });
+  }
+
+  return dates;
 }

@@ -1,5 +1,5 @@
 import { endOfMonth, firstWeekdayAfter, firstWeekdayBefore, firstWeekdayOnOrAfter, startOfMonth } from "./date-math";
-import { parseDateAnchor } from "./anchors";
+import { parseDateAnchor, parseDateRangeAnchor } from "./anchors";
 import { parseOrdinal } from "./ordinal";
 import { parseQuarterRange } from "./quarter";
 import { parseRelativeModifierExpression } from "./relative";
@@ -171,6 +171,11 @@ function parseRangeExpression(
   const quarterRange = parseQuarterRange(input, anchorDate, Temporal);
   if (quarterRange?.kind === "range") {
     return quarterRange;
+  }
+
+  const dateRangeAnchor = parseDateRangeAnchor(input, anchorDate, Temporal, context, lookups);
+  if (dateRangeAnchor?.kind === "range") {
+    return dateRangeAnchor;
   }
 
   return parseWeekRange(input, anchorDate, Temporal);
