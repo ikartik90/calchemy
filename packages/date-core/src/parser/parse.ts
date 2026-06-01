@@ -245,11 +245,18 @@ function parseHolidayExclusion(
   }
 
   const baseValue = parseKnownExpression(baseInput, anchorDate, context, Temporal, lookups);
-  if (baseValue?.kind !== "range") {
-    return null;
+  if (baseValue?.kind === "range") {
+    return {
+      kind: "multiple",
+      dates: expandDatesBetween(baseValue.start, baseValue.end).filter((date) => !context.holidays?.includes(date)),
+    };
   }
 
-  return { kind: "multiple", dates: expandDatesBetween(baseValue.start, baseValue.end).filter((date) => !context.holidays?.includes(date)) };
+  if (baseValue?.kind === "multiple") {
+    return { kind: "multiple", dates: baseValue.dates.filter((date) => !context.holidays?.includes(date)) };
+  }
+
+  return null;
 }
 
 // Expands every calendar date in an inclusive range.

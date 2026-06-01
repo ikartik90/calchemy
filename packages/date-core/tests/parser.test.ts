@@ -375,6 +375,18 @@ describe("parseDate", () => {
     }
   });
 
+  test("selects weekdays in an ordinal week range and skips holidays", () => {
+    const result = calchemy.parseDate("tuesday and friday of the 52nd week excluding holidays", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: ["2026-12-22"],
+      });
+    }
+  });
+
   test("selects weekdays in a multiplier ordinal week range", () => {
     const result = calchemy.parseDate("tuesday and friday of the hundredth week", context);
 
