@@ -1,22 +1,9 @@
 import { normalizeInput } from "./normalize";
-import { parseBareDateAnchor, parseDateAnchor, parseDateRangeAnchor } from "./strategies/anchors";
-import { parseMonthRange } from "./strategies/month";
-import { parseMonthDayNumberSelection } from "./strategies/month-day-selection";
-import { parseNamedDate } from "./strategies/named-date";
-import { parseNumericCandidates } from "./strategies/numeric";
-import { parseQuarterRange } from "./strategies/quarter";
-import { parseRange } from "./strategies/range";
-import { parseRecurring } from "./strategies/recurring";
-import { parseRelativeExpression } from "./strategies/relative";
-import { createCandidate, labelDateValue } from "./strategies/shared";
-import {
-  parseWeekdayInMonthWithOffset,
-  parseWeekdayRelativeToAnchorWithOffset,
-  parseOrdinalWeekdayRelativeToAnchor,
-  parseWeekdaySelectionBetween,
-  parseWeekdaySelectionForRelativeRange,
-} from "./strategies/weekday-selection";
-import { parseWeekRange } from "./strategies/week";
+import { resolveDateSlice } from "./resolve";
+import { sliceDateExpression } from "./slice";
+import { standardizeChunks, type StandardChunk } from "./chunks";
+import { parseNumericCandidates } from "./primitives/numeric-date";
+import { createCandidate, labelDateValue } from "./primitives/shared";
 import { createDateVocabulary, createDateVocabularyLookups, type DateVocabularyLookups } from "./vocabulary";
 import type { PlainDate, TemporalApi } from "../temporal/types";
 import type {
@@ -43,6 +30,7 @@ export function parseDateWithTemporal(
   const vocabulary = createDateVocabulary(options.namedDatesVocabulary);
   const lookups = createDateVocabularyLookups(vocabulary);
   const normalized = normalizeInput(input, lookups);
+  const chunks = standardizeChunks(normalized.tokens, lookups);
   const source = {
     normalizedInput: normalized.normalized,
     tokens: normalized.tokens,
@@ -93,7 +81,7 @@ export function parseDateWithTemporal(
     };
   }
 
-  const value = parseKnownExpression(normalized.normalized, anchorDate, resolved, Temporal, lookups);
+  const value = parseKnownExpression(normalized.normalized, anchorDate, resolved, Temporal, lookups, chunks);
 
   if (!value) {
     return {
@@ -142,132 +130,8 @@ function parseKnownExpression(
   context: ResolvedParseDateContext,
   Temporal: TemporalApi,
   lookups: DateVocabularyLookups,
+  chunks: readonly StandardChunk[] = [],
 ): DateValue | null {
-  const exclusion = parseHolidayExclusion(input, anchorDate, context, Temporal, lookups);
-  if (exclusion) {
-    return exclusion;
-  }
-
-  const bareAnchor = parseBareDateAnchor(input, anchorDate, lookups);
-  if (bareAnchor) {
-    return { kind: "single", date: bareAnchor };
-  }
-
-  const relative = parseRelativeExpression(input, anchorDate, context, lookups);
-  if (relative) {
-    return relative;
-  }
-
-  const dateAnchor = parseDateAnchor(input, anchorDate, Temporal, lookups, context);
-  if (dateAnchor) {
-    return { kind: "single", date: dateAnchor };
-  }
-
-  const dateRangeAnchor = parseDateRangeAnchor(input, anchorDate, Temporal, context, lookups);
-  if (dateRangeAnchor) {
-    return dateRangeAnchor;
-  }
-
-  const weekdaySelection = parseWeekdaySelectionBetween(input, anchorDate, Temporal, lookups, context);
-  if (weekdaySelection) {
-    return weekdaySelection;
-  }
-
-  const weekdayInMonth = parseWeekdayInMonthWithOffset(input, anchorDate, lookups);
-  if (weekdayInMonth) {
-    return weekdayInMonth;
-  }
-
-  const weekdayRelativeToAnchor = parseWeekdayRelativeToAnchorWithOffset(input, anchorDate, Temporal, lookups, context);
-  if (weekdayRelativeToAnchor) {
-    return weekdayRelativeToAnchor;
-  }
-
-  const weekdaySelectionForRange = parseWeekdaySelectionForRelativeRange(input, anchorDate, Temporal, lookups, context);
-  if (weekdaySelectionForRange) {
-    return weekdaySelectionForRange;
-  }
-
-  const ordinalWeekday = parseOrdinalWeekdayRelativeToAnchor(input, anchorDate, Temporal, lookups, context);
-  if (ordinalWeekday) {
-    return ordinalWeekday;
-  }
-
-  const monthDayNumberSelection = parseMonthDayNumberSelection(input, anchorDate, Temporal, lookups, context);
-  if (monthDayNumberSelection) {
-    return monthDayNumberSelection;
-  }
-
-  const monthRange = parseMonthRange(input, anchorDate, Temporal);
-  if (monthRange) {
-    return monthRange;
-  }
-
-  const quarterRange = parseQuarterRange(input, anchorDate, Temporal);
-  if (quarterRange) {
-    return quarterRange;
-  }
-
-  const weekRange = parseWeekRange(input, anchorDate, Temporal);
-  if (weekRange) {
-    return weekRange;
-  }
-
-  const range = parseRange(input, anchorDate, Temporal, lookups, context);
-  if (range) {
-    return range;
-  }
-
-  const recurring = parseRecurring(input, anchorDate, context, lookups);
-  if (recurring) {
-    return recurring;
-  }
-
-  const date = parseNamedDate(input, anchorDate.year, Temporal, lookups, context);
-  if (date) {
-    return { kind: "single", date };
-  }
-
-  return null;
-}
-
-// Applies trailing holiday exclusions to any parsed range expression.
-function parseHolidayExclusion(
-  input: string,
-  anchorDate: PlainDate,
-  context: ResolvedParseDateContext,
-  Temporal: TemporalApi,
-  lookups: DateVocabularyLookups,
-): DateValue | null {
-  const baseInput = input.replace(/\s+(?:excluding|skip) holidays$/, "");
-  if (baseInput === input) {
-    return null;
-  }
-
-  const baseValue = parseKnownExpression(baseInput, anchorDate, context, Temporal, lookups);
-  if (baseValue?.kind === "range") {
-    return {
-      kind: "multiple",
-      dates: expandDatesBetween(baseValue.start, baseValue.end).filter((date) => !context.holidays?.includes(date)),
-    };
-  }
-
-  if (baseValue?.kind === "multiple") {
-    return { kind: "multiple", dates: baseValue.dates.filter((date) => !context.holidays?.includes(date)) };
-  }
-
-  return null;
-}
-
-// Expands every calendar date in an inclusive range.
-function expandDatesBetween(start: PlainDate, end: PlainDate): PlainDate[] {
-  const dates: PlainDate[] = [];
-  let cursor = start;
-
-  while (cursor.toString().localeCompare(end.toString()) <= 0) {
-    dates.push(cursor);
-    cursor = cursor.add({ days: 1 });
-  }
-
-  return dates;
+  const slice = sliceDateExpression(input, chunks, lookups);
+  return resolveDateSlice(slice, anchorDate, Temporal, context, lookups);
 }

@@ -1,4 +1,4 @@
-import { endOfMonth, startOfMonth } from "./date-math";
+import { endOfMonth, startOfMonth } from "../primitives/date-math";
 import type { PlainDate, TemporalApi } from "../../temporal/types";
 import type { DateValue, ResolvedParseDateContext } from "../../types";
 import type { DateVocabularyLookups } from "../vocabulary";

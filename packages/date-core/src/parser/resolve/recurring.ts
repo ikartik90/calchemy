@@ -1,5 +1,5 @@
-import { endOfNextMonth, firstWeekdayAfter, startOfNextWeek } from "./date-math";
-import { comparePlainDate } from "./shared";
+import { endOfNextMonth, firstWeekdayAfter, startOfNextWeek } from "../primitives/date-math";
+import { comparePlainDate } from "../primitives/shared";
 import type { PlainDate } from "../../temporal/types";
 import type { DateValue, ResolvedParseDateContext } from "../../types";
 import type { DateVocabularyLookups } from "../vocabulary";

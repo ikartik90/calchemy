@@ -1,6 +1,6 @@
-import { endOfMonth, expandTwoDigitYear } from "./date-math";
-import { parseOrdinal } from "./ordinal";
-import { parseAmount } from "./shared";
+import { endOfMonth, expandTwoDigitYear } from "../primitives/date-math";
+import { parseOrdinal } from "../primitives/ordinals";
+import { parseAmount } from "../primitives/shared";
 import type { PlainDate, TemporalApi } from "../../temporal/types";
 import type { DateValue } from "../../types";
 

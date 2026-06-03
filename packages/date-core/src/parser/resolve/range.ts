@@ -1,4 +1,8 @@
-import { parseDateAnchor } from "./anchors";
+import { parseDateAnchor, parseDateRangeAnchor } from "./anchors";
+import { parseMonthRange } from "./month";
+import { parseQuarterRange } from "./quarter";
+import { parseRelativeModifierExpression } from "./relative";
+import { parseWeekRange } from "./week";
 import type { PlainDate, TemporalApi } from "../../temporal/types";
 import type { DateValue, ResolvedParseDateContext } from "../../types";
 import type { DateVocabularyLookups } from "../vocabulary";
@@ -22,14 +26,51 @@ export function parseRange(
     return null;
   }
 
-  const start = parseDateAnchor(startInput.trim(), anchorDate, Temporal, lookups, context);
-  const end = parseDateAnchor(endInput.trim(), anchorDate, Temporal, lookups, context);
+  const start = parseRangeEndpoint(startInput.trim(), "start", anchorDate, Temporal, lookups, context);
+  const end = parseRangeEndpoint(endInput.trim(), "end", anchorDate, Temporal, lookups, context);
 
   if (!start || !end) {
     return null;
   }
 
   return { kind: "range", start, end };
+}
+
+function parseRangeEndpoint(
+  input: string,
+  boundary: "start" | "end",
+  anchorDate: PlainDate,
+  Temporal: TemporalApi,
+  lookups: DateVocabularyLookups,
+  context: ResolvedParseDateContext,
+): PlainDate | null {
+  const single = parseDateAnchor(input, anchorDate, Temporal, lookups, context);
+  if (single) {
+    return single;
+  }
+
+  const range = parseRangeEndpointValue(input, anchorDate, Temporal, lookups, context);
+  if (range?.kind !== "range") {
+    return null;
+  }
+
+  return boundary === "start" ? range.start : range.end;
+}
+
+function parseRangeEndpointValue(
+  input: string,
+  anchorDate: PlainDate,
+  Temporal: TemporalApi,
+  lookups: DateVocabularyLookups,
+  context: ResolvedParseDateContext,
+): DateValue | null {
+  return (
+    parseRelativeModifierExpression(input, anchorDate, context, lookups) ??
+    parseDateRangeAnchor(input, anchorDate, Temporal, context, lookups) ??
+    parseMonthRange(input, anchorDate, Temporal) ??
+    parseQuarterRange(input, anchorDate, Temporal) ??
+    parseWeekRange(input, anchorDate, Temporal)
+  );
 }
 
 // Splits a range into endpoint phrases without splitting inside numeric dates.

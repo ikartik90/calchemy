@@ -8,8 +8,8 @@ import {
   startOfMonth,
   startOfWeek,
   startOfYear,
-} from "./date-math";
-import { comparePlainDate, parseAmount, toDuration } from "./shared";
+} from "../primitives/date-math";
+import { comparePlainDate, parseAmount, toDuration } from "../primitives/shared";
 import type { PlainDate } from "../../temporal/types";
 import type { DateValue, DurationUnit, ResolvedParseDateContext } from "../../types";
 import type { DateVocabularyLookups } from "../vocabulary";

@@ -1,9 +1,9 @@
-import { endOfMonth, firstWeekdayAfter, firstWeekdayBefore, firstWeekdayOnOrAfter, startOfMonth } from "./date-math";
+import { endOfMonth, firstWeekdayAfter, firstWeekdayBefore, firstWeekdayOnOrAfter, startOfMonth } from "../primitives/date-math";
 import { parseDateAnchor, parseDateRangeAnchor } from "./anchors";
-import { parseOrdinal } from "./ordinal";
+import { parseOrdinal } from "../primitives/ordinals";
 import { parseQuarterRange } from "./quarter";
 import { parseRelativeModifierExpression } from "./relative";
-import { comparePlainDate, parseAmount, toDuration } from "./shared";
+import { comparePlainDate, parseAmount, toDuration } from "../primitives/shared";
 import { parseWeekRange } from "./week";
 import type { PlainDate, TemporalApi } from "../../temporal/types";
 import type { DateValue, ResolvedParseDateContext } from "../../types";
@@ -47,7 +47,7 @@ export function parseWeekdaySelectionForRelativeRange(
   lookups: DateVocabularyLookups,
   context: ResolvedParseDateContext,
 ): DateValue | null {
-  const match = /^(?:(select|all|alternate|every other) )?(.+?) (?:for|during|in|from|of) (?:the )?(.+)$/.exec(input);
+  const match = /^(?:(select|all|alternate|every other|every) )?(.+?) (?:for|during|in|from|of) (?:the )?(.+)$/.exec(input);
   if (!match?.[1] || !match[2] || !match[3]) {
     if (!match?.[2] || !match[3]) {
       return null;
@@ -55,14 +55,37 @@ export function parseWeekdaySelectionForRelativeRange(
   }
 
   const interval = match[1] === "alternate" || match[1] === "every other" ? 2 : 1;
-  const weekdays = parseWeekdayList(match[2], lookups);
-  const range = parseRangeExpression(match[3], anchorDate, Temporal, context, lookups);
+  const dayUnit = lookups.durationUnits.get(match[2]);
+  if (dayUnit === "day") {
+    const value = parseRangeOrMultipleExpression(match[3], anchorDate, Temporal, context, lookups);
+    const dates =
+      value?.kind === "range" ? expandDatesBetween(value.start, value.end) : value?.kind === "multiple" ? value.dates : [];
 
-  if (weekdays.length === 0 || range?.kind !== "range") {
+    return dates.length > 0 ? { kind: "multiple", dates: selectEveryNthDate(dates, interval) } : null;
+  }
+
+  const weekdays = parseWeekdayList(match[2], lookups);
+  const value = parseRangeOrMultipleExpression(match[3], anchorDate, Temporal, context, lookups);
+
+  if (weekdays.length === 0) {
     return null;
   }
 
-  return { kind: "multiple", dates: expandWeekdaysBetween(range.start, range.end, weekdays, interval) };
+  if (value?.kind === "range") {
+    return { kind: "multiple", dates: expandWeekdaysBetween(value.start, value.end, weekdays, interval) };
+  }
+
+  if (value?.kind === "multiple") {
+    return {
+      kind: "multiple",
+      dates: selectEveryNthDate(
+        value.dates.filter((date) => weekdays.includes(date.dayOfWeek)),
+        interval,
+      ),
+    };
+  }
+
+  return null;
 }
 
 // Parses phrases such as "next monday in march plus two weeks".
@@ -163,6 +186,17 @@ function parseRangeExpression(
   context: ResolvedParseDateContext,
   lookups: DateVocabularyLookups,
 ): DateValue | null {
+  const value = parseRangeOrMultipleExpression(input, anchorDate, Temporal, context, lookups);
+  return value?.kind === "range" ? value : null;
+}
+
+function parseRangeOrMultipleExpression(
+  input: string,
+  anchorDate: PlainDate,
+  Temporal: TemporalApi,
+  context: ResolvedParseDateContext,
+  lookups: DateVocabularyLookups,
+): DateValue | null {
   const relativeRange = parseRelativeModifierExpression(input, anchorDate, context, lookups);
   if (relativeRange?.kind === "range") {
     return relativeRange;
@@ -174,7 +208,7 @@ function parseRangeExpression(
   }
 
   const dateRangeAnchor = parseDateRangeAnchor(input, anchorDate, Temporal, context, lookups);
-  if (dateRangeAnchor?.kind === "range") {
+  if (dateRangeAnchor?.kind === "range" || dateRangeAnchor?.kind === "multiple") {
     return dateRangeAnchor;
   }
 
@@ -265,6 +299,24 @@ function parseWeekdayList(input: string, lookups: DateVocabularyLookups): number
   }
 
   return Array.from(new Set(weekdays as number[]));
+}
+
+// Selects every nth date from an already ordered set of dates.
+function selectEveryNthDate(dates: readonly PlainDate[], interval: number): PlainDate[] {
+  return dates.filter((_, index) => index % interval === 0);
+}
+
+// Expands every calendar date in an inclusive range.
+function expandDatesBetween(start: PlainDate, end: PlainDate): PlainDate[] {
+  const dates: PlainDate[] = [];
+  let cursor = start;
+
+  while (comparePlainDate(cursor, end) <= 0) {
+    dates.push(cursor);
+    cursor = cursor.add({ days: 1 });
+  }
+
+  return dates;
 }
 
 // Expands matching weekdays between two dates, optionally skipping alternates.

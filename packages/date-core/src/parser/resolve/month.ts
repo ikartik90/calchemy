@@ -1,5 +1,5 @@
-import { endOfMonth } from "./date-math";
-import { expandTwoDigitYear } from "./date-math";
+import { endOfMonth } from "../primitives/date-math";
+import { expandTwoDigitYear } from "../primitives/date-math";
 import type { PlainDate, TemporalApi } from "../../temporal/types";
 import type { DateValue } from "../../types";
 

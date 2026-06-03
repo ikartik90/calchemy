@@ -18,24 +18,49 @@ export function parseNamedDate(
     return namedDate;
   }
 
-  const monthMatch = /^([a-z]+) (\d{1,2})(?: (\d{2,4}))?$/.exec(compact);
-  if (monthMatch?.[1] && monthMatch[2]) {
-    const month = lookups.months.get(monthMatch[1]);
-    const day = Number(monthMatch[2]);
-    const year = monthMatch[3] ? expandTwoDigitYear(Number(monthMatch[3]), anchorYear) : anchorYear;
+  return parseMonthNameDate(compact, anchorYear, Temporal, lookups);
+}
 
-    if (!month) {
-      return null;
-    }
+function parseMonthNameDate(
+  input: string,
+  anchorYear: number,
+  Temporal: TemporalApi,
+  lookups: DateVocabularyLookups,
+): PlainDate | null {
+  const monthFirst = /^([a-z]+) (\d{1,2})(?: (\d{2,4}))?$/.exec(input);
+  if (monthFirst?.[1] && monthFirst[2]) {
+    return createMonthNameDate(monthFirst[1], monthFirst[2], monthFirst[3], anchorYear, Temporal, lookups);
+  }
 
-    try {
-      return Temporal.PlainDate.from({ year, month, day });
-    } catch {
-      return null;
-    }
+  const dayFirst = /^(\d{1,2}) ([a-z]+)(?: (\d{2,4}))?$/.exec(input);
+  if (dayFirst?.[1] && dayFirst[2]) {
+    return createMonthNameDate(dayFirst[2], dayFirst[1], dayFirst[3], anchorYear, Temporal, lookups);
   }
 
   return null;
+}
+
+function createMonthNameDate(
+  monthInput: string,
+  dayInput: string,
+  yearInput: string | undefined,
+  anchorYear: number,
+  Temporal: TemporalApi,
+  lookups: DateVocabularyLookups,
+): PlainDate | null {
+  const month = lookups.months.get(monthInput);
+  if (!month) {
+    return null;
+  }
+
+  const day = Number(dayInput);
+  const year = yearInput ? expandTwoDigitYear(Number(yearInput), anchorYear) : anchorYear;
+
+  try {
+    return Temporal.PlainDate.from({ year, month, day }, { overflow: "reject" });
+  } catch {
+    return null;
+  }
 }
 
 // Resolves caller-provided named-date vocabulary, including explicit and relative years.

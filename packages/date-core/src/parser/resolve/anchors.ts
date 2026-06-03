@@ -1,10 +1,10 @@
-import { firstWeekdayOnOrAfter } from "./date-math";
-import { parseNamedDate } from "./named-date";
-import { parseNumericCandidates } from "./numeric";
-import { parseOrdinal } from "./ordinal";
+import { firstWeekdayOnOrAfter } from "../primitives/date-math";
+import { parseNamedDate } from "../primitives/named-date";
+import { parseNumericCandidates } from "../primitives/numeric-date";
+import { parseOrdinal } from "../primitives/ordinals";
 import { parseQuarterRange } from "./quarter";
 import { parseRelativeModifierExpression } from "./relative";
-import { comparePlainDate } from "./shared";
+import { comparePlainDate } from "../primitives/shared";
 import type { PlainDate, TemporalApi } from "../../temporal/types";
 import type { DateValue, ResolvedParseDateContext } from "../../types";
 import type { DateVocabularyLookups } from "../vocabulary";
@@ -69,6 +69,11 @@ export function parseDateRangeAnchor(
   context: ResolvedParseDateContext,
   lookups: DateVocabularyLookups,
 ): DateValue | null {
+  const ordinalCalendarUnitSpanInRange = parseOrdinalCalendarUnitSpanInRangeAnchor(input, anchorDate, Temporal, context, lookups);
+  if (ordinalCalendarUnitSpanInRange) {
+    return ordinalCalendarUnitSpanInRange;
+  }
+
   const ordinalCalendarUnitInRange = parseOrdinalCalendarUnitInRangeAnchor(input, anchorDate, Temporal, context, lookups);
   if (ordinalCalendarUnitInRange) {
     return ordinalCalendarUnitInRange;
@@ -77,6 +82,68 @@ export function parseDateRangeAnchor(
   const ordinalDayGroupInRange = parseOrdinalDayGroupInRangeAnchor(input, anchorDate, Temporal, context, lookups);
   if (ordinalDayGroupInRange) {
     return ordinalDayGroupInRange;
+  }
+
+  return null;
+}
+
+// Parses spans such as "between 50th and 52nd week this year".
+function parseOrdinalCalendarUnitSpanInRangeAnchor(
+  input: string,
+  anchorDate: PlainDate,
+  Temporal: TemporalApi,
+  context: ResolvedParseDateContext,
+  lookups: DateVocabularyLookups,
+): DateValue | null {
+  const parts = parseOrdinalCalendarUnitSpanInRangeParts(input, lookups);
+  if (!parts) {
+    return null;
+  }
+
+  const range = parseAnchorRange(parts.rangeInput, anchorDate, Temporal, context, lookups);
+  const startOrdinal = parseOrdinal(parts.startOrdinalInput);
+  const endOrdinal = parseOrdinal(parts.endOrdinalInput);
+  if (range?.kind !== "range" || !startOrdinal || !endOrdinal || startOrdinal > endOrdinal) {
+    return null;
+  }
+
+  const startRange = selectOrdinalCalendarUnitRange(range, parts.unit, startOrdinal);
+  const endRange = selectOrdinalCalendarUnitRange(range, parts.unit, endOrdinal);
+  return startRange?.kind === "range" && endRange?.kind === "range"
+    ? { kind: "range", start: startRange.start, end: endRange.end }
+    : null;
+}
+
+// Splits shared-unit ordinal spans into start ordinal, end ordinal, unit, and range text.
+function parseOrdinalCalendarUnitSpanInRangeParts(
+  input: string,
+  lookups: DateVocabularyLookups,
+): { startOrdinalInput: string; endOrdinalInput: string; unit: "week" | "month"; rangeInput: string } | null {
+  const parseUnit = (unitInput: string | undefined) => {
+    const unit = unitInput ? lookups.durationUnits.get(unitInput) : undefined;
+    return unit === "week" || unit === "month" ? unit : null;
+  };
+
+  const postfixMatch = /^between (.+) and (.+) ([a-z]+) (?:of|in) (?:the )?(.+)$/.exec(input);
+  const postfixUnit = parseUnit(postfixMatch?.[3]);
+  if (postfixMatch?.[1] && postfixMatch[2] && postfixUnit && postfixMatch[4]) {
+    return {
+      startOrdinalInput: postfixMatch[1],
+      endOrdinalInput: postfixMatch[2],
+      unit: postfixUnit,
+      rangeInput: postfixMatch[4],
+    };
+  }
+
+  const barePostfixMatch = /^between (.+) and (.+) ([a-z]+) ((?:this|next|upcoming|future|last|previous|past) [a-z]+)$/.exec(input);
+  const barePostfixUnit = parseUnit(barePostfixMatch?.[3]);
+  if (barePostfixMatch?.[1] && barePostfixMatch[2] && barePostfixUnit && barePostfixMatch[4]) {
+    return {
+      startOrdinalInput: barePostfixMatch[1],
+      endOrdinalInput: barePostfixMatch[2],
+      unit: barePostfixUnit,
+      rangeInput: barePostfixMatch[4],
+    };
   }
 
   return null;
@@ -95,13 +162,38 @@ function parseOrdinalCalendarUnitInRangeAnchor(
     return null;
   }
 
-  const ordinal = parseOrdinal(parts.ordinalInput);
   const range = parseAnchorRange(parts.rangeInput, anchorDate, Temporal, context, lookups);
-  if (!ordinal || range?.kind !== "range") {
+  if (range?.kind !== "range") {
     return null;
   }
 
-  return selectOrdinalCalendarUnitRange(range, parts.unit, ordinal);
+  const ordinal = parseOrdinal(parts.ordinalInput);
+  if (ordinal) {
+    return selectOrdinalCalendarUnitRange(range, parts.unit, ordinal);
+  }
+
+  const ordinals = parseOrdinalList(parts.ordinalInput);
+  if (ordinals.length === 0) {
+    return null;
+  }
+
+  const selectedRanges = ordinals
+    .map((value) => selectOrdinalCalendarUnitRange(range, parts.unit, value))
+    .filter((value): value is Extract<DateValue, { kind: "range" }> => value?.kind === "range");
+
+  if (selectedRanges.length !== ordinals.length) {
+    return null;
+  }
+
+  if (areContiguousRanges(selectedRanges)) {
+    const firstRange = selectedRanges[0];
+    const lastRange = selectedRanges.at(-1);
+    return firstRange && lastRange ? { kind: "range", start: firstRange.start, end: lastRange.end } : null;
+  }
+
+  const dates = selectedRanges.flatMap((selectedRange) => expandDatesBetween(selectedRange.start, selectedRange.end));
+
+  return dates.length > 0 ? { kind: "multiple", dates } : null;
 }
 
 // Splits ordinal calendar-unit-in-range phrases into ordinal, unit, and range text.
@@ -148,6 +240,42 @@ function selectOrdinalCalendarUnitRange(
   }
 
   return { kind: "range", start, end: comparePlainDate(end, range.end) <= 0 ? end : range.end };
+}
+
+// Returns whether ranges form one continuous interval in their listed order.
+function areContiguousRanges(ranges: readonly Extract<DateValue, { kind: "range" }>[]): boolean {
+  return ranges.every((range, index) => {
+    const previousRange = ranges[index - 1];
+    return !previousRange || range.start.equals(previousRange.end.add({ days: 1 }));
+  });
+}
+
+// Parses ordinal lists such as "51st and 52nd" into separate ordinal values.
+function parseOrdinalList(input: string): number[] {
+  const values = input
+    .split(/\s+(?:and|or)\s+|,\s*/)
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map((value) => parseOrdinal(value));
+
+  if (values.length < 2 || values.some((value) => value === null)) {
+    return [];
+  }
+
+  return Array.from(new Set(values as number[]));
+}
+
+// Expands every calendar date in an inclusive range.
+function expandDatesBetween(start: PlainDate, end: PlainDate): PlainDate[] {
+  const dates: PlainDate[] = [];
+  let cursor = start;
+
+  while (comparePlainDate(cursor, end) <= 0) {
+    dates.push(cursor);
+    cursor = cursor.add({ days: 1 });
+  }
+
+  return dates;
 }
 
 // Parses phrases such as "tomorrow next month" by projecting one date anchor into a relative range.

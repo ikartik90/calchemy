@@ -1,7 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { describe, expect, test } from "vitest";
-import { parseOrdinal } from "../src/parser/strategies/ordinal";
-import { parseAmount } from "../src/parser/strategies/shared";
+import { parseOrdinal } from "../src/parser/primitives/ordinals";
+import { parseAmount } from "../src/parser/primitives/shared";
 import { createCalchemyWithTemporal, isDateValueJSON, resolveExpectedDateValue } from "../src";
 import type { CompletionSource, DateValueJSON, HolidayProvider, NamedDatesVocabularyEntry, ParseDateContext } from "../src";
 
@@ -10,7 +10,7 @@ const holidays: HolidayProvider = {
   id: "test",
   label: "Test holidays",
   includes(date) {
-    return date.toString() === "2026-06-06" || date.toString() === "2026-12-25";
+    return date.toString() === "2026-05-18" || date.toString() === "2026-06-06" || date.toString() === "2026-12-25";
   },
 };
 const namedDatesVocabulary = [
@@ -69,12 +69,16 @@ describe("parseDate", () => {
     ["upcoming 10 days", { kind: "range", start: "2026-05-27", end: "2026-06-05" }],
     ["next 10 days", { kind: "range", start: "2026-05-27", end: "2026-06-05" }],
     ["future 2 weeks", { kind: "range", start: "2026-05-27", end: "2026-06-09" }],
+    ["12 weeks from 3/6/26", { kind: "range", start: "2026-06-03", end: "2026-08-26" }],
+    ["12 weeks from 6 mar, 27", { kind: "range", start: "2027-03-06", end: "2027-05-29" }],
     ["first 10 days of next month", { kind: "range", start: "2026-06-01", end: "2026-06-10" }],
     ["last 20 days of the next month", { kind: "range", start: "2026-06-11", end: "2026-06-30" }],
     ["first ten days in next year", { kind: "range", start: "2027-01-01", end: "2027-01-10" }],
     ["third weekend of the next month", { kind: "range", start: "2026-06-20", end: "2026-06-21" }],
     ["third week last quarter", { kind: "range", start: "2026-01-15", end: "2026-01-21" }],
     ["third week of last quarter", { kind: "range", start: "2026-01-15", end: "2026-01-21" }],
+    ["51st and 52nd week this year", { kind: "range", start: "2026-12-17", end: "2026-12-30" }],
+    ["between 50th and 52nd week this year", { kind: "range", start: "2026-12-10", end: "2026-12-30" }],
     ["Christmas 2026-Jul 1, 27", { kind: "range", start: "2026-12-25", end: "2027-07-01" }],
     ["from christmas to 7/1/2027", { kind: "range", start: "2026-12-25", end: "2027-01-07" }],
     ["from christmas to 7-1-2027", { kind: "range", start: "2026-12-25", end: "2027-01-07" }],
@@ -98,6 +102,9 @@ describe("parseDate", () => {
     ["m12 next year", { kind: "range", start: "2027-12-01", end: "2027-12-31" }],
     ["W3 22", { kind: "range", start: "2022-01-17", end: "2022-01-23" }],
     ["w52 next year", { kind: "range", start: "2027-12-27", end: "2028-01-02" }],
+    ["w48-w52", { kind: "range", start: "2026-11-23", end: "2026-12-27" }],
+    ["m8-m12", { kind: "range", start: "2026-08-01", end: "2026-12-31" }],
+    ["q1-q3", { kind: "range", start: "2026-01-01", end: "2026-09-30" }],
     ["Q3 27", { kind: "range", start: "2027-07-01", end: "2027-09-30" }],
     ["next monday in march plus two weeks", { kind: "single", date: "2027-03-15" }],
     ["next monday in march + two weeks", { kind: "single", date: "2027-03-15" }],
@@ -125,6 +132,14 @@ describe("parseDate", () => {
     ["the tuesday after second weekend of next month", { kind: "single", date: "2026-06-16" }],
     ["jul 1", { kind: "single", date: "2026-07-01" }],
     ["jan 5", { kind: "single", date: "2026-01-05" }],
+    ["6 mar, 27", { kind: "single", date: "2027-03-06" }],
+    ["06 mar, 2027", { kind: "single", date: "2027-03-06" }],
+    ["6 mar 27", { kind: "single", date: "2027-03-06" }],
+    ["06 mar 2027", { kind: "single", date: "2027-03-06" }],
+    ["mar 6, 27", { kind: "single", date: "2027-03-06" }],
+    ["mar 06, 2027", { kind: "single", date: "2027-03-06" }],
+    ["mar 6 27", { kind: "single", date: "2027-03-06" }],
+    ["mar 06 2027", { kind: "single", date: "2027-03-06" }],
     ["christmas this year", { kind: "single", date: "2026-12-25" }],
     ["easter next year", { kind: "single", date: "2027-03-28" }],
   ] satisfies Array<[string, DateValueJSON]>)("parses %s", (input, expected) => {
@@ -375,6 +390,18 @@ describe("parseDate", () => {
     }
   });
 
+  test("samples even weekday occurrences across shorthand month boundaries and excludes holidays", () => {
+    const result = calchemy.parseDate("even mondays from m3 to m5 excluding holidays", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: ["2026-03-09", "2026-03-23", "2026-04-06", "2026-04-20", "2026-05-04"],
+      });
+    }
+  });
+
   test("selects weekdays in an ordinal week range and skips holidays", () => {
     const result = calchemy.parseDate("tuesday and friday of the 52nd week excluding holidays", context);
 
@@ -460,6 +487,42 @@ describe("parseDate", () => {
           "2026-08-10",
           "2026-08-24",
         ],
+      });
+    }
+  });
+
+  test("selects alternate days for multiple ordinal week ranges", () => {
+    const result = calchemy.parseDate("every other day of 51st and 52nd week this year", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: [
+          "2026-12-17",
+          "2026-12-19",
+          "2026-12-21",
+          "2026-12-23",
+          "2026-12-25",
+          "2026-12-27",
+          "2026-12-29",
+        ],
+      });
+    }
+  });
+
+  test.each([
+    ["every tuesdays of 51st and 52nd week this year"],
+    ["all tuesdays of 51st and 52nd week this year"],
+    ["tuesdays of 51st and 52nd week this year"],
+  ])("selects weekdays for multiple ordinal week ranges: %s", (input) => {
+    const result = calchemy.parseDate(input, context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: ["2026-12-22", "2026-12-29"],
       });
     }
   });
@@ -550,6 +613,166 @@ describe("parseDate", () => {
     }
   });
 
+  test("returns weekdays for week ranges excluding weekends", () => {
+    const result = calchemy.parseDate("52nd week next year excluding weekends", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: ["2027-12-24", "2027-12-27", "2027-12-28", "2027-12-29", "2027-12-30"],
+      });
+    }
+  });
+
+  test("returns weekdays for multiple ordinal week ranges excluding weekends", () => {
+    const result = calchemy.parseDate("51st and 52nd week next year excluding weekends", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: [
+          "2027-12-17",
+          "2027-12-20",
+          "2027-12-21",
+          "2027-12-22",
+          "2027-12-23",
+          "2027-12-24",
+          "2027-12-27",
+          "2027-12-28",
+          "2027-12-29",
+          "2027-12-30",
+        ],
+      });
+    }
+  });
+
+  test("returns weekdays for multiple ordinal week ranges excluding weekends and holidays", () => {
+    const result = calchemy.parseDate("51st and 52nd week this year excluding weekends and holidays", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: [
+          "2026-12-17",
+          "2026-12-18",
+          "2026-12-21",
+          "2026-12-22",
+          "2026-12-23",
+          "2026-12-24",
+          "2026-12-28",
+          "2026-12-29",
+          "2026-12-30",
+        ],
+      });
+    }
+  });
+
+  test("returns weekdays for multiple shorthand week ranges excluding weekends", () => {
+    const result = calchemy.parseDate("w51 and w52 next year excluding weekends", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: [
+          "2027-12-20",
+          "2027-12-21",
+          "2027-12-22",
+          "2027-12-23",
+          "2027-12-24",
+          "2027-12-27",
+          "2027-12-28",
+          "2027-12-29",
+          "2027-12-30",
+          "2027-12-31",
+        ],
+      });
+    }
+  });
+
+  test("composes shorthand month ranges with month exclusions", () => {
+    const result = calchemy.parseDate("m3 and m4 next year excluding april", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: [
+          "2027-03-01",
+          "2027-03-02",
+          "2027-03-03",
+          "2027-03-04",
+          "2027-03-05",
+          "2027-03-06",
+          "2027-03-07",
+          "2027-03-08",
+          "2027-03-09",
+          "2027-03-10",
+          "2027-03-11",
+          "2027-03-12",
+          "2027-03-13",
+          "2027-03-14",
+          "2027-03-15",
+          "2027-03-16",
+          "2027-03-17",
+          "2027-03-18",
+          "2027-03-19",
+          "2027-03-20",
+          "2027-03-21",
+          "2027-03-22",
+          "2027-03-23",
+          "2027-03-24",
+          "2027-03-25",
+          "2027-03-26",
+          "2027-03-27",
+          "2027-03-28",
+          "2027-03-29",
+          "2027-03-30",
+          "2027-03-31",
+        ],
+      });
+    }
+  });
+
+  test("composes ordinal month ranges with weekend exclusions", () => {
+    const result = calchemy.parseDate("third and fourth month next year excluding weekends", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      const value = calchemy.toJSON(result.value);
+      expect(value.kind).toBe("multiple");
+      if (value.kind === "multiple") {
+        expect(value.dates[0]).toBe("2027-03-01");
+        expect(value.dates.at(-1)).toBe("2027-04-30");
+        expect(value.dates).not.toContain("2027-03-06");
+        expect(value.dates).not.toContain("2027-04-25");
+      }
+    }
+  });
+
+  test("filters resolved ranges by year exclusions", () => {
+    const result = calchemy.parseDate("christmas 2026-Jul 1, 27 excluding 2027", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: [
+          "2026-12-25",
+          "2026-12-26",
+          "2026-12-27",
+          "2026-12-28",
+          "2026-12-29",
+          "2026-12-30",
+          "2026-12-31",
+        ],
+      });
+    }
+  });
+
   test("supports exclusions for holidays", () => {
     const result = calchemy.parseDate(
       "all mon and sat until the first monday after the end of next month excluding holidays",
@@ -610,6 +833,7 @@ describe("parseDate", () => {
 
   test("resolves expected value kind mismatches in core", () => {
     const rangeResult = calchemy.parseDate("last 90 days", context);
+    const fromNowResult = calchemy.parseDate("12 weeks from now", context);
 
     expect(rangeResult.status).toBe("valid");
     if (rangeResult.status === "valid") {
@@ -624,6 +848,17 @@ describe("parseDate", () => {
       expect(multipleResult.status).toBe("invalid");
       if (multipleResult.status === "invalid") {
         expect(multipleResult.errors[0]?.code).toBe("unexpected-value-kind");
+      }
+    }
+
+    expect(fromNowResult.status).toBe("valid");
+    if (fromNowResult.status === "valid") {
+      expect(calchemy.toJSON(fromNowResult.value)).toEqual({ kind: "single", date: "2026-08-19" });
+
+      const rangeResult = resolveExpectedDateValue(fromNowResult, "range");
+      expect(rangeResult.status).toBe("valid");
+      if (rangeResult.status === "valid") {
+        expect(calchemy.toJSON(rangeResult.value)).toEqual({ kind: "range", start: "2026-05-27", end: "2026-08-19" });
       }
     }
   });
