@@ -1,7 +1,7 @@
-import { parseAmount } from "../primitives/numbers";
+import { parseAmount } from "../primitives/shared";
 import { parseConnector } from "../primitives/connectors";
 import { parseDurationUnit } from "../primitives/units";
-import { parseOrdinal } from "../primitives/ordinals";
+import { parseOrdinal } from "../primitives/numbers";
 import { parsePeriod } from "../primitives/periods";
 import { parseStructuralShorthand } from "../primitives/shorthands";
 import type { StandardChunk } from "./types";

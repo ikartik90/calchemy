@@ -1,7 +1,7 @@
 import { firstWeekdayOnOrAfter } from "../primitives/date-math";
 import { parseNamedDate } from "../primitives/named-date";
 import { parseNumericCandidates } from "../primitives/numeric-date";
-import { parseOrdinal } from "../primitives/ordinals";
+import { parseOrdinal } from "../primitives/numbers";
 import { parseQuarterRange } from "./quarter";
 import { parseRelativeModifierExpression } from "./relative";
 import { comparePlainDate } from "../primitives/shared";

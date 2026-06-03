@@ -1,4 +1,4 @@
-import { parseCardinalWords } from "./number-words";
+import { parseCardinalWords } from "./numbers";
 import type { PlainDate } from "../../temporal/types";
 import type { Candidate, DateValue, DurationUnit } from "../../types";
 

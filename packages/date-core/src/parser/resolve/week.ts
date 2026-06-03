@@ -1,5 +1,5 @@
 import { expandTwoDigitYear, startOfWeek } from "../primitives/date-math";
-import { parseOrdinal } from "../primitives/ordinals";
+import { parseOrdinal } from "../primitives/numbers";
 import type { PlainDate, TemporalApi } from "../../temporal/types";
 import type { DateValue } from "../../types";
 

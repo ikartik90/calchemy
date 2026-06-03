@@ -1,6 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { describe, expect, test } from "vitest";
-import { parseOrdinal } from "../src/parser/primitives/ordinals";
+import { parseOrdinal } from "../src/parser/primitives/numbers";
 import { parseAmount } from "../src/parser/primitives/shared";
 import { createCalchemyWithTemporal, isDateValueJSON, resolveExpectedDateValue } from "../src";
 import type { CompletionSource, DateValueJSON, HolidayProvider, NamedDatesVocabularyEntry, ParseDateContext } from "../src";
@@ -905,6 +905,13 @@ describe("ordinals", () => {
     ["first", 1],
     ["nineteenth", 19],
     ["twentieth", 20],
+    ["thirtieth", 30],
+    ["fortieth", 40],
+    ["fiftieth", 50],
+    ["sixtieth", 60],
+    ["seventieth", 70],
+    ["eightieth", 80],
+    ["ninetieth", 90],
     ["one", 1],
     ["two", 2],
     ["twenty", 20],
@@ -923,6 +930,8 @@ describe("ordinals", () => {
     ["thousandth", 1000],
     ["one thousandth", 1000],
     ["one hundred twenty third", 123],
+    ["one hundred thirtieth", 130],
+    ["two hundred fortieth", 240],
   ])("parses %s", (input, expected) => {
     expect(parseOrdinal(input)).toBe(expected);
   });

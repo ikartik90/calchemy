@@ -1,6 +1,6 @@
 import { endOfMonth, firstWeekdayAfter, firstWeekdayBefore, firstWeekdayOnOrAfter, startOfMonth } from "../primitives/date-math";
 import { parseDateAnchor, parseDateRangeAnchor } from "./anchors";
-import { parseOrdinal } from "../primitives/ordinals";
+import { parseOrdinal } from "../primitives/numbers";
 import { parseQuarterRange } from "./quarter";
 import { parseRelativeModifierExpression } from "./relative";
 import { comparePlainDate, parseAmount, toDuration } from "../primitives/shared";
