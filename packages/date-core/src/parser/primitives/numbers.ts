@@ -1,4 +1,10 @@
-import { Scales, ScaleOrdinals, SmallCardinals, SmallOrdinals, Tens } from "../types";
+import {
+  Scales,
+  ScaleOrdinals,
+  SmallCardinals,
+  SmallOrdinals,
+  Tens,
+} from "../types";
 
 // Example: `parseCardinalWords("one hundred twenty three")` returns `123`.
 export function parseCardinalWords(value: string): number | null {
@@ -59,7 +65,11 @@ export function parseAmount(value: string | undefined): number | null {
     return null;
   }
 
-  const normalized = value.trim().toLowerCase().replace(/-/g, " ").replace(/\s+/g, " ");
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ");
   if (Number.isFinite(Number(normalized))) {
     return Number(normalized);
   }
@@ -73,7 +83,11 @@ export function parseOrdinal(input: string | undefined): number | null {
     return null;
   }
 
-  const normalized = input.trim().toLowerCase().replace(/-/g, " ").replace(/\s+/g, " ");
+  const normalized = input
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ");
   if (/^\d+$/.test(normalized)) {
     return Number(normalized);
   }
@@ -105,7 +119,11 @@ function parseCompoundOrdinal(input: string): number | null {
   const words = input.split(" ");
   const lastWord = words.at(-1);
   const ordinal = lastWord ? SmallOrdinals.get(lastWord) : undefined;
-  const scaleWord = lastWord ? ScaleOrdinals.find(([ordinalScaleWord]) => ordinalScaleWord === lastWord)?.[1] : undefined;
+  const scaleWord = lastWord
+    ? ScaleOrdinals.find(
+        ([ordinalScaleWord]) => ordinalScaleWord === lastWord,
+      )?.[1]
+    : undefined;
 
   if (scaleWord) {
     return parseCardinalWords([...words.slice(0, -1), scaleWord].join(" "));

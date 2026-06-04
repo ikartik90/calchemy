@@ -1,6 +1,11 @@
 import type { DurationUnit, Token } from "../../types";
 import type { StructuralShorthand } from "../primitives/shorthands";
-import type { Connector, ExclusionMarker, Period, SamplerChunkCommand } from "../types";
+import type {
+  Connector,
+  ExclusionMarker,
+  Period,
+  SamplerChunkCommand,
+} from "../types";
 
 export type StandardChunk =
   | { kind: "command"; value: SamplerChunkCommand; token: Token }

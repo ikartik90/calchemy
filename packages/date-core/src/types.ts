@@ -76,7 +76,10 @@ export type NamedDatesVocabularyEntry = {
   value: string;
   shortcuts?: readonly string[];
   isHoliday?: boolean;
-  resolveDate(args: { year: number; context: ResolvedParseDateContext }): PlainDate | null;
+  resolveDate(args: {
+    year: number;
+    context: ResolvedParseDateContext;
+  }): PlainDate | null;
 };
 
 export type DateVocabulary = {
@@ -98,7 +101,14 @@ export type CompletionEntry = {
 };
 
 export type ResolvedParseDateContext = Required<
-  Pick<ParseDateContext, "anchor" | "locale" | "weekStartsOn" | "dateOrderPreference" | "lastNDaysIncludesToday">
+  Pick<
+    ParseDateContext,
+    | "anchor"
+    | "locale"
+    | "weekStartsOn"
+    | "dateOrderPreference"
+    | "lastNDaysIncludesToday"
+  >
 > &
   Pick<ParseDateContext, "holidays">;
 
@@ -143,7 +153,12 @@ export type CandidateSource = {
 
 export type AmbiguityGroup = {
   id: string;
-  kind: "date-order" | "two-digit-year" | "relative-anchor" | "range-boundary" | "holiday-calendar";
+  kind:
+    | "date-order"
+    | "two-digit-year"
+    | "relative-anchor"
+    | "range-boundary"
+    | "holiday-calendar";
   message: string;
   options: AmbiguityOption[];
 };
@@ -155,12 +170,20 @@ export type AmbiguityOption = {
 };
 
 export type ParseDateError = {
-  code: "empty-input" | "unsupported-expression" | "invalid-date" | "invalid-context" | "unexpected-value-kind";
+  code:
+    | "empty-input"
+    | "unsupported-expression"
+    | "invalid-date"
+    | "invalid-context"
+    | "unexpected-value-kind";
   message: string;
   token?: Token;
 };
 
-export type ParseDateResult = ValidParseDateResult | AmbiguousParseDateResult | InvalidParseDateResult;
+export type ParseDateResult =
+  | ValidParseDateResult
+  | AmbiguousParseDateResult
+  | InvalidParseDateResult;
 
 export type ValidParseDateResult = {
   status: "valid";
