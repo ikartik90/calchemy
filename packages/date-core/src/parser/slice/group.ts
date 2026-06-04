@@ -65,7 +65,7 @@ export function sliceDateExpression(
     return scoped;
   }
 
-  return createSlice(parseBoundary(chunkText(expressionChunks) || input, lookups), exclusions, null, null, transforms);
+  return createSlice(parseBoundary(chunkText(trimCommandAndArticle(expressionChunks)) || input, lookups), exclusions, null, null, transforms);
 }
 
 // Example: `sliceWeekdayBetween(chunksFor("all mondays between today and next month"), [], [], lookups)` returns a sampled range.

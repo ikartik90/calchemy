@@ -82,6 +82,7 @@ describe("parseDate", () => {
     ["from christmas to 7/1/2027", { kind: "range", start: "2026-12-25", end: "2027-01-07" }],
     ["from christmas to 7-1-2027", { kind: "range", start: "2026-12-25", end: "2027-01-07" }],
     ["from christmas to 7.1.2027", { kind: "range", start: "2026-12-25", end: "2027-01-07" }],
+    ["select 3/6/26 to end of q3", { kind: "range", start: "2026-06-03", end: "2026-09-30" }],
     ["2026-11-10/2026-11-24", { kind: "range", start: "2026-11-10", end: "2026-11-24" }],
     ["between christmas and jul 1 2027", { kind: "range", start: "2026-12-25", end: "2027-07-01" }],
     ["Q1", { kind: "range", start: "2026-01-01", end: "2026-03-31" }],
