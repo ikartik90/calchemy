@@ -1,7 +1,8 @@
-import type { DurationUnit, Token } from "../../types";
+import type { Token } from "../../types";
 import type { StructuralShorthand } from "../primitives/shorthands";
 import type {
   Connector,
+  DurationUnit,
   ExclusionMarker,
   Period,
   SamplerChunkCommand,

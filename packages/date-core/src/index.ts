@@ -29,7 +29,6 @@ export type {
   DateValueJSON,
   DateVocabulary,
   DurationAmount,
-  DurationUnit,
   DurationUnitVocabularyEntry,
   HolidayProvider,
   InlineCompletion,
@@ -49,4 +48,5 @@ export type {
   WeekdayVocabularyEntry,
   WeekdayIndex,
 } from "./types";
+export type { DurationUnit } from "./parser/types";
 export type { PlainDate, TemporalApi, ZonedDateTime } from "./temporal/types";

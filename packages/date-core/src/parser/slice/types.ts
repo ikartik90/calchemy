@@ -1,10 +1,10 @@
-import type { DurationUnit } from "../../types";
 import type {
   BoundaryEndpointSide,
   BoundaryPlacement,
   CalendarListPeriod,
   CalendarRangePeriod,
   DayGroupPeriod,
+  DurationUnit,
   RelationDirection,
   RelativeDateValue,
   RelativeModifier,

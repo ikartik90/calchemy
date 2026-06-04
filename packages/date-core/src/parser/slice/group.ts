@@ -55,6 +55,16 @@ export function sliceDateExpression(
     return until;
   }
 
+  const scopedUpperBound = sliceScopedSamplerUpperBound(expressionChunks, exclusions, transforms, lookups);
+  if (scopedUpperBound) {
+    return scopedUpperBound;
+  }
+
+  const upperBound = sliceUpperBoundRange(expressionChunks, exclusions, transforms, lookups);
+  if (upperBound) {
+    return upperBound;
+  }
+
   const between = sliceWeekdayBetween(expressionChunks, exclusions, transforms, lookups);
   if (between) {
     return between;
@@ -134,14 +144,63 @@ function sliceUntilSampler(
   transforms: readonly TransformSlice[],
   lookups: DateVocabularyLookups,
 ): DateSlice | null {
-  const untilIndex = findConnectorIndex(chunks, "until");
-  if (untilIndex <= 0 || untilIndex >= chunks.length - 1) {
+  const upperBound = findUpperBoundConnector(chunks);
+  if (!upperBound || upperBound.index <= 0 || upperBound.index + upperBound.width >= chunks.length) {
     return null;
   }
 
-  const sampler = parseSamplerFromChunks(chunks.slice(0, untilIndex), lookups);
-  const end = parseBoundaryEndpoint(chunks.slice(untilIndex + 1), lookups);
+  const sampler = parseSamplerFromChunks(chunks.slice(0, upperBound.index), lookups);
+  const end = parseBoundaryEndpoint(chunks.slice(upperBound.index + upperBound.width), lookups);
   return sampler && end ? createSlice(anchorUntilBoundary(end), exclusions, sampler, null, transforms) : null;
+}
+
+// Example: `sliceUpperBoundRange(chunksFor("tomorrow until end of next month"), [], [], lookups)` composes a range.
+function sliceUpperBoundRange(
+  chunks: readonly StandardChunk[],
+  exclusions: readonly ExclusionSlice[],
+  transforms: readonly TransformSlice[],
+  lookups: DateVocabularyLookups,
+): DateSlice | null {
+  const upperBound = findUpperBoundConnector(chunks);
+  if (!upperBound || upperBound.index <= 0 || upperBound.index + upperBound.width >= chunks.length) {
+    return null;
+  }
+
+  if (shouldDeferUpperBoundRange(chunks, upperBound.index, lookups)) {
+    return null;
+  }
+
+  const start = parseBoundaryEndpoint(trimCommandAndArticle(chunks.slice(0, upperBound.index)), lookups);
+  const end = parseBoundaryEndpoint(chunks.slice(upperBound.index + upperBound.width), lookups);
+  return start && end ? createSlice({ kind: "range", start, end }, exclusions, null, null, transforms) : null;
+}
+
+// Example: `sliceScopedSamplerUpperBound(chunksFor("mondays from tomorrow up to march"), [], [], lookups)` samples a bounded range.
+function sliceScopedSamplerUpperBound(
+  chunks: readonly StandardChunk[],
+  exclusions: readonly ExclusionSlice[],
+  transforms: readonly TransformSlice[],
+  lookups: DateVocabularyLookups,
+): DateSlice | null {
+  const upperBound = findUpperBoundConnector(chunks);
+  if (!upperBound || upperBound.index <= 0 || upperBound.index + upperBound.width >= chunks.length) {
+    return null;
+  }
+
+  const leftChunks = chunks.slice(0, upperBound.index);
+  const scopeIndex = findScopedSamplerConnectorIndex(leftChunks);
+  if (scopeIndex <= 0 || scopeIndex >= leftChunks.length - 1) {
+    return null;
+  }
+
+  const sampler = parseSamplerFromChunks(leftChunks.slice(0, scopeIndex), lookups);
+  if (!sampler) {
+    return null;
+  }
+
+  const start = parseTypedBoundaryEndpoint(chunkText(trimLeadingArticle(leftChunks.slice(scopeIndex + 1))), lookups, "start");
+  const end = parseBoundaryEndpoint(chunks.slice(upperBound.index + upperBound.width), lookups);
+  return start && end ? createSlice({ kind: "range", start, end }, exclusions, sampler, null, transforms) : null;
 }
 
 // Example: `sliceWeekdayRelation(chunksFor("thursday before next weekend"), [], [], lookups)` builds relation intent.
@@ -415,6 +474,43 @@ function createSlice(
 // Example: `findConnectorIndex(chunksFor("from today to tomorrow"), "to")` returns the `to` index.
 function findConnectorIndex(chunks: readonly StandardChunk[], value: string): number {
   return chunks.findIndex((chunk) => chunk.kind === "connector" && chunk.value === value);
+}
+
+// Example: `findUpperBoundConnector(chunksFor("today up to tomorrow"))` finds the `up to` connector.
+function findUpperBoundConnector(chunks: readonly StandardChunk[]): { index: number; width: number } | null {
+  for (let index = 0; index < chunks.length; index += 1) {
+    const chunk = chunks[index];
+    if (chunk?.kind === "connector" && (chunk.value === "until" || chunk.value === "to")) {
+      return { index, width: 1 };
+    }
+
+    const next = chunks[index + 1];
+    if (chunk?.kind === "word" && chunk.value === "up" && next?.kind === "connector" && next.value === "to") {
+      return { index, width: 2 };
+    }
+  }
+
+  return null;
+}
+
+// Example: `shouldDeferUpperBoundRange(chunksFor("from christmas to july"), 2, lookups)` preserves existing range parsing.
+function shouldDeferUpperBoundRange(chunks: readonly StandardChunk[], upperBoundIndex: number, lookups: DateVocabularyLookups): boolean {
+  const first = chunks[0];
+  if (first?.kind === "connector" && first.value === "from") {
+    return true;
+  }
+
+  const scopedConnectorIndex = findScopedSamplerConnectorIndex(chunks.slice(0, upperBoundIndex));
+  return scopedConnectorIndex > 0 && Boolean(parseSamplerFromChunks(chunks.slice(0, scopedConnectorIndex), lookups));
+}
+
+// Example: `findScopedSamplerConnectorIndex(chunksFor("mondays from june"))` returns the `from` index.
+function findScopedSamplerConnectorIndex(chunks: readonly StandardChunk[]): number {
+  return chunks.findIndex(
+    (chunk) =>
+      chunk.kind === "connector" &&
+      (chunk.value === "for" || chunk.value === "during" || chunk.value === "in" || chunk.value === "from" || chunk.value === "of"),
+  );
 }
 
 // Example: `findLastChunkIndex(chunks, isWeekdayChunk)` returns the last matching index.

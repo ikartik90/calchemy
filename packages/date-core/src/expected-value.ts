@@ -1,7 +1,7 @@
 import type { DateValue, ParseDateResult, ValidParseDateResult } from "./types";
 import { parseAmount } from "./parser/primitives/numbers";
 import { toDuration } from "./parser/primitives/shared";
-import type { DurationUnit } from "./types";
+import type { DurationUnit } from "./parser/types";
 
 export type ExpectedDateValue = DateValue["kind"];
 
@@ -67,8 +67,20 @@ function parseDurationUnit(input: string): DurationUnit | null {
     return "week";
   }
 
+  if (input === "weekday" || input === "weekdays") {
+    return "weekdays";
+  }
+
+  if (input === "weekend" || input === "weekends") {
+    return "weekend";
+  }
+
   if (input === "month" || input === "months") {
     return "month";
+  }
+
+  if (input === "quarter" || input === "quarters") {
+    return "quarter";
   }
 
   if (input === "year" || input === "years" || input === "yr" || input === "yrs") {

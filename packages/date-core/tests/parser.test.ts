@@ -53,6 +53,7 @@ describe("parseDate", () => {
     ["today", { kind: "single", date: "2026-05-27" }],
     ["tomorrow", { kind: "single", date: "2026-05-28" }],
     ["three weeks from now", { kind: "single", date: "2026-06-17" }],
+    ["3 quarters from now", { kind: "single", date: "2027-02-27" }],
     ["2 yrs from now", { kind: "single", date: "2028-05-27" }],
     ["first day of next month", { kind: "single", date: "2026-06-01" }],
     ["first day of the next month", { kind: "single", date: "2026-06-01" }],
@@ -68,8 +69,16 @@ describe("parseDate", () => {
     ["upcoming 10 days", { kind: "range", start: "2026-05-27", end: "2026-06-05" }],
     ["next 10 days", { kind: "range", start: "2026-05-27", end: "2026-06-05" }],
     ["future 2 weeks", { kind: "range", start: "2026-05-27", end: "2026-06-09" }],
+    ["25 days from tomorrow", { kind: "range", start: "2026-05-28", end: "2026-06-22" }],
+    ["25 days from tomorrow until the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
+    ["25 days from tomorrow till the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
+    ["25 days from tomorrow up to the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
+    ["25 days from tomorrow upto the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
+    ["25 days from tomorrow to the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
+    ["tomorrow until end of next month", { kind: "range", start: "2026-05-28", end: "2026-06-30" }],
     ["12 weeks from 3/6/26", { kind: "range", start: "2026-06-03", end: "2026-08-26" }],
     ["12 weeks from 6 mar, 27", { kind: "range", start: "2027-03-06", end: "2027-05-29" }],
+    ["12 weeks from 6 mar, 27 until end of q3 27", { kind: "range", start: "2027-05-29", end: "2027-09-30" }],
     ["first 10 days of next month", { kind: "range", start: "2026-06-01", end: "2026-06-10" }],
     ["last 20 days of the next month", { kind: "range", start: "2026-06-11", end: "2026-06-30" }],
     ["first ten days in next year", { kind: "range", start: "2027-01-01", end: "2027-01-10" }],
@@ -106,8 +115,10 @@ describe("parseDate", () => {
     ["m8-m12", { kind: "range", start: "2026-08-01", end: "2026-12-31" }],
     ["q1-q3", { kind: "range", start: "2026-01-01", end: "2026-09-30" }],
     ["Q3 27", { kind: "range", start: "2027-07-01", end: "2027-09-30" }],
+    ["june 27", { kind: "range", start: "2027-06-01", end: "2027-06-30" }],
     ["start of q3", { kind: "single", date: "2026-07-01" }],
     ["end of q3", { kind: "single", date: "2026-09-30" }],
+    ["end of june 27", { kind: "single", date: "2027-06-30" }],
     ["end of next quarter", { kind: "single", date: "2026-09-30" }],
     ["next monday in march plus two weeks", { kind: "single", date: "2027-03-15" }],
     ["next monday in march + two weeks", { kind: "single", date: "2027-03-15" }],
@@ -295,6 +306,66 @@ describe("parseDate", () => {
           "2026-08-10",
           "2026-08-17",
           "2026-08-24",
+        ],
+      });
+    }
+  });
+
+  test.each([
+    "Every monday from tomorrow up to the end of march",
+    "Every monday from tomorrow up to the end of march 27",
+  ])("selects weekdays from an explicit start through an upper-bound endpoint: %s", (input) => {
+    const result = calchemy.parseDate(input, context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: [
+          "2026-06-01",
+          "2026-06-08",
+          "2026-06-15",
+          "2026-06-22",
+          "2026-06-29",
+          "2026-07-06",
+          "2026-07-13",
+          "2026-07-20",
+          "2026-07-27",
+          "2026-08-03",
+          "2026-08-10",
+          "2026-08-17",
+          "2026-08-24",
+          "2026-08-31",
+          "2026-09-07",
+          "2026-09-14",
+          "2026-09-21",
+          "2026-09-28",
+          "2026-10-05",
+          "2026-10-12",
+          "2026-10-19",
+          "2026-10-26",
+          "2026-11-02",
+          "2026-11-09",
+          "2026-11-16",
+          "2026-11-23",
+          "2026-11-30",
+          "2026-12-07",
+          "2026-12-14",
+          "2026-12-21",
+          "2026-12-28",
+          "2027-01-04",
+          "2027-01-11",
+          "2027-01-18",
+          "2027-01-25",
+          "2027-02-01",
+          "2027-02-08",
+          "2027-02-15",
+          "2027-02-22",
+          "2027-03-01",
+          "2027-03-08",
+          "2027-03-15",
+          "2027-03-22",
+          "2027-03-29",
         ],
       });
     }
@@ -579,6 +650,192 @@ describe("parseDate", () => {
           "2026-06-29",
         ],
       });
+    }
+  });
+
+  test("parses recurring weekdays until the end of this year", () => {
+    const result = calchemy.parseDate("mondays and wednesdays until the end of year", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: [
+          "2026-05-27",
+          "2026-06-01",
+          "2026-06-03",
+          "2026-06-08",
+          "2026-06-10",
+          "2026-06-15",
+          "2026-06-17",
+          "2026-06-22",
+          "2026-06-24",
+          "2026-06-29",
+          "2026-07-01",
+          "2026-07-06",
+          "2026-07-08",
+          "2026-07-13",
+          "2026-07-15",
+          "2026-07-20",
+          "2026-07-22",
+          "2026-07-27",
+          "2026-07-29",
+          "2026-08-03",
+          "2026-08-05",
+          "2026-08-10",
+          "2026-08-12",
+          "2026-08-17",
+          "2026-08-19",
+          "2026-08-24",
+          "2026-08-26",
+          "2026-08-31",
+          "2026-09-02",
+          "2026-09-07",
+          "2026-09-09",
+          "2026-09-14",
+          "2026-09-16",
+          "2026-09-21",
+          "2026-09-23",
+          "2026-09-28",
+          "2026-09-30",
+          "2026-10-05",
+          "2026-10-07",
+          "2026-10-12",
+          "2026-10-14",
+          "2026-10-19",
+          "2026-10-21",
+          "2026-10-26",
+          "2026-10-28",
+          "2026-11-02",
+          "2026-11-04",
+          "2026-11-09",
+          "2026-11-11",
+          "2026-11-16",
+          "2026-11-18",
+          "2026-11-23",
+          "2026-11-25",
+          "2026-11-30",
+          "2026-12-02",
+          "2026-12-07",
+          "2026-12-09",
+          "2026-12-14",
+          "2026-12-16",
+          "2026-12-21",
+          "2026-12-23",
+          "2026-12-28",
+          "2026-12-30",
+        ],
+      });
+    }
+  });
+
+  test("parses recurring weekdays until a quarter duration endpoint", () => {
+    const result = calchemy.parseDate("mondays and wednesdays until 3 quarters from now", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(result.corrections).not.toContainEqual(
+        expect.objectContaining({ from: "quarters", to: "quarterly" }),
+      );
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: [
+          "2026-05-27",
+          "2026-06-01",
+          "2026-06-03",
+          "2026-06-08",
+          "2026-06-10",
+          "2026-06-15",
+          "2026-06-17",
+          "2026-06-22",
+          "2026-06-24",
+          "2026-06-29",
+          "2026-07-01",
+          "2026-07-06",
+          "2026-07-08",
+          "2026-07-13",
+          "2026-07-15",
+          "2026-07-20",
+          "2026-07-22",
+          "2026-07-27",
+          "2026-07-29",
+          "2026-08-03",
+          "2026-08-05",
+          "2026-08-10",
+          "2026-08-12",
+          "2026-08-17",
+          "2026-08-19",
+          "2026-08-24",
+          "2026-08-26",
+          "2026-08-31",
+          "2026-09-02",
+          "2026-09-07",
+          "2026-09-09",
+          "2026-09-14",
+          "2026-09-16",
+          "2026-09-21",
+          "2026-09-23",
+          "2026-09-28",
+          "2026-09-30",
+          "2026-10-05",
+          "2026-10-07",
+          "2026-10-12",
+          "2026-10-14",
+          "2026-10-19",
+          "2026-10-21",
+          "2026-10-26",
+          "2026-10-28",
+          "2026-11-02",
+          "2026-11-04",
+          "2026-11-09",
+          "2026-11-11",
+          "2026-11-16",
+          "2026-11-18",
+          "2026-11-23",
+          "2026-11-25",
+          "2026-11-30",
+          "2026-12-02",
+          "2026-12-07",
+          "2026-12-09",
+          "2026-12-14",
+          "2026-12-16",
+          "2026-12-21",
+          "2026-12-23",
+          "2026-12-28",
+          "2026-12-30",
+          "2027-01-04",
+          "2027-01-06",
+          "2027-01-11",
+          "2027-01-13",
+          "2027-01-18",
+          "2027-01-20",
+          "2027-01-25",
+          "2027-01-27",
+          "2027-02-01",
+          "2027-02-03",
+          "2027-02-08",
+          "2027-02-10",
+          "2027-02-15",
+          "2027-02-17",
+          "2027-02-22",
+          "2027-02-24",
+        ],
+      });
+    }
+  });
+
+  test("parses recurring weekdays until an implied weekday duration endpoint", () => {
+    const result = calchemy.parseDate("mondays and wednesdays until 300 weekdays", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      const json = calchemy.toJSON(result.value);
+      expect(json.kind).toBe("multiple");
+      if (json.kind === "multiple") {
+        expect(json.dates).toHaveLength(121);
+        expect(json.dates[0]).toBe("2026-05-27");
+        expect(json.dates.at(-1)).toBe("2027-07-21");
+      }
     }
   });
 

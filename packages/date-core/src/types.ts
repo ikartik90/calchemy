@@ -1,4 +1,5 @@
 import type { PlainDate, TemporalApi, ZonedDateTime } from "./temporal/types";
+import type { DurationUnit } from "./parser/types";
 
 export type DateValue = SingleDateValue | DateRangeValue | MultipleDatesValue;
 
@@ -31,8 +32,6 @@ export type ParseDateContext = {
   holidays?: HolidayProvider;
   lastNDaysIncludesToday?: boolean;
 };
-
-export type DurationUnit = "day" | "week" | "month" | "year";
 
 export type DurationAmount = {
   unit: DurationUnit;

@@ -1,13 +1,13 @@
 import { parseAmount, parseOrdinal } from "../primitives/numbers";
 import { parsePeriod } from "../primitives/periods";
 import { parseStructuralShorthand } from "../primitives/shorthands";
-import type { DurationUnit } from "../../types";
 import {
   type BoundaryPlacement,
   type BoundaryEndpointSide,
   type CalendarListPeriod,
   type CalendarRangePeriod,
   type DayGroupPeriod,
+  type DurationUnit,
   type RelationDirection,
   type RelativeDateValue,
   type RelativeModifier,
@@ -172,10 +172,11 @@ function parseWeekBoundary(input: string): BoundarySlice | null {
   return week && week >= 1 ? { kind: "week-range", week, year: parseYearReference(match?.[3], match?.[4]) } : null;
 }
 
-// Example: `parseNamedMonthBoundary("march", lookups)` returns a full-month boundary.
+// Example: `parseNamedMonthBoundary("march 27", lookups)` returns a full-month boundary.
 function parseNamedMonthBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
-  const month = lookups.months.get(input);
-  return month ? { kind: "named-month-range", month } : null;
+  const match = /^([a-z]+)(?: (?:(this|next|last|previous) year|(\d{2,4})))?$/.exec(input);
+  const month = match?.[1] ? lookups.months.get(match[1]) : undefined;
+  return month ? { kind: "month-range", month, year: parseYearReference(match?.[2], match?.[3]) } : null;
 }
 
 // Example: `parseRangeBoundary("from christmas to 7/1/2027", lookups)` returns typed endpoint boundaries.
@@ -230,6 +231,16 @@ function parseRelativeBoundary(input: string, lookups: DateVocabularyLookups): B
     return { kind: "relative", expression: { kind: "bare", value: bare as RelativeDateValue } };
   }
 
+  const dayGroup = parseDayGroup(input);
+  if (dayGroup) {
+    return { kind: "relative", expression: { kind: "modifier", modifier: "this", target: { kind: "day-group", group: dayGroup } } };
+  }
+
+  const bareCalendarUnit = parseDurationUnit(input, lookups);
+  if (bareCalendarUnit) {
+    return { kind: "relative", expression: { kind: "modifier", modifier: "this", target: { kind: "calendar-unit", unit: bareCalendarUnit } } };
+  }
+
   const subset = parseLeadingOrTrailingDaysBoundary(input, lookups);
   if (subset) {
     return subset;
@@ -240,6 +251,13 @@ function parseRelativeBoundary(input: string, lookups: DateVocabularyLookups): B
   const fromNowUnit = parseDurationUnit(fromNowMatch?.[2], lookups);
   if (fromNowAmount && fromNowUnit) {
     return { kind: "relative", expression: { kind: "from-now", amount: fromNowAmount, unit: fromNowUnit } };
+  }
+
+  const impliedFromNowMatch = /^(.+) ([a-z]+)$/.exec(input);
+  const impliedFromNowAmount = parseAmount(impliedFromNowMatch?.[1]);
+  const impliedFromNowUnit = parseDurationUnit(impliedFromNowMatch?.[2], lookups);
+  if (impliedFromNowAmount && impliedFromNowUnit) {
+    return { kind: "relative", expression: { kind: "from-now", amount: impliedFromNowAmount, unit: impliedFromNowUnit } };
   }
 
   const lastDaysMatch = /^last (\d+) days$/.exec(input);

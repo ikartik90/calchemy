@@ -8,13 +8,13 @@ import { parseNamedDate } from "../primitives/named-date";
 import { parseNumericCandidates } from "../primitives/numeric-date";
 import { comparePlainDate, toDuration } from "../primitives/shared";
 import { applyRelations } from "./relations";
-import type { DurationUnit } from "../../types";
 import {
   BackwardRelativeModifierSet,
   ForwardRelativeModifierSet,
   type CalendarListPeriod,
   type CalendarRangePeriod,
   type DayGroupPeriod,
+  type DurationUnit,
 } from "../types";
 import type {
   BoundaryEndpointSlice,
@@ -85,7 +85,7 @@ export function resolveBoundary(
         ? {
             kind: "range",
             start,
-            end: start.add(toDuration(boundary.amount, boundary.unit)),
+            end: shiftDateByDuration(start, boundary.amount, boundary.unit),
           }
         : null;
     }
@@ -143,13 +143,16 @@ export function resolveBoundary(
         context,
         lookups,
       );
-      const end = resolveBoundaryEndpoint(
-        boundary.end,
-        anchorDate,
-        Temporal,
-        context,
-        lookups,
-      );
+      const end = start
+        ? resolveRangeEndEndpoint(
+            boundary.end,
+            start,
+            anchorDate,
+            Temporal,
+            context,
+            lookups,
+          )
+        : null;
       return start && end && comparePlainDate(start, end) <= 0
         ? { kind: "range", start, end }
         : null;
@@ -279,6 +282,60 @@ function resolveBoundaryEndpoint(
     context,
     lookups,
   );
+}
+
+// Example: `resolveRangeEndEndpoint(endOfMarch, MayStart, anchor, ...)` rolls bare March to the next year.
+function resolveRangeEndEndpoint(
+  endpoint: BoundaryEndpointSlice,
+  start: PlainDate,
+  anchorDate: PlainDate,
+  Temporal: TemporalApi,
+  context: ResolvedParseDateContext,
+  lookups: DateVocabularyLookups,
+): PlainDate | null {
+  const end = resolveBoundaryEndpoint(
+    endpoint,
+    anchorDate,
+    Temporal,
+    context,
+    lookups,
+  );
+  if (!end || comparePlainDate(start, end) <= 0) {
+    return end;
+  }
+
+  return resolveFloatingRangeEndAfterStart(endpoint, start, Temporal);
+}
+
+// Example: `resolveFloatingRangeEndAfterStart(marchEndpoint, 2026-05-28, Temporal)` returns March 2027.
+function resolveFloatingRangeEndAfterStart(
+  endpoint: BoundaryEndpointSlice,
+  start: PlainDate,
+  Temporal: TemporalApi,
+): PlainDate | null {
+  if (endpoint.kind !== "boundary") {
+    return null;
+  }
+
+  const boundary = endpoint.boundary;
+  if (boundary.kind !== "month-range" || boundary.year.kind !== "anchor") {
+    return null;
+  }
+
+  const sameYear = resolveMonthRange(boundary.month, start.year, Temporal);
+  if (sameYear.kind !== "range") {
+    return null;
+  }
+  const sameYearEndpoint = endpoint.side === "start" ? sameYear.start : sameYear.end;
+  if (comparePlainDate(start, sameYearEndpoint) <= 0) {
+    return sameYearEndpoint;
+  }
+
+  const nextYear = resolveMonthRange(boundary.month, start.year + 1, Temporal);
+  if (nextYear.kind !== "range") {
+    return null;
+  }
+  return endpoint.side === "start" ? nextYear.start : nextYear.end;
 }
 
 // Example: `resolveBoundaryAsEndpoint(monthBoundary, "end", anchor, Temporal, context, lookups)` returns the month end.
@@ -424,7 +481,7 @@ function resolveRelativeExpression(
   if (expression.kind === "from-now") {
     return {
       kind: "single",
-      date: anchorDate.add(toDuration(expression.amount, expression.unit)),
+      date: shiftDateByDuration(anchorDate, expression.amount, expression.unit),
     };
   }
 
@@ -442,6 +499,7 @@ function resolveRelativeExpression(
     expression.modifier,
     expression.target,
     anchorDate,
+    Temporal,
     context,
   );
 }
@@ -499,6 +557,7 @@ function resolveRelativeModifierExpression(
   modifier: RelativeModifier,
   target: RelativeTargetSlice,
   anchorDate: PlainDate,
+  Temporal: TemporalApi,
   context: ResolvedParseDateContext,
 ): DateValue | null {
   switch (target.kind) {
@@ -507,6 +566,7 @@ function resolveRelativeModifierExpression(
         modifier,
         target.unit,
         anchorDate,
+        Temporal,
         context,
       );
     case "counted-duration":
@@ -578,11 +638,34 @@ function resolveDurationRange(
   return null;
 }
 
+// Example: `shiftDateByDuration(anchor, 3, "weekdays")` skips weekend days.
+function shiftDateByDuration(
+  date: PlainDate,
+  amount: number,
+  unit: DurationUnit,
+): PlainDate {
+  if (unit !== "weekdays") {
+    return date.add(toDuration(amount, unit));
+  }
+
+  let cursor = date;
+  let remaining = amount;
+  const step = amount < 0 ? -1 : 1;
+  while (remaining !== 0) {
+    cursor = cursor.add({ days: step });
+    if (cursor.dayOfWeek >= 1 && cursor.dayOfWeek <= 5) {
+      remaining -= step;
+    }
+  }
+  return cursor;
+}
+
 // Example: `resolveCalendarUnitRange("this", "week", anchor, context)` returns the current configured week.
 function resolveCalendarUnitRange(
   modifier: RelativeModifier,
   unit: DurationUnit,
   anchorDate: PlainDate,
+  Temporal: TemporalApi,
   context: ResolvedParseDateContext,
 ): DateValue | null {
   const offset = modifier === "this" ? 0 : isForwardModifier(modifier) ? 1 : -1;
@@ -606,6 +689,10 @@ function resolveCalendarUnitRange(
       start: startOfCalendarMonth(date),
       end: endOfCalendarMonth(date),
     };
+  }
+
+  if (unit === "quarter") {
+    return resolveRelativeQuarterRange(modifier, anchorDate, Temporal);
   }
 
   return {

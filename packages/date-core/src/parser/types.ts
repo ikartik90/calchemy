@@ -32,7 +32,7 @@ export const PeriodRecords = [
     value: "weekdays",
     aliases: ["weekday"],
     shortcuts: [],
-    duration: false,
+    duration: true,
     calendarRange: false,
     calendarList: false,
     dayGroup: true,
@@ -41,7 +41,7 @@ export const PeriodRecords = [
     value: "weekend",
     aliases: ["weekends"],
     shortcuts: [],
-    duration: false,
+    duration: true,
     calendarRange: false,
     calendarList: false,
     dayGroup: true,
@@ -59,7 +59,7 @@ export const PeriodRecords = [
     value: "quarter",
     aliases: [],
     shortcuts: [],
-    duration: false,
+    duration: true,
     calendarRange: true,
     calendarList: false,
     dayGroup: false,
@@ -77,6 +77,7 @@ export const PeriodRecords = [
 
 type PeriodRecord = (typeof PeriodRecords)[number];
 export type Period = (typeof PeriodRecords)[number]["value"];
+export type DurationUnit = Period;
 
 export const PeriodAliasEntries = PeriodRecords.flatMap((period) =>
   period.aliases.map((alias) => [alias, period.value] as const),
@@ -168,10 +169,13 @@ export const DurationUnitVocabularyValues: readonly DurationUnitVocabularyEntry[
       return [];
     }
 
-    const plural = `${period.value}s`;
+    const plural = period.value.endsWith("s") ? period.value : `${period.value}s`;
     return [
       { value: period.value, unit: period.value },
-      { value: plural, unit: period.value, shortcuts: period.shortcuts },
+      ...(plural === period.value
+        ? []
+        : [{ value: plural, unit: period.value, shortcuts: period.shortcuts }]),
+      ...period.aliases.map((alias) => ({ value: alias, unit: period.value })),
     ];
   });
 
@@ -232,6 +236,11 @@ export const ConnectorValues = [
   ",",
 ] as const;
 export type Connector = (typeof ConnectorValues)[number];
+export const ConnectorAliasEntries = [
+  ["till", "until"],
+  ["upto", "until"],
+] as const satisfies readonly (readonly [string, Connector])[];
+export const ConnectorAliasValues = ConnectorAliasEntries.map(([alias]) => alias);
 
 export const SmallCardinals: ReadonlyMap<string, number> = new Map([
   ["one", 1],
@@ -457,6 +466,7 @@ export const TransformOperatorSet = new Set<Connector>(TransformOperatorValues);
 
 export const GrammarWordSet = new Set([
   ...ConnectorValues,
+  ...ConnectorAliasValues,
   ...NumberWords,
   ...PeriodWords,
   ...BoundarySideValues,

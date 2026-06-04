@@ -1,5 +1,6 @@
 import type { PlainDate } from "../../temporal/types";
-import type { Candidate, DateValue, DurationUnit } from "../../types";
+import type { Candidate, DateValue } from "../../types";
+import type { DurationUnit } from "../types";
 
 // Example: `comparePlainDate(2026-01-01, 2026-01-02)` returns a negative number.
 export function comparePlainDate(left: PlainDate, right: PlainDate): number {
@@ -43,12 +44,24 @@ export function toDuration(amount: number, unit: DurationUnit | undefined): Reco
     return { days: amount };
   }
 
+  if (unit === "weekdays") {
+    return { days: amount * 5 };
+  }
+
+  if (unit === "weekend") {
+    return { days: amount * 2 };
+  }
+
   if (unit === "week") {
     return { weeks: amount };
   }
 
   if (unit === "year") {
     return { years: amount };
+  }
+
+  if (unit === "quarter") {
+    return { months: amount * 3 };
   }
 
   return { months: amount };
