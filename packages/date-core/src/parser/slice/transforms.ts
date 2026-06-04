@@ -1,7 +1,1 @@
-import type { DurationUnit } from "../../types";
-
-export type TransformSlice = {
-  amount: number;
-  direction: "add" | "subtract";
-  unit: DurationUnit;
-};
+export type { TransformSlice } from "./types";

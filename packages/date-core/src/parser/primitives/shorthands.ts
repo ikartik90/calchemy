@@ -1,8 +1,16 @@
+import type { DateVocabularyLookups } from "../vocabulary";
+
 export type StructuralShorthand =
   | { kind: "week"; ordinal: number }
   | { kind: "month"; ordinal: number }
   | { kind: "quarter"; ordinal: number };
 
+// Example: `resolveAlias("tmrw", lookups)` returns `tomorrow` when configured as a shorthand.
+export function resolveAlias(input: string, lookups: DateVocabularyLookups): string | null {
+  return lookups.aliases.get(input) ?? null;
+}
+
+// Example: `parseStructuralShorthand("w52")` returns week shorthand with ordinal `52`.
 export function parseStructuralShorthand(input: string): StructuralShorthand | null {
   const match = /^([wmq])\s*(\d+)$/i.exec(input);
   if (!match?.[1] || !match[2]) {

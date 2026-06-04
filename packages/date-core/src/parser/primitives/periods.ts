@@ -1,17 +1,7 @@
-export type Period = "day" | "week" | "weekdays" | "weekend" | "month" | "quarter" | "year";
+export type { CalendarRangePeriod, DayGroupPeriod, Period } from "../types";
+import { PeriodAliasMap, type Period } from "../types";
 
+// Example: `parsePeriod("weekends")` returns `weekend`.
 export function parsePeriod(input: string): Period | null {
-  if (input === "weekday" || input === "weekdays") {
-    return "weekdays";
-  }
-
-  if (input === "weekend" || input === "weekends") {
-    return "weekend";
-  }
-
-  if (input === "day" || input === "week" || input === "month" || input === "quarter" || input === "year") {
-    return input;
-  }
-
-  return null;
+  return PeriodAliasMap.get(input as never) ?? null;
 }

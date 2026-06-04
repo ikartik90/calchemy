@@ -1,21 +1,32 @@
-import type { SamplerSlice } from "./types";
+import { parsePeriod } from "../primitives/periods";
+import {
+  AlternatingSamplerCommandSet,
+  SamplerParitySet,
+  SamplerParityStartIndexMap,
+  type SamplerCommand,
+  type SamplerParity,
+} from "../types";
 import type { DateVocabularyLookups } from "../vocabulary";
 
-type SamplerCommand = "all" | "alternate" | "every" | "every other" | "select" | undefined;
+export type SamplerSlice =
+  | { kind: "all-days"; interval: number; startIndex: number }
+  | { kind: "day-number-parity"; parity: SamplerParity }
+  | { kind: "weekdays"; weekdays: number[]; interval: number; startIndex: number };
 
+// Example: `sliceSampler("mondays", "all", lookups)` returns weekday sampler intent.
 export function sliceSampler(input: string, command: SamplerCommand, lookups: DateVocabularyLookups): SamplerSlice | null {
   const occurrence = parseOccurrencePrefix(input);
   const samplerInput = occurrence?.input ?? input;
-  const interval = command === "alternate" || command === "every other" || occurrence ? 2 : 1;
-  const startIndex = occurrence?.parity === "even" ? 1 : 0;
+  const interval = command && AlternatingSamplerCommandSet.has(command) ? 2 : occurrence ? 2 : 1;
+  const startIndex = occurrence ? (SamplerParityStartIndexMap.get(occurrence.parity) ?? 0) : 0;
 
-  if (samplerInput === "day" || samplerInput === "days") {
+  if (parsePeriod(samplerInput) === "day") {
     return { kind: "all-days", interval, startIndex };
   }
 
-  const parityMatch = /^(odd|even) numbered dates?$/.exec(samplerInput);
-  if (parityMatch?.[1]) {
-    return { kind: "day-number-parity", parity: parityMatch[1] as "odd" | "even" };
+  const parityMatch = /^(.+) numbered (.+)$/.exec(samplerInput);
+  if (parityMatch?.[1] && SamplerParitySet.has(parityMatch[1]) && parityMatch[2] && parsePeriod(parityMatch[2]) === "day") {
+    return { kind: "day-number-parity", parity: parityMatch[1] as SamplerParity };
   }
 
   const weekdays = parseWeekdayList(samplerInput, lookups);
@@ -31,15 +42,17 @@ export function sliceSampler(input: string, command: SamplerCommand, lookups: Da
   return null;
 }
 
-function parseOccurrencePrefix(input: string): { parity: "odd" | "even"; input: string } | null {
-  const match = /^(odd|even) (.+)$/.exec(input);
-  if (!match?.[1] || !match[2] || match[2].startsWith("numbered ")) {
+// Example: `parseOccurrencePrefix("even mondays")` returns even occurrence metadata for `mondays`.
+function parseOccurrencePrefix(input: string): { parity: SamplerParity; input: string } | null {
+  const match = /^(.+) (.+)$/.exec(input);
+  if (!match?.[1] || !SamplerParitySet.has(match[1]) || !match[2] || match[2].startsWith("numbered ")) {
     return null;
   }
 
-  return { parity: match[1] as "odd" | "even", input: match[2] };
+  return { parity: match[1] as SamplerParity, input: match[2] };
 }
 
+// Example: `parseWeekdayList("monday and friday", lookups)` returns `[1, 5]`.
 function parseWeekdayList(input: string, lookups: DateVocabularyLookups): number[] {
   const values = input
     .split(/\s+(?:and|or)\s+|,\s*/)

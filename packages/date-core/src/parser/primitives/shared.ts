@@ -1,13 +1,12 @@
-import { parseCardinalWords } from "./numbers";
 import type { PlainDate } from "../../temporal/types";
 import type { Candidate, DateValue, DurationUnit } from "../../types";
 
-// Compares PlainDate values by their ISO calendar ordering.
+// Example: `comparePlainDate(2026-01-01, 2026-01-02)` returns a negative number.
 export function comparePlainDate(left: PlainDate, right: PlainDate): number {
   return left.toString().localeCompare(right.toString());
 }
 
-// Creates a parse candidate with optional explanatory metadata.
+// Example: `createCandidate("best", value, 1, "2026-01-01", source)` creates a ranked parse candidate.
 export function createCandidate(
   id: string,
   value: DateValue,
@@ -26,7 +25,7 @@ export function createCandidate(
   };
 }
 
-// Produces a compact human-readable label for a parsed date value.
+// Example: `labelDateValue({ kind: "multiple", dates })` returns `N dates`.
 export function labelDateValue(value: DateValue): string {
   switch (value.kind) {
     case "single":
@@ -38,21 +37,7 @@ export function labelDateValue(value: DateValue): string {
   }
 }
 
-// Parses a numeric or natural-language amount from a phrase.
-export function parseAmount(value: string | undefined): number | null {
-  if (!value) {
-    return null;
-  }
-
-  const normalized = value.trim().toLowerCase().replace(/-/g, " ").replace(/\s+/g, " ");
-  if (Number.isFinite(Number(normalized))) {
-    return Number(normalized);
-  }
-
-  return parseCardinalWords(normalized);
-}
-
-// Converts a count and parser duration unit into a Temporal duration-like object.
+// Example: `toDuration(3, "week")` returns `{ weeks: 3 }`.
 export function toDuration(amount: number, unit: DurationUnit | undefined): Record<string, number> {
   if (unit === "day") {
     return { days: amount };

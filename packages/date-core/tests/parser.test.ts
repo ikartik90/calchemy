@@ -1,7 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { describe, expect, test } from "vitest";
-import { parseOrdinal } from "../src/parser/primitives/numbers";
-import { parseAmount } from "../src/parser/primitives/shared";
+import { parseAmount, parseOrdinal } from "../src/parser/primitives/numbers";
 import { createCalchemyWithTemporal, isDateValueJSON, resolveExpectedDateValue } from "../src";
 import type { CompletionSource, DateValueJSON, HolidayProvider, NamedDatesVocabularyEntry, ParseDateContext } from "../src";
 
@@ -106,6 +105,9 @@ describe("parseDate", () => {
     ["m8-m12", { kind: "range", start: "2026-08-01", end: "2026-12-31" }],
     ["q1-q3", { kind: "range", start: "2026-01-01", end: "2026-09-30" }],
     ["Q3 27", { kind: "range", start: "2027-07-01", end: "2027-09-30" }],
+    ["start of q3", { kind: "single", date: "2026-07-01" }],
+    ["end of q3", { kind: "single", date: "2026-09-30" }],
+    ["end of next quarter", { kind: "single", date: "2026-09-30" }],
     ["next monday in march plus two weeks", { kind: "single", date: "2027-03-15" }],
     ["next monday in march + two weeks", { kind: "single", date: "2027-03-15" }],
     ["next monday in march + 2 weeks", { kind: "single", date: "2027-03-15" }],

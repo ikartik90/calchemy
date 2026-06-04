@@ -56,18 +56,18 @@ export type WeekdayVocabularyEntry = {
 };
 
 export type RelativeVocabularyEntry = {
-  value: "today" | "tomorrow" | "yesterday" | "now";
+  value: string;
   shortcuts?: readonly string[];
 };
 
 export type DurationUnitVocabularyEntry = {
-  value: "day" | "days" | "week" | "weeks" | "month" | "months" | "year" | "years";
+  value: string;
   unit: DurationUnit;
   shortcuts?: readonly string[];
 };
 
 export type RecurrenceFrequencyVocabularyEntry = {
-  value: "daily" | "weekly" | "fortnightly" | "monthly" | "yearly";
+  value: string;
   cadence: RecurrenceCadence;
   shortcuts?: readonly string[];
 };

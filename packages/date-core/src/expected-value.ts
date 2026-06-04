@@ -1,5 +1,6 @@
 import type { DateValue, ParseDateResult, ValidParseDateResult } from "./types";
-import { parseAmount, toDuration } from "./parser/primitives/shared";
+import { parseAmount } from "./parser/primitives/numbers";
+import { toDuration } from "./parser/primitives/shared";
 import type { DurationUnit } from "./types";
 
 export type ExpectedDateValue = DateValue["kind"];

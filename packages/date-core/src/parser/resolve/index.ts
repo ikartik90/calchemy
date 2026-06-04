@@ -9,6 +9,7 @@ import type { PlainDate, TemporalApi } from "../../temporal/types";
 import type { DateValue, ResolvedParseDateContext } from "../../types";
 import type { DateVocabularyLookups } from "../vocabulary";
 
+// Example: `resolveDateSlice(slice, anchor, Temporal, context, lookups)` resolves typed parser intent into a DateValue.
 export function resolveDateSlice(
   slice: DateSlice,
   anchorDate: PlainDate,
@@ -21,13 +22,17 @@ export function resolveDateSlice(
     return null;
   }
 
-  const related = applyRelations(boundary);
-  const transformed = applyTransforms(related);
-  const sampled = slice.sampler ? applySampler(transformed, slice.sampler) : transformed;
+  const related = applyRelations(boundary, slice.relation);
+  if (!related) {
+    return null;
+  }
+
+  const sampled = slice.sampler ? applySampler(related, slice.sampler) : related;
   if (!sampled) {
     return null;
   }
 
-  const filtered = applyExclusions(sampled, slice.exclusions, anchorDate, Temporal, context, lookups);
+  const transformed = applyTransforms(sampled, slice.transforms);
+  const filtered = applyExclusions(transformed, slice.exclusions, anchorDate, Temporal, context, lookups);
   return filtered ? materializeDateValue(filtered) : null;
 }

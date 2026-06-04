@@ -3,7 +3,7 @@ import { createCandidate } from "./shared";
 import type { PlainDate, TemporalApi } from "../../temporal/types";
 import type { Candidate, DateOrder, ResolvedParseDateContext } from "../../types";
 
-// Builds candidate interpretations for separated numeric dates.
+// Example: `parseNumericCandidates("03/04/25", context, Temporal, source)` returns date-order candidates.
 export function parseNumericCandidates(
   input: string,
   context: ResolvedParseDateContext,
@@ -33,7 +33,7 @@ export function parseNumericCandidates(
     .filter((candidate): candidate is Candidate => candidate !== null);
 }
 
-// Parses a separated numeric date using one date-order interpretation.
+// Example: `parseNumericDate("03/04/25", "DMY", 2026, Temporal)` returns 2025-04-03.
 function parseNumericDate(
   input: string,
   dateOrder: DateOrder,
@@ -69,11 +69,12 @@ function parseNumericDate(
   }
 }
 
+// Example: `isNumericDate("2026-11-10")` returns true.
 function isNumericDate(input: string): boolean {
   return /^\d{1,4}([./-])\d{1,2}\1\d{2,4}$/.test(input);
 }
 
-// Formats a date-order interpretation for candidate explanations.
+// Example: `formatDateOrder("MDY")` returns `MM/DD/YY`.
 function formatDateOrder(order: DateOrder): string {
   switch (order) {
     case "DMY":

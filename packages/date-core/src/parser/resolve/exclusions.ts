@@ -1,4 +1,4 @@
-import { resolveRawBoundary } from "./boundary";
+import { resolveBoundary } from "./boundary";
 import { expandValueDates } from "./sampler";
 import { comparePlainDate } from "../primitives/shared";
 import type { ExclusionSlice } from "../slice";
@@ -6,7 +6,7 @@ import type { PlainDate, TemporalApi } from "../../temporal/types";
 import type { DateValue, ResolvedParseDateContext } from "../../types";
 import type { DateVocabularyLookups } from "../vocabulary";
 
-export type LegacyResolver = (input: string) => DateValue | null;
+// Example: `applyExclusions(range, [{ kind: "weekends" }], anchor, Temporal, context, lookups)` removes weekend dates.
 export function applyExclusions(
   value: DateValue,
   exclusions: readonly ExclusionSlice[],
@@ -19,9 +19,7 @@ export function applyExclusions(
     return value;
   }
 
-  const predicates = exclusions.map((exclusion) =>
-    parseExclusionPredicate(exclusion.input, anchorDate, Temporal, context, lookups),
-  );
+  const predicates = exclusions.map((exclusion) => createExclusionPredicate(exclusion, anchorDate, Temporal, context, lookups));
   if (predicates.some((predicate) => !predicate)) {
     return null;
   }
@@ -30,94 +28,41 @@ export function applyExclusions(
   return { kind: "multiple", dates };
 }
 
-function parseExclusionPredicate(
-  input: string,
+// Example: `createExclusionPredicate({ kind: "holidays" }, anchor, Temporal, context, lookups)` checks configured holidays.
+function createExclusionPredicate(
+  exclusion: ExclusionSlice,
   anchorDate: PlainDate,
   Temporal: TemporalApi,
   context: ResolvedParseDateContext,
   lookups: DateVocabularyLookups,
 ): ((date: PlainDate) => boolean) | null {
-  const parts = splitList(input);
-  if (parts.length > 1) {
-    const predicates = parts.map((part) => parseSingleExclusionPredicate(part, anchorDate, Temporal, context, lookups));
-    if (predicates.some((predicate) => !predicate)) {
-      return null;
+  switch (exclusion.kind) {
+    case "boundary": {
+      const value = resolveBoundary(exclusion.boundary, anchorDate, Temporal, context, lookups);
+      return value ? createDateValuePredicate(value) : null;
     }
-
-    return (date) => predicates.some((predicate) => predicate?.(date));
+    case "holidays":
+      return (date) => context.holidays?.includes(date) ?? false;
+    case "months":
+      return (date) => exclusion.months.includes(date.month);
+    case "weekdays":
+      return (date) => date.dayOfWeek >= 1 && date.dayOfWeek <= 5;
+    case "weekends":
+      return (date) => date.dayOfWeek === 6 || date.dayOfWeek === 7;
+    case "years":
+      return (date) => exclusion.years.includes(date.year);
   }
-
-  return parseSingleExclusionPredicate(input, anchorDate, Temporal, context, lookups);
 }
 
-function parseSingleExclusionPredicate(
-  input: string,
-  anchorDate: PlainDate,
-  Temporal: TemporalApi,
-  context: ResolvedParseDateContext,
-  lookups: DateVocabularyLookups,
-): ((date: PlainDate) => boolean) | null {
-  if (input === "holidays") {
-    return (date) => context.holidays?.includes(date) ?? false;
-  }
-
-  if (input === "weekend" || input === "weekends") {
-    return (date) => date.dayOfWeek === 6 || date.dayOfWeek === 7;
-  }
-
-  if (input === "weekday" || input === "weekdays") {
-    return (date) => date.dayOfWeek >= 1 && date.dayOfWeek <= 5;
-  }
-
-  const months = parseMonthExclusionList(input, lookups);
-  if (months.length > 0) {
-    return (date) => months.includes(date.month);
-  }
-
-  const years = parseYearExclusionList(input);
-  if (years.length > 0) {
-    return (date) => years.includes(date.year);
-  }
-
-  const value = resolveRawBoundary(input, anchorDate, Temporal, context, lookups);
-  if (value?.kind === "single") {
+// Example: `createDateValuePredicate(christmasValue)` matches a single resolved date or range.
+function createDateValuePredicate(value: DateValue): (date: PlainDate) => boolean {
+  if (value.kind === "single") {
     return (date) => date.equals(value.date);
   }
 
-  if (value?.kind === "range") {
+  if (value.kind === "range") {
     return (date) => comparePlainDate(date, value.start) >= 0 && comparePlainDate(date, value.end) <= 0;
   }
 
-  if (value?.kind === "multiple") {
-    return (date) => value.dates.some((excludedDate) => excludedDate.equals(date));
-  }
-
-  return null;
-}
-
-function splitList(input: string): string[] {
-  return input
-    .split(/\s+(?:and|or)\s+|,\s*/)
-    .map((value) => value.trim())
-    .filter(Boolean);
-}
-
-function parseMonthExclusionList(input: string, lookups: DateVocabularyLookups): number[] {
-  const values = splitList(input).map((value) => lookups.months.get(value));
-
-  if (values.length === 0 || values.some((value) => value === undefined)) {
-    return [];
-  }
-
-  return Array.from(new Set(values as number[]));
-}
-
-function parseYearExclusionList(input: string): number[] {
-  const values = splitList(input);
-
-  if (values.length === 0 || values.some((value) => !/^\d{4}$/.test(value))) {
-    return [];
-  }
-
-  return Array.from(new Set(values.map(Number)));
+  return (date) => value.dates.some((excludedDate) => excludedDate.equals(date));
 }

@@ -15,12 +15,13 @@ import type {
   ResolvedParseDateContext,
 } from "../types";
 
-const DEFAULT_DATE_ORDER_PREFERENCE: DateOrder[] = ["DMY", "MDY", "YMD"];
+const DefaultDateOrderPreference: DateOrder[] = ["DMY", "MDY", "YMD"];
 
 export type ParseDateWithTemporalOptions = {
   namedDatesVocabulary?: readonly NamedDatesVocabularyEntry[];
 };
 
+// Example: `parseDateWithTemporal("next friday", context, Temporal)` returns a structured parse result.
 export function parseDateWithTemporal(
   input: string,
   context: ParseDateContext,
@@ -103,6 +104,7 @@ export function parseDateWithTemporal(
   };
 }
 
+// Example: `resolveContext({}, Temporal)` fills parser defaults around the current Temporal anchor.
 function resolveContext(context: ParseDateContext, Temporal: TemporalApi): ResolvedParseDateContext {
   const anchor = context.anchor ?? Temporal.Now.zonedDateTimeISO();
 
@@ -116,14 +118,16 @@ function resolveContext(context: ParseDateContext, Temporal: TemporalApi): Resol
   };
 }
 
+// Example: `normalizeDateOrderPreference(["MDY", "MDY"])` returns a de-duplicated preference list.
 function normalizeDateOrderPreference(value: DateOrder[] | undefined): DateOrder[] {
   if (!value || value.length === 0) {
-    return DEFAULT_DATE_ORDER_PREFERENCE;
+    return DefaultDateOrderPreference;
   }
 
   return Array.from(new Set(value));
 }
 
+// Example: `parseKnownExpression("next month", anchor, context, Temporal, lookups, chunks)` resolves a non-numeric phrase.
 function parseKnownExpression(
   input: string,
   anchorDate: PlainDate,

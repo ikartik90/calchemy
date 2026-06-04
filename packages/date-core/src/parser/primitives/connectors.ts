@@ -1,28 +1,8 @@
-const CONNECTOR_VALUES = [
-  "after",
-  "and",
-  "before",
-  "between",
-  "during",
-  "following",
-  "for",
-  "from",
-  "in",
-  "minus",
-  "of",
-  "or",
-  "plus",
-  "preceding",
-  "through",
-  "to",
-  "until",
-  ",",
-] as const;
+import { ConnectorValues, type Connector } from "../types";
 
-export type Connector = (typeof CONNECTOR_VALUES)[number];
+const Connectors = new Set<string>(ConnectorValues);
 
-const CONNECTORS = new Set<string>(CONNECTOR_VALUES);
-
+// Example: `parseConnector("until")` returns `until`.
 export function parseConnector(input: string): Connector | null {
-  return CONNECTORS.has(input) ? (input as Connector) : null;
+  return Connectors.has(input) ? (input as Connector) : null;
 }

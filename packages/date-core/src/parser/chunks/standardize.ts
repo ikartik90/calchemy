@@ -1,17 +1,20 @@
-import { parseAmount } from "../primitives/shared";
+import { parseAmount } from "../primitives/numbers";
 import { parseConnector } from "../primitives/connectors";
 import { parseDurationUnit } from "../primitives/units";
 import { parseOrdinal } from "../primitives/numbers";
 import { parsePeriod } from "../primitives/periods";
 import { parseStructuralShorthand } from "../primitives/shorthands";
+import { ExclusionMarkerValues, SamplerChunkCommandValues } from "../types";
 import type { StandardChunk } from "./types";
 import type { Token } from "../../types";
 import type { DateVocabularyLookups } from "../vocabulary";
 
+// Example: `standardizeChunks(tokensFor("all mondays"), lookups)` emits command and weekday chunks.
 export function standardizeChunks(tokens: readonly Token[], lookups: DateVocabularyLookups): StandardChunk[] {
   return tokens.map((token) => standardizeToken(token, lookups));
 }
 
+// Example: `standardizeToken(monthToken("march"), lookups)` emits a month chunk with value `3`.
 function standardizeToken(token: Token, lookups: DateVocabularyLookups): StandardChunk {
   if (token.kind === "separator") {
     return { kind: "separator", value: token.normalized, token };
@@ -27,8 +30,14 @@ function standardizeToken(token: Token, lookups: DateVocabularyLookups): Standar
     return { kind: "connector", value: connector, token };
   }
 
-  if (token.normalized === "all" || token.normalized === "every" || token.normalized === "select") {
-    return { kind: "command", value: token.normalized, token };
+  const exclusionMarker = ExclusionMarkerValues.find((value) => value === token.normalized);
+  if (exclusionMarker) {
+    return { kind: "exclusion-marker", value: exclusionMarker, token };
+  }
+
+  const command = SamplerChunkCommandValues.find((value) => value === token.normalized);
+  if (command) {
+    return { kind: "command", value: command, token };
   }
 
   const weekday = lookups.weekdays.get(token.normalized);

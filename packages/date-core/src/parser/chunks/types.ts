@@ -1,12 +1,12 @@
 import type { DurationUnit, Token } from "../../types";
-import type { Connector } from "../primitives/connectors";
-import type { Period } from "../primitives/periods";
 import type { StructuralShorthand } from "../primitives/shorthands";
+import type { Connector, ExclusionMarker, Period, SamplerChunkCommand } from "../types";
 
 export type StandardChunk =
-  | { kind: "command"; value: "all" | "every" | "select"; token: Token }
+  | { kind: "command"; value: SamplerChunkCommand; token: Token }
   | { kind: "connector"; value: Connector; token: Token }
   | { kind: "duration-unit"; value: DurationUnit; token: Token }
+  | { kind: "exclusion-marker"; value: ExclusionMarker; token: Token }
   | { kind: "month"; value: number; token: Token }
   | { kind: "number"; value: number; token: Token }
   | { kind: "ordinal"; value: number; token: Token }

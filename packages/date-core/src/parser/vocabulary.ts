@@ -1,71 +1,10 @@
 import type {
   DateVocabulary,
   DurationUnitVocabularyEntry,
-  MonthVocabularyEntry,
   NamedDatesVocabularyEntry,
-  RecurrenceFrequencyVocabularyEntry,
   RelativeVocabularyEntry,
-  WeekdayVocabularyEntry,
 } from "../types";
-
-const MONTHS: readonly MonthVocabularyEntry[] = [
-  { value: "january", shortcuts: ["jan"], month: 1 },
-  { value: "february", shortcuts: ["feb"], month: 2 },
-  { value: "march", shortcuts: ["mar"], month: 3 },
-  { value: "april", shortcuts: ["apr"], month: 4 },
-  { value: "may", shortcuts: [], month: 5 },
-  { value: "june", shortcuts: ["jun"], month: 6 },
-  { value: "july", shortcuts: ["jul"], month: 7 },
-  { value: "august", shortcuts: ["aug"], month: 8 },
-  { value: "september", shortcuts: ["sep", "sept"], month: 9 },
-  { value: "october", shortcuts: ["oct"], month: 10 },
-  { value: "november", shortcuts: ["nov"], month: 11 },
-  { value: "december", shortcuts: ["dec"], month: 12 },
-];
-
-const WEEKDAYS: readonly WeekdayVocabularyEntry[] = [
-  { value: "monday", shortcuts: ["mon", "mondays"], weekday: 1 },
-  { value: "tuesday", shortcuts: ["tue", "tues", "tuesdays"], weekday: 2 },
-  { value: "wednesday", shortcuts: ["wed", "wednesdays"], weekday: 3 },
-  { value: "thursday", shortcuts: ["thu", "thur", "thurs", "thursdays"], weekday: 4 },
-  { value: "friday", shortcuts: ["fri", "fridays"], weekday: 5 },
-  { value: "saturday", shortcuts: ["sat", "saturdays"], weekday: 6 },
-  { value: "sunday", shortcuts: ["sun", "sundays"], weekday: 7 },
-];
-
-const RELATIVES: readonly RelativeVocabularyEntry[] = [
-  { value: "today" },
-  { value: "tomorrow", shortcuts: ["tmr", "tmrw"] },
-  { value: "yesterday" },
-  { value: "now" },
-];
-
-const DURATION_UNITS: readonly DurationUnitVocabularyEntry[] = [
-  { value: "day", unit: "day" },
-  { value: "days", unit: "day" },
-  { value: "week", shortcuts: ["wk"], unit: "week" },
-  { value: "weeks", shortcuts: ["wks"], unit: "week" },
-  { value: "month", unit: "month" },
-  { value: "months", unit: "month" },
-  { value: "year", shortcuts: ["yr"], unit: "year" },
-  { value: "years", shortcuts: ["yrs"], unit: "year" },
-];
-
-const RECURRENCE_FREQUENCIES: readonly RecurrenceFrequencyVocabularyEntry[] = [
-  { value: "daily", cadence: { kind: "interval", every: { unit: "day", count: 1 } } },
-  { value: "weekly", cadence: { kind: "interval", every: { unit: "week", count: 1 } } },
-  { value: "fortnightly", cadence: { kind: "interval", every: { unit: "week", count: 2 } } },
-  { value: "monthly", cadence: { kind: "interval", every: { unit: "month", count: 1 } } },
-  { value: "yearly", cadence: { kind: "interval", every: { unit: "year", count: 1 } } },
-];
-
-export const DEFAULT_DATE_VOCABULARY: DateVocabulary = {
-  months: MONTHS,
-  weekdays: WEEKDAYS,
-  relatives: RELATIVES,
-  durationUnits: DURATION_UNITS,
-  recurrenceFrequencies: RECURRENCE_FREQUENCIES,
-};
+import { DefaultDateVocabulary } from "./types";
 
 export type DateVocabularyLookups = {
   aliases: Map<string, string>;
@@ -77,13 +16,15 @@ export type DateVocabularyLookups = {
   namedDates: readonly NamedDatesVocabularyEntry[];
 };
 
+// Example: `createDateVocabulary([{ value: "christmas", ... }])` adds caller-provided named dates.
 export function createDateVocabulary(namedDates: readonly NamedDatesVocabularyEntry[] = []): DateVocabulary {
   return {
-    ...DEFAULT_DATE_VOCABULARY,
+    ...DefaultDateVocabulary,
     namedDates,
   };
 }
 
+// Example: `createDateVocabularyLookups(DefaultDateVocabulary)` builds alias and unit maps.
 export function createDateVocabularyLookups(vocabulary: DateVocabulary): DateVocabularyLookups {
   const aliases = new Map<string, string>();
   const months = new Map<string, number>();
@@ -142,12 +83,14 @@ export function createDateVocabularyLookups(vocabulary: DateVocabulary): DateVoc
   };
 }
 
+// Example: `addAliasEntries(map, "january", ["jan"])` maps `jan` to `january`.
 function addAliasEntries(aliases: Map<string, string>, value: string, shortcuts: readonly string[]): void {
   for (const shortcut of shortcuts) {
     aliases.set(normalizeVocabularyValue(shortcut), normalizeVocabularyValue(value));
   }
 }
 
+// Example: `addFuzzyEntries(values, "february", ["feb"])` marks words eligible for typo matching.
 function addFuzzyEntries(values: Set<string>, value: string, shortcuts: readonly string[]): void {
   values.add(normalizeVocabularyValue(value));
   for (const shortcut of shortcuts) {
@@ -155,6 +98,7 @@ function addFuzzyEntries(values: Set<string>, value: string, shortcuts: readonly
   }
 }
 
+// Example: `normalizeVocabularyValue("  New Year  ")` returns `new year`.
 export function normalizeVocabularyValue(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }

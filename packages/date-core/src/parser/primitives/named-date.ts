@@ -3,7 +3,7 @@ import { normalizeVocabularyValue, type DateVocabularyLookups } from "../vocabul
 import type { PlainDate, TemporalApi } from "../../temporal/types";
 import type { ResolvedParseDateContext } from "../../types";
 
-// Parses configured named dates and month-name dates into a PlainDate.
+// Example: `parseNamedDate("christmas 2026", 2026, Temporal, lookups, context)` returns Christmas 2026.
 export function parseNamedDate(
   input: string,
   anchorYear: number,
@@ -21,6 +21,7 @@ export function parseNamedDate(
   return parseMonthNameDate(compact, anchorYear, Temporal, lookups);
 }
 
+// Example: `parseMonthNameDate("july 1 27", 2026, Temporal, lookups)` returns July 1, 2027.
 function parseMonthNameDate(
   input: string,
   anchorYear: number,
@@ -40,6 +41,7 @@ function parseMonthNameDate(
   return null;
 }
 
+// Example: `createMonthNameDate("july", "1", "27", 2026, Temporal, lookups)` creates July 1, 2027.
 function createMonthNameDate(
   monthInput: string,
   dayInput: string,
@@ -63,7 +65,7 @@ function createMonthNameDate(
   }
 }
 
-// Resolves caller-provided named-date vocabulary, including explicit and relative years.
+// Example: `parseConfiguredNamedDate("easter next year", 2026, lookups, context)` resolves the configured Easter date.
 function parseConfiguredNamedDate(
   input: string,
   anchorYear: number,
@@ -91,7 +93,7 @@ function parseConfiguredNamedDate(
   return null;
 }
 
-// Converts relative year words into a concrete calendar year.
+// Example: `resolveRelativeYear("next", 2026)` returns `2027`.
 function resolveRelativeYear(value: string, anchorYear: number): number {
   if (value === "next") {
     return anchorYear + 1;

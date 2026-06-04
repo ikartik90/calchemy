@@ -1,91 +1,9 @@
 import type { Correction, Token } from "../types";
+import { ArticleWords, GrammarWordSet } from "./types";
 import { createDateVocabulary, createDateVocabularyLookups, type DateVocabularyLookups } from "./vocabulary";
 
-const DEFAULT_LOOKUPS = createDateVocabularyLookups(createDateVocabulary());
-const GRAMMAR_WORDS = new Set([
-  "after",
-  "all",
-  "alternate",
-  "and",
-  "before",
-  "between",
-  "date",
-  "dates",
-  "end",
-  "even",
-  "except",
-  "excluding",
-  "every",
-  "eight",
-  "eighteen",
-  "eighteenth",
-  "eighth",
-  "eleven",
-  "eleventh",
-  "fifth",
-  "fifteen",
-  "fifteenth",
-  "fifty",
-  "first",
-  "five",
-  "forty",
-  "four",
-  "fourteen",
-  "fourteenth",
-  "fourth",
-  "for",
-  "following",
-  "from",
-  "holidays",
-  "hundred",
-  "hundredth",
-  "in",
-  "minus",
-  "nine",
-  "nineteen",
-  "nineteenth",
-  "ninth",
-  "numbered",
-  "odd",
-  "of",
-  "one",
-  "or",
-  "other",
-  "plus",
-  "second",
-  "seven",
-  "seventeen",
-  "seventeenth",
-  "seventh",
-  "select",
-  "six",
-  "sixteen",
-  "sixteenth",
-  "sixth",
-  "skip",
-  "sixty",
-  "ten",
-  "tenth",
-  "the",
-  "thirteen",
-  "thirteenth",
-  "thirty",
-  "third",
-  "to",
-  "twelve",
-  "twelfth",
-  "twentieth",
-  "twenty",
-  "two",
-  "until",
-  "week",
-  "weekday",
-  "weekdays",
-  "weekend",
-  "weekends",
-  "thousand",
-  "thousandth",
-]);
+const DefaultLookups = createDateVocabularyLookups(createDateVocabulary());
+const ArticleWordSet = new Set(ArticleWords);
 
 export type NormalizedInput = {
   normalized: string;
@@ -93,7 +11,8 @@ export type NormalizedInput = {
   corrections: Correction[];
 };
 
-export function normalizeInput(input: string, lookups: DateVocabularyLookups = DEFAULT_LOOKUPS): NormalizedInput {
+// Example: `normalizeInput("tmrw")` returns normalized `tomorrow` plus shorthand correction metadata.
+export function normalizeInput(input: string, lookups: DateVocabularyLookups = DefaultLookups): NormalizedInput {
   const normalized = input
     .trim()
     .toLowerCase()
@@ -104,47 +23,55 @@ export function normalizeInput(input: string, lookups: DateVocabularyLookups = D
 
   const tokens = tokenize(normalized);
   const corrections: Correction[] = [];
-  const corrected = tokens.map((token) => {
-    if (token.kind !== "word") {
-      return token.normalized;
-    }
+  const correctedTokens = tokens
+    .map((token): Token | null => {
+      if (token.kind !== "word") {
+        return token;
+      }
 
-    const possessiveBase = stripKnownPossessive(token.normalized, lookups);
-    if (possessiveBase) {
-      return possessiveBase;
-    }
+      if (ArticleWordSet.has(token.normalized as never)) {
+        return null;
+      }
 
-    const alias = lookups.aliases.get(token.normalized);
-    if (alias) {
-      corrections.push({ from: token.normalized, to: alias, reason: "shorthand", confidence: 1 });
-      return alias;
-    }
+      const possessiveBase = stripKnownPossessive(token.normalized, lookups);
+      if (possessiveBase) {
+        return { ...token, normalized: possessiveBase };
+      }
 
-    if (GRAMMAR_WORDS.has(token.normalized)) {
-      return token.normalized;
-    }
+      const alias = lookups.aliases.get(token.normalized);
+      if (alias) {
+        corrections.push({ from: token.normalized, to: alias, reason: "shorthand", confidence: 1 });
+        return { ...token, normalized: alias };
+      }
 
-    const fuzzy = findFuzzyMatch(token.normalized, lookups.fuzzyValues);
-    if (fuzzy) {
-      corrections.push({ from: token.normalized, to: fuzzy, reason: "typo", confidence: 0.86 });
-      return fuzzy;
-    }
+      if (GrammarWordSet.has(token.normalized)) {
+        return token;
+      }
 
-    return token.normalized;
-  });
+      const fuzzy = findFuzzyMatch(token.normalized, lookups.fuzzyValues);
+      if (fuzzy) {
+        corrections.push({ from: token.normalized, to: fuzzy, reason: "typo", confidence: 0.86 });
+        return { ...token, normalized: fuzzy };
+      }
+
+      return token;
+    })
+    .filter((token): token is Token => token !== null);
 
   return {
-    normalized: corrected
+    normalized: correctedTokens
+      .map((token) => token.normalized)
       .join(" ")
       .replace(/\s+([,./-])\s+/g, "$1")
       .replace(/(^|\s)\.(?=\s|$)/g, " ")
       .replace(/\s+/g, " ")
       .trim(),
-    tokens,
+    tokens: correctedTokens,
     corrections,
   };
 }
 
+// Example: `tokenize("q4-next year")` returns word, number, separator, and word tokens.
 function tokenize(input: string): Token[] {
   const matches = input.matchAll(/\d+|[a-z']+|[.,/-]/g);
 
@@ -163,6 +90,7 @@ function tokenize(input: string): Token[] {
   });
 }
 
+// Example: `stripKnownPossessive("week's", lookups)` returns `week` when it is known vocabulary.
 function stripKnownPossessive(value: string, lookups: DateVocabularyLookups): string | null {
   const base = getPossessiveBase(value);
   if (!base) {
@@ -172,6 +100,7 @@ function stripKnownPossessive(value: string, lookups: DateVocabularyLookups): st
   return isKnownWord(base, lookups) ? base : null;
 }
 
+// Example: `getPossessiveBase("years'")` returns `years`.
 function getPossessiveBase(value: string): string | null {
   if (value.endsWith("'s")) {
     return value.slice(0, -2);
@@ -184,9 +113,10 @@ function getPossessiveBase(value: string): string | null {
   return null;
 }
 
+// Example: `isKnownWord("february", lookups)` returns true for month vocabulary.
 function isKnownWord(value: string, lookups: DateVocabularyLookups): boolean {
   return (
-    GRAMMAR_WORDS.has(value) ||
+    GrammarWordSet.has(value) ||
     lookups.aliases.has(value) ||
     lookups.months.has(value) ||
     lookups.weekdays.has(value) ||
@@ -196,6 +126,7 @@ function isKnownWord(value: string, lookups: DateVocabularyLookups): boolean {
   );
 }
 
+// Example: `findFuzzyMatch("febuary", ["february"])` returns `february`.
 function findFuzzyMatch(value: string, vocabulary: readonly string[]): string | null {
   if (vocabulary.includes(value)) {
     return null;
@@ -209,6 +140,7 @@ function findFuzzyMatch(value: string, vocabulary: readonly string[]): string | 
   return match ?? null;
 }
 
+// Example: `levenshtein("march", "marhc")` returns the edit distance between the words.
 function levenshtein(a: string, b: string): number {
   const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
   const current = Array.from({ length: b.length + 1 }, () => 0);
