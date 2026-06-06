@@ -15,6 +15,8 @@ export type UseCalchemyOptions = {
 };
 
 export type CalchemyState = {
+  calchemy: Calchemy;
+  parseContext: ParseDateContext | undefined;
   inputValue: string;
   value: DateValue | null;
   result: ParseDateResult;
@@ -126,6 +128,8 @@ export function useCalchemy(options: UseCalchemyOptions): CalchemyState {
   }
 
   return {
+    calchemy: options.calchemy,
+    parseContext: options.parseContext,
     inputValue,
     value,
     result,

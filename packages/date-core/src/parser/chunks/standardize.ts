@@ -1,6 +1,5 @@
 import { parseAmount } from "../primitives/numbers";
 import { parseConnector } from "../primitives/connectors";
-import { parseDurationUnit } from "../primitives/units";
 import { parseOrdinal } from "../primitives/numbers";
 import { parsePeriod } from "../primitives/periods";
 import { parseStructuralShorthand } from "../primitives/shorthands";
@@ -11,7 +10,7 @@ import type { DateVocabularyLookups } from "../vocabulary";
 
 // Example: `standardizeChunks(tokensFor("all mondays"), lookups)` emits command and weekday chunks.
 export function standardizeChunks(tokens: readonly Token[], lookups: DateVocabularyLookups): StandardChunk[] {
-  return tokens.map((token) => standardizeToken(token, lookups));
+  return standardizeCalendarRangeChunks(tokens.map((token) => standardizeToken(token, lookups)));
 }
 
 // Example: `standardizeToken(monthToken("march"), lookups)` emits a month chunk with value `3`.
@@ -22,7 +21,7 @@ function standardizeToken(token: Token, lookups: DateVocabularyLookups): Standar
 
   const shorthand = parseStructuralShorthand(token.normalized);
   if (shorthand) {
-    return { kind: "shorthand", value: shorthand, token };
+    return { kind: "shorthand", value: shorthand, token, boundarySide: "start" };
   }
 
   const connector = parseConnector(token.normalized);
@@ -50,7 +49,7 @@ function standardizeToken(token: Token, lookups: DateVocabularyLookups): Standar
     return { kind: "month", value: month, token };
   }
 
-  const durationUnit = parseDurationUnit(token.normalized, lookups);
+  const durationUnit = lookups.durationUnits.get(token.normalized);
   if (durationUnit) {
     return { kind: "duration-unit", value: durationUnit, token };
   }
@@ -75,4 +74,76 @@ function standardizeToken(token: Token, lookups: DateVocabularyLookups): Standar
   }
 
   return { kind: "word", value: token.normalized, token };
+}
+
+// Example: `standardizeCalendarRangeChunks(chunksFor("3rd quarter"))` emits a structural Q3 shorthand chunk.
+function standardizeCalendarRangeChunks(chunks: readonly StandardChunk[]): StandardChunk[] {
+  const standardized: StandardChunk[] = [];
+
+  for (let index = 0; index < chunks.length; index += 1) {
+    const chunk = chunks[index];
+    const next = chunks[index + 1];
+    const afterNext = chunks[index + 2];
+
+    if (
+      chunk?.kind === "ordinal" &&
+      next?.kind === "duration-unit" &&
+      next.value === "quarter" &&
+      next.token.normalized === "quarter" &&
+      chunk.value >= 1 &&
+      chunk.value <= 4
+    ) {
+      standardized.push({
+        kind: "shorthand",
+        value: { kind: "quarter", ordinal: chunk.value },
+        boundarySide: "start",
+        token: {
+          kind: "word",
+          raw: `${chunk.token.raw} ${next.token.raw}`,
+          normalized: `q${chunk.value}`,
+          start: chunk.token.start,
+          end: next.token.end,
+        },
+      });
+      index += 1;
+      continue;
+    }
+
+    if (
+      chunk?.kind === "ordinal" &&
+      next?.kind === "word" &&
+      isOrdinalSuffix(next.value) &&
+      afterNext?.kind === "duration-unit" &&
+      afterNext.value === "quarter" &&
+      afterNext.token.normalized === "quarter" &&
+      chunk.value >= 1 &&
+      chunk.value <= 4
+    ) {
+      standardized.push({
+        kind: "shorthand",
+        value: { kind: "quarter", ordinal: chunk.value },
+        boundarySide: "start",
+        token: {
+          kind: "word",
+          raw: `${chunk.token.raw}${next.token.raw} ${afterNext.token.raw}`,
+          normalized: `q${chunk.value}`,
+          start: chunk.token.start,
+          end: afterNext.token.end,
+        },
+      });
+      index += 2;
+      continue;
+    }
+
+    if (chunk) {
+      standardized.push(chunk);
+    }
+  }
+
+  return standardized;
+}
+
+// Example: `isOrdinalSuffix("rd")` returns true.
+function isOrdinalSuffix(value: string): boolean {
+  return value === "st" || value === "nd" || value === "rd" || value === "th";
 }

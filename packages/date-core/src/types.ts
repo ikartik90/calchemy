@@ -215,6 +215,7 @@ export type InlineCompletion = {
 
 export type Calchemy = {
   Temporal: TemporalApi;
+  namedDatesVocabulary: readonly NamedDatesVocabularyEntry[];
   parseDate(input: string, context?: ParseDateContext): ParseDateResult;
   toJSON(value: DateValue): DateValueJSON;
   fromJSON(value: unknown): DateValue;

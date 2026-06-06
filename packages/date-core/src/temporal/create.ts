@@ -23,6 +23,7 @@ export function createCalchemyWithTemporal(
 
   return {
     Temporal,
+    namedDatesVocabulary: options.namedDatesVocabulary ?? [],
     parseDate(input, context = {}) {
       return parseDateWithTemporal(input, { ...options.defaultContext, ...context }, Temporal, parseOptions);
     },

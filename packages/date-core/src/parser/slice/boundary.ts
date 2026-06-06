@@ -147,7 +147,7 @@ function parseQuarterBoundary(input: string): BoundarySlice | null {
       : null;
   }
 
-  const shorthandMatch = /^(.+?)(?: (?:(this|next|last|previous) year|(\d{2,4})))?$/.exec(input);
+  const shorthandMatch = /^(.+?)(?: (?:of )?(?:(this|next|last|previous) year|(\d{2,4})))?$/.exec(input);
   const shorthand = shorthandMatch?.[1] ? parseStructuralShorthand(shorthandMatch[1]) : null;
   return shorthand?.kind === "quarter" && shorthand.ordinal >= 1 && shorthand.ordinal <= 4
     ? { kind: "quarter-range", quarter: shorthand.ordinal, year: parseYearReference(shorthandMatch?.[2], shorthandMatch?.[3]) }

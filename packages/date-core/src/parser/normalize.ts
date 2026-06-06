@@ -57,16 +57,19 @@ export function normalizeInput(input: string, lookups: DateVocabularyLookups = D
       return token;
     })
     .filter((token): token is Token => token !== null);
+  const semanticTokens = correctedTokens.filter((token, index) =>
+    isSemanticToken(token, correctedTokens[index - 1], correctedTokens[index + 1]),
+  );
 
   return {
-    normalized: correctedTokens
+    normalized: semanticTokens
       .map((token) => token.normalized)
       .join(" ")
       .replace(/\s+([,./-])\s+/g, "$1")
       .replace(/(^|\s)\.(?=\s|$)/g, " ")
       .replace(/\s+/g, " ")
       .trim(),
-    tokens: correctedTokens,
+    tokens: semanticTokens,
     corrections,
   };
 }
@@ -88,6 +91,19 @@ function tokenize(input: string): Token[] {
       end: start + raw.length,
     };
   });
+}
+
+// Example: `isSemanticToken(".", numberToken, numberToken)` preserves dotted numeric dates.
+function isSemanticToken(token: Token, previous: Token | undefined, next: Token | undefined): boolean {
+  if (token.kind !== "separator") {
+    return true;
+  }
+
+  if (token.normalized === ".") {
+    return previous?.kind === "number" && next?.kind === "number";
+  }
+
+  return token.normalized !== ",";
 }
 
 // Example: `stripKnownPossessive("week's", lookups)` returns `week` when it is known vocabulary.

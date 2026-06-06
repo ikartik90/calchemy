@@ -7,6 +7,8 @@ import { createCandidate, labelDateValue } from "./primitives/shared";
 import { createDateVocabulary, createDateVocabularyLookups, type DateVocabularyLookups } from "./vocabulary";
 import type { PlainDate, TemporalApi } from "../temporal/types";
 import type {
+  AmbiguousParseDateResult,
+  Candidate,
   DateOrder,
   DateValue,
   NamedDatesVocabularyEntry,
@@ -82,6 +84,19 @@ export function parseDateWithTemporal(
     };
   }
 
+  const ambiguousKnownExpression = parseKnownExpressionAmbiguity(
+    input,
+    normalized.normalized,
+    anchorDate,
+    resolved,
+    Temporal,
+    lookups,
+    source,
+  );
+  if (ambiguousKnownExpression) {
+    return ambiguousKnownExpression;
+  }
+
   const value = parseKnownExpression(normalized.normalized, anchorDate, resolved, Temporal, lookups, chunks);
 
   if (!value) {
@@ -138,4 +153,88 @@ function parseKnownExpression(
 ): DateValue | null {
   const slice = sliceDateExpression(input, chunks, lookups);
   return resolveDateSlice(slice, anchorDate, Temporal, context, lookups);
+}
+
+// Example: `parseKnownExpressionAmbiguity("every monday until 3/4/27", ...)` returns date-order candidates for the whole phrase.
+function parseKnownExpressionAmbiguity(
+  input: string,
+  normalizedInput: string,
+  anchorDate: PlainDate,
+  context: ResolvedParseDateContext,
+  Temporal: TemporalApi,
+  lookups: DateVocabularyLookups,
+  source: Candidate["source"],
+): AmbiguousParseDateResult | null {
+  const nestedNumeric = findNestedNumericDate(normalizedInput);
+  if (!nestedNumeric) {
+    return null;
+  }
+
+  const numericCandidates = parseNumericCandidates(nestedNumeric.value, context, Temporal, source);
+  if (numericCandidates.length <= 1) {
+    return null;
+  }
+
+  const candidates = numericCandidates.flatMap((numericCandidate) => {
+    if (numericCandidate.value.kind !== "single") {
+      return [];
+    }
+
+    const interpretedInput = replaceRange(
+      normalizedInput,
+      nestedNumeric.start,
+      nestedNumeric.end,
+      numericCandidate.value.date.toString(),
+    );
+    const normalized = normalizeInput(interpretedInput, lookups);
+    const chunks = standardizeChunks(normalized.tokens, lookups);
+    const value = parseKnownExpression(normalized.normalized, anchorDate, context, Temporal, lookups, chunks);
+
+    return value
+      ? [
+          createCandidate(
+            `nested-${numericCandidate.id}`,
+            value,
+            numericCandidate.confidence,
+            labelDateValue(value),
+            source,
+            numericCandidate.explanation,
+          ),
+        ]
+      : [];
+  });
+
+  if (candidates.length <= 1) {
+    return null;
+  }
+
+  return {
+    status: "ambiguous",
+    input,
+    candidates,
+    ambiguityGroups: [
+      {
+        id: "date-order",
+        kind: "date-order",
+        message: "Which date order did you mean?",
+        options: candidates.map((candidate) => ({
+          id: candidate.id,
+          label: candidate.explanation ?? candidate.label,
+          candidateIds: [candidate.id],
+        })),
+      },
+    ],
+    corrections: source.corrections,
+  };
+}
+
+// Example: `findNestedNumericDate("every monday until 3/4/27")` finds `3/4/27`.
+function findNestedNumericDate(input: string): { value: string; start: number; end: number } | null {
+  const match = /(?<!^)\b\d{1,4}([./-])\d{1,2}\1\d{2,4}\b/.exec(input);
+  return match ? { value: match[0], start: match.index, end: match.index + match[0].length } : null;
+}
+
+// Example: `replaceRange("until 3/4/27", 6, 12, "2027-04-03")` returns an interpreted phrase.
+function replaceRange(input: string, start: number, end: number, replacement: string): string {
+  return `${input.slice(0, start)}${replacement}${input.slice(end)}`;
 }

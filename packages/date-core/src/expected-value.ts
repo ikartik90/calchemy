@@ -1,7 +1,9 @@
 import type { DateValue, ParseDateResult, ValidParseDateResult } from "./types";
 import { parseAmount } from "./parser/primitives/numbers";
 import { toDuration } from "./parser/primitives/shared";
-import type { DurationUnit } from "./parser/types";
+import { createDateVocabulary, createDateVocabularyLookups, normalizeVocabularyValue } from "./parser/vocabulary";
+
+const DefaultDateVocabularyLookups = createDateVocabularyLookups(createDateVocabulary());
 
 export type ExpectedDateValue = DateValue["kind"];
 
@@ -54,40 +56,8 @@ function parseFromNowDuration(input: string): Record<string, number> | null {
   }
 
   const amount = parseAmount(match[1]);
-  const unit = parseDurationUnit(match[2]);
+  const unit = DefaultDateVocabularyLookups.durationUnits.get(normalizeVocabularyValue(match[2]));
   return amount && unit ? toDuration(amount, unit) : null;
-}
-
-function parseDurationUnit(input: string): DurationUnit | null {
-  if (input === "day" || input === "days") {
-    return "day";
-  }
-
-  if (input === "week" || input === "weeks" || input === "wk" || input === "wks") {
-    return "week";
-  }
-
-  if (input === "weekday" || input === "weekdays") {
-    return "weekdays";
-  }
-
-  if (input === "weekend" || input === "weekends") {
-    return "weekend";
-  }
-
-  if (input === "month" || input === "months") {
-    return "month";
-  }
-
-  if (input === "quarter" || input === "quarters") {
-    return "quarter";
-  }
-
-  if (input === "year" || input === "years" || input === "yr" || input === "yrs") {
-    return "year";
-  }
-
-  return null;
 }
 
 function withResolvedValue(result: ValidParseDateResult, value: DateValue): ValidParseDateResult {

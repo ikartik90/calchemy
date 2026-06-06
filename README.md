@@ -83,13 +83,242 @@ export function InvoiceFilter() {
     <Calchemy.Root calchemy={calchemy}>
       <Calchemy.Field placeholder="Try 'last 90 days'" />
       <Calchemy.Candidates />
-      <Calchemy.Calendar />
+      <Calchemy.Calendar>
+        <Calchemy.CalendarHeader>
+          <Calchemy.CalendarPrevious pageSize={{ months: 1 }} />
+          <Calchemy.CalendarHeading />
+          <Calchemy.CalendarNext pageSize={{ months: 1 }} />
+        </Calchemy.CalendarHeader>
+        <Calchemy.CalendarWeekdays />
+        <Calchemy.CalendarGrid />
+      </Calchemy.Calendar>
     </Calchemy.Root>
   );
 }
 ```
 
-`Calchemy.Field` owns inline tab completion. `Calchemy.Candidates` renders parse choices. `Calchemy.Calendar` is optional.
+`Calchemy.Field` owns inline tab completion. `Calchemy.Candidates` renders parse choices. `Calchemy.Calendar` is optional and renders headless calendar parts.
+
+### React state
+
+`Calchemy.Root` wraps the `useCalchemy` hook. Pass controlled props when your app owns the input or selected value, or use `defaultInputValue` and `defaultValue` for local state.
+
+```tsx
+<Calchemy.Root
+  calchemy={calchemy}
+  expectedValue="range"
+  inputValue={query}
+  onInputValueChange={setQuery}
+  value={value}
+  onValueChange={setValue}
+  parseContext={{
+    locale: "en-US",
+    weekStartsOn: 1,
+  }}
+>
+  <Calchemy.Field placeholder="Try 'next week'" />
+  <Calchemy.Candidates />
+</Calchemy.Root>
+```
+
+Use `useCalchemy()` directly when you want the parser state without the component tree.
+
+### Calendar periods
+
+`Calchemy.Calendar` renders one visible month by default. Use the `period` prop to render months or weeks in larger windows.
+
+```tsx
+<Calchemy.Calendar period={{ months: 3 }}>
+  <Calchemy.CalendarHeader>
+    <Calchemy.CalendarPrevious pageSize={{ months: 3 }} />
+    <Calchemy.CalendarHeading />
+    <Calchemy.CalendarNext pageSize={{ months: 3 }} />
+  </Calchemy.CalendarHeader>
+
+  <Calchemy.CalendarMonthSelect aria-label="Month" />
+  <Calchemy.CalendarYearSelect aria-label="Year" />
+
+  <Calchemy.CalendarPeriodList>
+    <Calchemy.CalendarPeriod>
+      <Calchemy.CalendarPeriodHeading />
+      <Calchemy.CalendarWeekdays />
+      <Calchemy.CalendarGrid showBookends />
+    </Calchemy.CalendarPeriod>
+  </Calchemy.CalendarPeriodList>
+</Calchemy.Calendar>
+```
+
+Calendar parts are composable:
+
+- `CalendarHeading` labels the current visible period window and accepts custom children.
+- `CalendarPrevious` and `CalendarNext` move by `pageSize` from the current visible period, including after scroll.
+- `CalendarMonthSelect` and `CalendarYearSelect` are native select controls. Their values are strings at the DOM boundary and numbers when updating Temporal dates.
+- `CalendarWeekdays` uses `parseContext.weekStartsOn`.
+- `CalendarGrid` selects a single date on click and can render outside-month bookend days with `showBookends`.
+
+`period` and `pageSize` use Temporal-style duration objects:
+
+```tsx
+<Calchemy.Calendar period={{ months: 3 }}>
+  <Calchemy.CalendarPrevious pageSize={{ months: 1 }} />
+  <Calchemy.CalendarNext pageSize={{ months: 1 }} />
+</Calchemy.Calendar>
+```
+
+### Calendar constraints
+
+Use `bounds` to cap calendar operation. Navigation, scrolling, preloading, generated periods, and date selection stay inside the range.
+
+```tsx
+function BookingCalendar() {
+  const state = useCalchemyContext();
+  const today =
+    state.parseContext?.anchor?.toPlainDate() ??
+    state.calchemy.Temporal.Now.plainDateISO();
+
+  return (
+    <Calchemy.Calendar
+      period={{ months: 3 }}
+      bounds={{
+        start: today,
+        end: today.add({ months: 6 }),
+      }}
+    >
+      <Calchemy.CalendarHeader>
+        <Calchemy.CalendarPrevious pageSize={{ months: 1 }} />
+        <Calchemy.CalendarHeading />
+        <Calchemy.CalendarNext pageSize={{ months: 1 }} />
+      </Calchemy.CalendarHeader>
+      <Calchemy.CalendarGrid />
+    </Calchemy.Calendar>
+  );
+}
+```
+
+Use `isDateDisabled` for dates that should remain visible but cannot be selected.
+
+```tsx
+<Calchemy.Calendar
+  isDateDisabled={(date) => date.dayOfWeek === 6 || date.dayOfWeek === 7}
+>
+  <Calchemy.CalendarGrid />
+</Calchemy.Calendar>
+```
+
+Disabled days render with `disabled` and `data-disabled`. Days outside `bounds` also receive `data-out-of-bounds`.
+
+Named-date styling uses the same `NamedDatesVocabularyEntry` records passed to `createCalchemy()`.
+
+```tsx
+const calchemy = await createCalchemy({
+  namedDatesVocabulary: [
+    {
+      value: "company holiday",
+      isHoliday: true,
+      resolveDate({ year, context }) {
+        return context.anchor.toPlainDate().with({ year, month: 12, day: 25 });
+      },
+    },
+  ],
+});
+
+<Calchemy.Root calchemy={calchemy}>
+  <Calchemy.Calendar namedDates="holidays">
+    <Calchemy.CalendarGrid />
+  </Calchemy.Calendar>
+</Calchemy.Root>;
+```
+
+Use `namedDates="all"` to expose all configured named dates or `namedDates="holidays"` to expose entries with `isHoliday: true`. Matching days receive `data-named-date`; holiday matches also receive `data-holiday`.
+
+### Scrollable calendars
+
+Wrap `CalendarPeriodList` in `CalendarScroll` to preload periods as the user scrolls. The scroll direction defaults to vertical.
+
+```tsx
+<Calchemy.Calendar period={{ months: 3 }}>
+  <Calchemy.CalendarHeader>
+    <Calchemy.CalendarHeading />
+  </Calchemy.CalendarHeader>
+
+  <Calchemy.CalendarScroll direction="horizontal">
+    <Calchemy.CalendarPeriodList>
+      <Calchemy.CalendarPeriod>
+        <Calchemy.CalendarPeriodHeading />
+        <Calchemy.CalendarWeekdays />
+        <Calchemy.CalendarGrid />
+      </Calchemy.CalendarPeriod>
+    </Calchemy.CalendarPeriodList>
+  </Calchemy.CalendarScroll>
+</Calchemy.Calendar>
+```
+
+For vertical scrolling, give the scroll element a block-size or max-block-size. Without a height constraint, the page scrolls because the calendar grows to fit its content.
+
+```css
+[data-calchemy-scroll][data-direction="vertical"] {
+  max-block-size: 32rem;
+  overflow-y: auto;
+}
+
+[data-calchemy-scroll][data-direction="horizontal"] [data-calchemy-period-list] {
+  display: grid;
+  grid-auto-columns: calc((100% - 2rem) / 3);
+  grid-auto-flow: column;
+  gap: 1rem;
+}
+```
+
+`CalendarHeading`, `CalendarPrevious`, `CalendarNext`, `CalendarMonthSelect`, and `CalendarYearSelect` follow the current visible period while scrolling.
+
+### Custom calendar controls
+
+Use `useCalchemyCalendar()` inside `Calchemy.Calendar` when you want custom controls, including Radix UI selects or your own dropdown.
+
+```tsx
+import * as Select from "@radix-ui/react-select";
+import { useCalchemyCalendar } from "@calchemy/date-react";
+
+function MonthDropdown() {
+  const calendar = useCalchemyCalendar();
+  const current = calendar.visiblePeriodAnchor;
+
+  return (
+    <Select.Root
+      value={String(current.month)}
+      onValueChange={(value) => {
+        calendar.setPeriodAnchor(
+          current.with({ month: Number(value), day: 1 }),
+        );
+      }}
+    >
+      <Select.Trigger aria-label="Month">
+        <Select.Value />
+      </Select.Trigger>
+      <Select.Portal>
+        <Select.Content position="popper">
+          <Select.Viewport>
+            {Array.from({ length: 12 }, (_, index) => {
+              const month = index + 1;
+              const date = current.with({ month, day: 1 });
+
+              return (
+                <Select.Item key={month} value={String(month)}>
+                  <Select.ItemText>
+                    {date.toLocaleString(calendar.locale, { month: "long" })}
+                  </Select.ItemText>
+                </Select.Item>
+              );
+            })}
+          </Select.Viewport>
+        </Select.Content>
+      </Select.Portal>
+    </Select.Root>
+  );
+}
+```
+
+Use `calendar.visiblePeriodAnchor` for controls that should follow scrolling. Use `calendar.setPeriodAnchor()` to jump to a new month or year.
 
 ## Styling examples
 
@@ -115,10 +344,19 @@ Style the headless primitives with plain CSS, recipes, utility classes, CSS Modu
 }
 
 [data-calchemy-candidate],
-[data-calchemy-calendar-day] {
+[data-calchemy-day] {
   background: transparent;
   border: 0;
   cursor: pointer;
+}
+
+[data-calchemy-day][data-selected] {
+  background: #111;
+  color: white;
+}
+
+[data-calchemy-day][data-today] {
+  outline: 1px solid currentColor;
 }
 ```
 
@@ -138,7 +376,7 @@ Style the headless primitives with plain CSS, recipes, utility classes, CSS Modu
 <Calchemy.Root calchemy={calchemy}>
   <Calchemy.Field className="rounded-md border px-3 py-2" />
   <Calchemy.Candidates className="mt-2 grid gap-1" />
-  <Calchemy.Calendar className="mt-2 grid grid-cols-7 gap-1" />
+  <Calchemy.Calendar className="mt-2" />
 </Calchemy.Root>
 ```
 

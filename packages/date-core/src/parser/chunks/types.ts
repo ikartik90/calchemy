@@ -1,6 +1,7 @@
 import type { Token } from "../../types";
 import type { StructuralShorthand } from "../primitives/shorthands";
 import type {
+  BoundaryEndpointSide,
   Connector,
   DurationUnit,
   ExclusionMarker,
@@ -19,6 +20,6 @@ export type StandardChunk =
   | { kind: "period"; value: Period; token: Token }
   | { kind: "relative"; value: string; token: Token }
   | { kind: "separator"; value: string; token: Token }
-  | { kind: "shorthand"; value: StructuralShorthand; token: Token }
+  | { kind: "shorthand"; value: StructuralShorthand; token: Token; boundarySide?: BoundaryEndpointSide }
   | { kind: "weekday"; value: number; token: Token }
   | { kind: "word"; value: string; token: Token };

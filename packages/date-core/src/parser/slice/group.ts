@@ -15,6 +15,7 @@ import {
   MultiTokenSamplerCommandValues,
   RelativeModifierSet,
   TransformOperatorSet,
+  type BoundaryEndpointSide,
   type RelationDirection,
   type RelativeModifier,
   type SamplerCommand,
@@ -170,7 +171,8 @@ function sliceUpperBoundRange(
     return null;
   }
 
-  const start = parseBoundaryEndpoint(trimCommandAndArticle(chunks.slice(0, upperBound.index)), lookups);
+  const startChunks = trimCommandAndArticle(chunks.slice(0, upperBound.index));
+  const start = parseTypedBoundaryEndpoint(chunkText(startChunks), lookups, boundarySideFromChunks(startChunks) ?? "end");
   const end = parseBoundaryEndpoint(chunks.slice(upperBound.index + upperBound.width), lookups);
   return start && end ? createSlice({ kind: "range", start, end }, exclusions, null, null, transforms) : null;
 }
@@ -261,6 +263,12 @@ function parseBoundaryEndpoint(chunks: readonly StandardChunk[], lookups: DateVo
   }
 
   return parseTypedBoundaryEndpoint(chunkText(trimLeadingArticle(chunks)), lookups, "end");
+}
+
+// Example: `boundarySideFromChunks(chunksFor("q3"))` returns `start`.
+function boundarySideFromChunks(chunks: readonly StandardChunk[]): BoundaryEndpointSide | undefined {
+  const shorthand = chunks.find((chunk): chunk is Extract<StandardChunk, { kind: "shorthand" }> => chunk.kind === "shorthand" && Boolean(chunk.boundarySide));
+  return shorthand?.boundarySide;
 }
 
 // Example: `parseWeekdayRelation(chunksFor("first monday after christmas"), lookups)` returns boundary plus relation.
@@ -560,7 +568,7 @@ function trimTrailingSeparators(chunks: readonly StandardChunk[]): readonly Stan
 // Example: `chunkText(chunksFor("q 4"))` returns normalized phrase text `q4`.
 function chunkText(chunks: readonly StandardChunk[]): string {
   return chunks
-    .map((chunk) => chunk.token.normalized)
+    .map((chunk) => (chunk.kind === "shorthand" ? `${chunk.value.kind[0]}${chunk.value.ordinal}` : chunk.token.normalized))
     .join(" ")
     .replace(/\b([mqw]) (\d+)/g, "$1$2")
     .replace(/\s+([,./])\s*/g, "$1")

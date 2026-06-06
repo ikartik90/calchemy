@@ -14,7 +14,7 @@ export function parseNumericCandidates(
     return [];
   }
 
-  return context.dateOrderPreference
+  return dateOrderCandidates(input, context.dateOrderPreference)
     .map((order, index) => {
       const date = parseNumericDate(input, order, context.anchor.year, Temporal);
       if (!date) {
@@ -31,6 +31,11 @@ export function parseNumericCandidates(
       );
     })
     .filter((candidate): candidate is Candidate => candidate !== null);
+}
+
+// Example: `dateOrderCandidates("2026-11-10", ["MDY", "DMY"])` includes ISO-style `YMD`.
+function dateOrderCandidates(input: string, preference: readonly DateOrder[]): DateOrder[] {
+  return hasLeadingFourDigitYear(input) ? Array.from(new Set([...preference, "YMD" as const])) : [...preference];
 }
 
 // Example: `parseNumericDate("03/04/25", "DMY", 2026, Temporal)` returns 2025-04-03.
@@ -72,6 +77,11 @@ function parseNumericDate(
 // Example: `isNumericDate("2026-11-10")` returns true.
 function isNumericDate(input: string): boolean {
   return /^\d{1,4}([./-])\d{1,2}\1\d{2,4}$/.test(input);
+}
+
+// Example: `hasLeadingFourDigitYear("2026-11-10")` returns true.
+function hasLeadingFourDigitYear(input: string): boolean {
+  return /^\d{4}([./-])\d{1,2}\1\d{2,4}$/.test(input);
 }
 
 // Example: `formatDateOrder("MDY")` returns `MM/DD/YY`.

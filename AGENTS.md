@@ -39,32 +39,28 @@ Agents MUST consult official documentation before implementing APIs or framework
 │   ├── date-core/
 │   │   ├── src/
 │   │   │   ├── parser/
-│   │   │   ├── temporal/
+│   │   │   │   ├── chunks/
+│   │   │   │   ├── primitives/
+│   │   │   │   ├── resolve/
+│   │   │   │   └── slice/
 │   │   │   ├── serialize/
-│   │   │   └── index.ts
+│   │   │   └── temporal/
 │   │   └── tests/
 │   ├── date-react/
 │   │   ├── src/
 │   │   │   ├── components/
-│   │   │   ├── hooks/
-│   │   │   └── index.ts
+│   │   │   └── hooks/
 │   │   └── tests/
-│   ├── date-holidays/
-│   └── date-fuzzy/
-├── examples/
-│   ├── vanilla-css/
-│   ├── panda-css/
-│   └── tailwind/
-├── docs/
-├── README.md
-└── AGENTS.md
+└── scripts/
 ```
 
 ## Ownership Rules
 
-- Parser logic belongs in `date-core`, never in React components.
-- React components should be headless, unstyled, and composable.
-- Styling examples belong in `examples/`, not in package internals.
+- `packages/date-core` owns parser semantics, candidate ranking, ambiguity modeling, Temporal value creation, expected-value helpers, and JSON/form serialization.
+- Parser behavior belongs in `date-core`, never in React components, demos, or scripts.
+- `packages/date-react` owns headless React primitives and hooks that consume the public `date-core` API. Keep it unstyled, composable, and independent from popover or styling libraries.
+- `scripts/parse-date.mjs` is for parser CLI checks and developer workflows. Keep reusable parsing behavior in `date-core`.
+- Future optional workspaces such as holiday providers, fuzzy matching, docs, or examples should live under their own package or top-level directory and consume `date-core` through public exports.
 
 # Build and Test Commands
 
@@ -89,11 +85,14 @@ pnpm --filter @calchemy/date-core typecheck
 
 ## Core Parser API
 
-Expose a simple public name with a rich result:
+Expose parsing through the `Calchemy` instance with a rich result:
 
 ```ts
-parseDate(input, context);
+const calchemy = await createCalchemy();
+calchemy.parseDate(input, context);
 ```
+
+Use `parseDateWithTemporal(input, context, Temporal)` only when injecting a Temporal implementation directly.
 
 The parser must support these result states:
 
@@ -131,17 +130,16 @@ Do not hide ambiguity by silently choosing one interpretation unless the caller 
 
 Prefer a deterministic, inspectable pipeline:
 
-1. Normalize: clean casing, whitespace, punctuation, and separators.
-2. Tokenize: split input into date vocabulary.
-3. Correct: apply typo and shorthand tolerance with correction metadata.
-4. Parse: convert tokens into semantic date instructions.
-5. Resolve context: apply the Temporal current-time anchor plus locale, week-start, and holiday settings.
-6. Expand: convert instructions into concrete Temporal values.
-7. Rank: score plausible candidates.
-8. Detect ambiguity: group competing interpretations.
-9. Return result: produce `valid`, `ambiguous`, or `invalid` output.
+1. Build vocabulary lookups, including configured named dates.
+2. Normalize and tokenize input: clean casing, whitespace, punctuation, aliases, articles, possessives, and known typos while recording corrections.
+3. Standardize tokens into typed chunks such as weekdays, months, periods, connectors, ordinals, shorthands, commands, exclusions, and numbers.
+4. Resolve context: apply the Temporal anchor plus locale, week-start, date-order preference, holiday provider, and relative-range options.
+5. Parse numeric date candidates first. Return `valid` for one candidate or `ambiguous` with a date-order group for competing candidates.
+6. Slice known language chunks into typed date intent: boundaries, relations, samplers, transforms, and exclusions.
+7. Resolve the slice into concrete Temporal values by resolving boundaries, applying relations, sampling, transforming, excluding dates, and materializing a `DateValue`.
+8. Return `valid` with the best candidate or `invalid` with structured errors and correction metadata.
 
-Known grammar and phrase support should remain distinct from broad fuzzy matching.
+Known grammar and phrase support should remain distinct from vocabulary aliases and fuzzy vocabulary correction.
 
 ## React Components
 

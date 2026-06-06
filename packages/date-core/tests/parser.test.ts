@@ -51,7 +51,9 @@ describe("parseDate", () => {
 
   test.each([
     ["today", { kind: "single", date: "2026-05-27" }],
+    ["today.", { kind: "single", date: "2026-05-27" }],
     ["tomorrow", { kind: "single", date: "2026-05-28" }],
+    ["tomorrow, next month.", { kind: "single", date: "2026-06-28" }],
     ["three weeks from now", { kind: "single", date: "2026-06-17" }],
     ["3 quarters from now", { kind: "single", date: "2027-02-27" }],
     ["2 yrs from now", { kind: "single", date: "2028-05-27" }],
@@ -76,7 +78,7 @@ describe("parseDate", () => {
     ["25 days from tomorrow upto the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
     ["25 days from tomorrow to the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
     ["tomorrow until end of next month", { kind: "range", start: "2026-05-28", end: "2026-06-30" }],
-    ["12 weeks from 3/6/26", { kind: "range", start: "2026-06-03", end: "2026-08-26" }],
+    ["3rd quarter until the end of the year.", { kind: "range", start: "2026-07-01", end: "2026-12-31" }],
     ["12 weeks from 6 mar, 27", { kind: "range", start: "2027-03-06", end: "2027-05-29" }],
     ["12 weeks from 6 mar, 27 until end of q3 27", { kind: "range", start: "2027-05-29", end: "2027-09-30" }],
     ["first 10 days of next month", { kind: "range", start: "2026-06-01", end: "2026-06-10" }],
@@ -88,16 +90,13 @@ describe("parseDate", () => {
     ["51st and 52nd week this year", { kind: "range", start: "2026-12-17", end: "2026-12-30" }],
     ["between 50th and 52nd week this year", { kind: "range", start: "2026-12-10", end: "2026-12-30" }],
     ["Christmas 2026-Jul 1, 27", { kind: "range", start: "2026-12-25", end: "2027-07-01" }],
-    ["from christmas to 7/1/2027", { kind: "range", start: "2026-12-25", end: "2027-01-07" }],
-    ["from christmas to 7-1-2027", { kind: "range", start: "2026-12-25", end: "2027-01-07" }],
-    ["from christmas to 7.1.2027", { kind: "range", start: "2026-12-25", end: "2027-01-07" }],
-    ["select 3/6/26 to end of q3", { kind: "range", start: "2026-06-03", end: "2026-09-30" }],
     ["2026-11-10/2026-11-24", { kind: "range", start: "2026-11-10", end: "2026-11-24" }],
     ["between christmas and jul 1 2027", { kind: "range", start: "2026-12-25", end: "2027-07-01" }],
     ["Q1", { kind: "range", start: "2026-01-01", end: "2026-03-31" }],
     ["q2", { kind: "range", start: "2026-04-01", end: "2026-06-30" }],
     ["Q3 2027", { kind: "range", start: "2027-07-01", end: "2027-09-30" }],
     ["Q4 next year", { kind: "range", start: "2027-10-01", end: "2027-12-31" }],
+    ["3rd quarter", { kind: "range", start: "2026-07-01", end: "2026-09-30" }],
     ["this quarter", { kind: "range", start: "2026-04-01", end: "2026-06-30" }],
     ["next quarter", { kind: "range", start: "2026-07-01", end: "2026-09-30" }],
     ["previous quarter", { kind: "range", start: "2026-01-01", end: "2026-03-31" }],
@@ -146,6 +145,7 @@ describe("parseDate", () => {
     ["the tuesday after second weekend of next month", { kind: "single", date: "2026-06-16" }],
     ["jul 1", { kind: "single", date: "2026-07-01" }],
     ["jan 5", { kind: "single", date: "2026-01-05" }],
+    ["mar. 6, 27", { kind: "single", date: "2027-03-06" }],
     ["6 mar, 27", { kind: "single", date: "2027-03-06" }],
     ["06 mar, 2027", { kind: "single", date: "2027-03-06" }],
     ["6 mar 27", { kind: "single", date: "2027-03-06" }],
@@ -1074,6 +1074,101 @@ describe("parseDate", () => {
     }
   });
 
+  test.each([
+    [
+      "12 weeks from 3/6/26",
+      [
+        { kind: "range", start: "2026-06-03", end: "2026-08-26" },
+        { kind: "range", start: "2026-03-06", end: "2026-05-29" },
+        { kind: "range", start: "2003-06-26", end: "2003-09-18" },
+      ],
+    ],
+    [
+      "from christmas to 7/1/2027",
+      [
+        { kind: "range", start: "2026-12-25", end: "2027-01-07" },
+        { kind: "range", start: "2026-12-25", end: "2027-07-01" },
+      ],
+    ],
+    [
+      "select 3/6/26 to end of q3",
+      [
+        { kind: "range", start: "2026-06-03", end: "2026-09-30" },
+        { kind: "range", start: "2026-03-06", end: "2026-09-30" },
+        { kind: "range", start: "2003-06-26", end: "2026-09-30" },
+      ],
+    ],
+  ])("returns ambiguity for nested numeric dates: %s", (input, expected) => {
+    const result = calchemy.parseDate(input, context);
+
+    expect(result.status).toBe("ambiguous");
+    if (result.status === "ambiguous") {
+      expect(result.ambiguityGroups[0]?.kind).toBe("date-order");
+      expect(result.candidates.map((candidate) => calchemy.toJSON(candidate.value))).toEqual(expected);
+    }
+  });
+
+  test("returns ambiguity for sampled ranges with numeric until endpoints", () => {
+    const result = calchemy.parseDate("every monday and thursday until 3/4/27", context);
+
+    expect(result.status).toBe("ambiguous");
+    if (result.status === "ambiguous") {
+      expect(result.ambiguityGroups[0]?.kind).toBe("date-order");
+      expect(result.candidates).toHaveLength(2);
+      expect(result.candidates.map((candidate) => candidate.id)).toEqual(["nested-dmy", "nested-mdy"]);
+      expect(
+        result.candidates.map((candidate) => {
+          const value = calchemy.toJSON(candidate.value);
+          return value.kind === "multiple" ? value.dates.at(-1) : null;
+        }),
+      ).toEqual(["2027-04-01", "2027-03-04"]);
+    }
+  });
+
+  test("returns ambiguity for sampled ranges with demo date order preferences", () => {
+    const demoCalchemy = createCalchemyWithTemporal(Temporal, {
+      defaultContext: {
+        anchor,
+        locale: "en-US",
+        weekStartsOn: 0,
+        dateOrderPreference: ["MDY", "DMY"],
+      },
+    });
+    const result = demoCalchemy.parseDate("every monday and thursday until 3/4/27");
+
+    expect(result.status).toBe("ambiguous");
+    if (result.status === "ambiguous") {
+      expect(result.ambiguityGroups[0]?.kind).toBe("date-order");
+      expect(result.candidates.map((candidate) => candidate.id)).toEqual(["nested-mdy", "nested-dmy"]);
+      expect(
+        result.candidates.map((candidate) => {
+          const value = demoCalchemy.toJSON(candidate.value);
+          return value.kind === "multiple" ? value.dates.at(-1) : null;
+        }),
+      ).toEqual(["2027-03-04", "2027-04-01"]);
+    }
+  });
+
+  test("returns ambiguity for scoped sampled ranges with numeric until endpoints", () => {
+    const result = calchemy.parseDate("mondays and thursdays from 3rd quarter until 3/4/27", context);
+
+    expect(result.status).toBe("ambiguous");
+    if (result.status === "ambiguous") {
+      expect(result.ambiguityGroups[0]?.kind).toBe("date-order");
+      expect(result.candidates).toHaveLength(2);
+      expect(result.candidates.map((candidate) => candidate.id)).toEqual(["nested-dmy", "nested-mdy"]);
+      expect(
+        result.candidates.map((candidate) => {
+          const value = calchemy.toJSON(candidate.value);
+          return value.kind === "multiple" ? { first: value.dates.at(0), last: value.dates.at(-1) } : null;
+        }),
+      ).toEqual([
+        { first: "2026-07-02", last: "2027-04-01" },
+        { first: "2026-07-02", last: "2027-03-04" },
+      ]);
+    }
+  });
+
   test("allows date order preference through parser initialization", () => {
     const ymdCalchemy = createCalchemyWithTemporal(Temporal, {
       defaultContext: {
@@ -1094,6 +1189,7 @@ describe("parseDate", () => {
   test("resolves expected value kind mismatches in core", () => {
     const rangeResult = calchemy.parseDate("last 90 days", context);
     const fromNowResult = calchemy.parseDate("12 weeks from now", context);
+    const quarterResult = calchemy.parseDate("3 quarters from now", context);
 
     expect(rangeResult.status).toBe("valid");
     if (rangeResult.status === "valid") {
@@ -1119,6 +1215,15 @@ describe("parseDate", () => {
       expect(rangeResult.status).toBe("valid");
       if (rangeResult.status === "valid") {
         expect(calchemy.toJSON(rangeResult.value)).toEqual({ kind: "range", start: "2026-05-27", end: "2026-08-19" });
+      }
+    }
+
+    expect(quarterResult.status).toBe("valid");
+    if (quarterResult.status === "valid") {
+      const rangeResult = resolveExpectedDateValue(quarterResult, "range");
+      expect(rangeResult.status).toBe("valid");
+      if (rangeResult.status === "valid") {
+        expect(calchemy.toJSON(rangeResult.value)).toEqual({ kind: "range", start: "2026-05-27", end: "2027-02-27" });
       }
     }
   });

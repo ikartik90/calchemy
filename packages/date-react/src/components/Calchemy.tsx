@@ -1,9 +1,17 @@
-import { createContext, useContext } from "react";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
-import type { DateValue } from "@calchemy/date-core";
-import { useCalchemy, type CalchemyState, type UseCalchemyOptions } from "../hooks/useCalchemy";
-
-const CalchemyContext = createContext<CalchemyState | null>(null);
+import { CalchemyContext, useCalchemyContext } from "./calendar/context";
+import { useCalchemy, type UseCalchemyOptions } from "../hooks/useCalchemy";
+import {
+  Calendar,
+  CalendarHeader,
+  CalendarHeading,
+  CalendarNext,
+  CalendarPrevious,
+} from "./calendar/Calendar";
+import { CalendarGrid, CalendarWeekdays } from "./calendar/CalendarGrid";
+import { CalendarPeriodHeading } from "./calendar/CalendarPeriodHeading";
+import { CalendarPeriod, CalendarPeriodList, CalendarScroll } from "./calendar/CalendarScroll";
+import { CalendarMonthSelect, CalendarYearSelect } from "./calendar/CalendarSelects";
 
 export type CalchemyRootProps = UseCalchemyOptions & {
   children: ReactNode;
@@ -69,60 +77,47 @@ function Candidates(props: CalchemyCandidatesProps) {
   );
 }
 
-export type CalchemyCalendarProps = Omit<ComponentPropsWithoutRef<"div">, "onSelect"> & {
-  month?: DateValue;
-};
+export { useCalchemyCalendar, useCalchemyContext } from "./calendar/context";
 
-function Calendar(props: CalchemyCalendarProps) {
-  const { month: _month, ...divProps } = props;
-  const state = useCalchemyContext();
-
-  if (state.expectedValue && state.expectedValue !== "single") {
-    return null;
-  }
-
-  const selected = state.value?.kind === "single" ? state.value.date : null;
-  const baseDate =
-    selected ??
-    (state.result.status === "valid" && state.result.value.kind === "single" ? state.result.value.date : null);
-
-  if (!baseDate) {
-    return null;
-  }
-
-  const first = baseDate.with({ day: 1 });
-  const days = Array.from({ length: first.daysInMonth }, (_, index) => first.add({ days: index }));
-
-  return (
-    <div {...divProps} data-calchemy-calendar="">
-      {days.map((date) => (
-        <button
-          type="button"
-          key={date.toString()}
-          data-calchemy-calendar-day=""
-          data-selected={selected?.equals(date) ? "" : undefined}
-          onClick={() => state.selectDate({ kind: "single", date })}
-        >
-          {date.day}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-export function useCalchemyContext(): CalchemyState {
-  const state = useContext(CalchemyContext);
-
-  if (!state) {
-    throw new Error("Calchemy components must be rendered inside Calchemy.Root.");
-  }
-
-  return state;
-}
+export type {
+  CalendarBounds,
+  CalendarDuration,
+  CalendarNamedDates,
+  CalendarPeriodModel,
+  CalendarPeriodUnit,
+  CalendarState,
+  ParsedCalendarPeriod,
+} from "./calendar/types";
+export type {
+  CalchemyCalendarHeaderProps,
+  CalchemyCalendarHeadingProps,
+  CalchemyCalendarNavigationProps,
+  CalchemyCalendarProps,
+} from "./calendar/Calendar";
+export type { CalchemyCalendarGridProps, CalchemyCalendarWeekdaysProps } from "./calendar/CalendarGrid";
+export type { CalchemyCalendarPeriodHeadingProps } from "./calendar/CalendarPeriodHeading";
+export type {
+  CalchemyCalendarPeriodListProps,
+  CalchemyCalendarPeriodProps,
+  CalchemyCalendarScrollProps,
+} from "./calendar/CalendarScroll";
+export type { CalchemyCalendarMonthSelectProps, CalchemyCalendarYearSelectProps } from "./calendar/CalendarSelects";
 
 export const Calchemy = {
   Root,
   Field,
   Candidates,
   Calendar,
+  CalendarHeader,
+  CalendarHeading,
+  CalendarPrevious,
+  CalendarNext,
+  CalendarScroll,
+  CalendarPeriodList,
+  CalendarPeriod,
+  CalendarPeriodHeading,
+  CalendarWeekdays,
+  CalendarGrid,
+  CalendarMonthSelect,
+  CalendarYearSelect,
 };
