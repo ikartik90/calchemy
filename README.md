@@ -80,7 +80,7 @@ const calchemy = await createCalchemy();
 
 export function InvoiceFilter() {
   return (
-    <Calchemy.Root calchemy={calchemy}>
+    <Calchemy.Root calchemy={calchemy} expectedValue="range">
       <Calchemy.Field placeholder="Try 'last 90 days'" />
       <Calchemy.Candidates />
       <Calchemy.Calendar>
@@ -101,7 +101,7 @@ export function InvoiceFilter() {
 
 ### React state
 
-`Calchemy.Root` wraps the `useCalchemy` hook. Pass controlled props when your app owns the input or selected value, or use `defaultInputValue` and `defaultValue` for local state.
+`Calchemy.Root` wraps the `useCalchemy` hook. Set `expectedValue` to the value kind your field accepts: `single`, `range`, or `multiple`. Pass controlled props when your app owns the input or selected value, or use `defaultInputValue` and `defaultValue` for local state.
 
 ```tsx
 <Calchemy.Root
@@ -154,7 +154,18 @@ Calendar parts are composable:
 - `CalendarPrevious` and `CalendarNext` move by `pageSize` from the current visible period, including after scroll.
 - `CalendarMonthSelect` and `CalendarYearSelect` are native select controls. Their values are strings at the DOM boundary and numbers when updating Temporal dates.
 - `CalendarWeekdays` uses `parseContext.weekStartsOn`.
-- `CalendarGrid` selects a single date on click and can render outside-month bookend days with `showBookends`.
+- `CalendarGrid` selects dates on click and can render outside-month bookend days with `showBookends`.
+
+For `expectedValue="multiple"`, `CalendarGrid` supports click and drag toggling. A click toggles one day. A drag toggles every enabled day cell intersecting the drag rectangle: unselected dates become selected, selected dates become deselected, and dates outside the rectangle keep their current state.
+
+```tsx
+<Calchemy.Root calchemy={calchemy} expectedValue="multiple">
+  <Calchemy.Calendar>
+    <Calchemy.CalendarWeekdays />
+    <Calchemy.CalendarGrid />
+  </Calchemy.Calendar>
+</Calchemy.Root>
+```
 
 `period` and `pageSize` use Temporal-style duration objects:
 
@@ -222,7 +233,7 @@ const calchemy = await createCalchemy({
   ],
 });
 
-<Calchemy.Root calchemy={calchemy}>
+<Calchemy.Root calchemy={calchemy} expectedValue="single">
   <Calchemy.Calendar namedDates="holidays">
     <Calchemy.CalendarGrid />
   </Calchemy.Calendar>
@@ -327,7 +338,7 @@ Style the headless primitives with plain CSS, recipes, utility classes, CSS Modu
 ### Vanilla CSS
 
 ```tsx
-<Calchemy.Root calchemy={calchemy}>
+<Calchemy.Root calchemy={calchemy} expectedValue="range">
   <Calchemy.Field className="date-field" />
   <div className="date-popover">
     <Calchemy.Candidates />
@@ -363,7 +374,7 @@ Style the headless primitives with plain CSS, recipes, utility classes, CSS Modu
 ### Panda CSS
 
 ```tsx
-<Calchemy.Root calchemy={calchemy}>
+<Calchemy.Root calchemy={calchemy} expectedValue="range">
   <Calchemy.Field className={dateInputRecipe()} />
   <Calchemy.Candidates className={candidateListRecipe()} />
   <Calchemy.Calendar className={calendarRecipe()} />
@@ -373,7 +384,7 @@ Style the headless primitives with plain CSS, recipes, utility classes, CSS Modu
 ### Tailwind
 
 ```tsx
-<Calchemy.Root calchemy={calchemy}>
+<Calchemy.Root calchemy={calchemy} expectedValue="range">
   <Calchemy.Field className="rounded-md border px-3 py-2" />
   <Calchemy.Candidates className="mt-2 grid gap-1" />
   <Calchemy.Calendar className="mt-2" />

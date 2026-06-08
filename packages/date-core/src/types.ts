@@ -179,6 +179,13 @@ export type ParseDateError = {
   token?: Token;
 };
 
+export type ParseDateWarning = {
+  code: "maximum-selectable-dates-exceeded";
+  message: string;
+  limit: number;
+  total: number;
+};
+
 export type ParseDateResult =
   | ValidParseDateResult
   | AmbiguousParseDateResult
@@ -190,6 +197,7 @@ export type ValidParseDateResult = {
   value: DateValue;
   candidates: Candidate[];
   corrections: Correction[];
+  warnings: ParseDateWarning[];
 };
 
 export type AmbiguousParseDateResult = {
@@ -198,6 +206,7 @@ export type AmbiguousParseDateResult = {
   candidates: Candidate[];
   ambiguityGroups: AmbiguityGroup[];
   corrections: Correction[];
+  warnings: ParseDateWarning[];
 };
 
 export type InvalidParseDateResult = {
@@ -205,6 +214,7 @@ export type InvalidParseDateResult = {
   input: string;
   errors: ParseDateError[];
   corrections: Correction[];
+  warnings: ParseDateWarning[];
 };
 
 export type InlineCompletion = {

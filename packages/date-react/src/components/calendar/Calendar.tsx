@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ComponentPropsWithoutRef, MouseEvent } from "react";
 import type { PlainDate } from "@calchemy/date-core";
 import { CalendarContext, useCalchemyCalendar, useCalchemyContext } from "./context";
@@ -51,6 +51,9 @@ export function Calendar({
     inputValue: string;
     index: number;
   } | null>(null);
+  useEffect(() => {
+    setScrolledVisiblePeriodIndex(null);
+  }, [state.expectedValue]);
   const periodAnchor = clampDateToBounds(
     navigationAnchor?.inputValue === state.inputValue ? navigationAnchor.date : derivedAnchor,
     bounds,
@@ -160,6 +163,9 @@ export function Calendar({
         },
         selectDate(date) {
           state.selectDate({ kind: "single", date });
+        },
+        selectValue(value) {
+          state.selectDate(value);
         },
       }) satisfies CalendarState,
     [

@@ -34,6 +34,7 @@ export function parseBoundary(input: string, lookups: DateVocabularyLookups): Bo
   return (
     parseBoundarySideBoundary(normalized, lookups) ??
     parseDurationFromAnchorBoundary(normalized, lookups) ??
+    parseDurationNearBoundary(normalized, lookups) ??
     parseRelativeBoundary(normalized, lookups) ??
     parseShorthandRangeListBoundary(normalized) ??
     parseNamedMonthBoundary(normalized, lookups) ??
@@ -222,6 +223,30 @@ function parseDurationFromAnchorBoundary(input: string, lookups: DateVocabularyL
   const amount = parseAmount(match[1]);
   const unit = parseDurationUnit(match[2], lookups);
   return amount && unit ? { kind: "duration-from-anchor", amount, unit, anchor: parseBoundary(match[3], lookups) } : null;
+}
+
+// Example: `parseDurationNearBoundary("3 days before christmas", lookups)` returns offset intent.
+function parseDurationNearBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
+  const match = /^(?:(.+) )?([a-z]+) (after|before|following|preceding) (.+)$/.exec(input);
+  if (!match?.[2] || !match[3] || !match[4]) {
+    return null;
+  }
+
+  const unit = parseDurationUnit(match[2], lookups);
+  if (!unit) {
+    return null;
+  }
+
+  const amount = match[1] ? parseAmount(match[1]) : 1;
+  return amount
+    ? {
+        kind: "duration-near-boundary",
+        amount,
+        unit,
+        direction: match[3] as RelationDirection,
+        anchor: parseBoundary(match[4], lookups),
+      }
+    : null;
 }
 
 // Example: `parseRelativeBoundary("next month", lookups)` returns a typed relative modifier boundary.

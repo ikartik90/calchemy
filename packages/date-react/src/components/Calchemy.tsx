@@ -53,7 +53,7 @@ function Candidates(props: CalchemyCandidatesProps) {
     return null;
   }
 
-  const candidates = state.expectedValue
+  const candidates = state.expectedValue && state.expectedValue !== "multiple"
     ? state.result.candidates.filter((candidate) => candidate.value.kind === state.expectedValue)
     : state.result.candidates;
 

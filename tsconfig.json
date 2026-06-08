@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "./packages/date-core" },
-    { "path": "./packages/date-react" }
+    { "path": "./packages/date-react" },
+    { "path": "./packages/date-react/tsconfig.test.json" }
   ]
 }

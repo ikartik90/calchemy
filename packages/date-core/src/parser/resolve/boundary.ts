@@ -89,6 +89,24 @@ export function resolveBoundary(
           }
         : null;
     }
+    case "duration-near-boundary": {
+      const direction = boundary.direction === "before" || boundary.direction === "preceding" ? -1 : 1;
+      const boundarySide = direction < 0 ? "start" : "end";
+      const date = resolveBoundaryAsEndpoint(
+        boundary.anchor,
+        boundarySide,
+        anchorDate,
+        Temporal,
+        context,
+        lookups,
+      );
+      return date
+        ? {
+            kind: "single",
+            date: shiftDateByDuration(date, boundary.amount * direction, boundary.unit),
+          }
+        : null;
+    }
     case "month-range":
       return resolveMonthRange(
         boundary.month,

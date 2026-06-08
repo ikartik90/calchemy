@@ -34,6 +34,13 @@ export type BoundarySlice =
       anchor: BoundarySlice;
     }
   | {
+      kind: "duration-near-boundary";
+      amount: number;
+      unit: DurationUnit;
+      direction: RelationDirection;
+      anchor: BoundarySlice;
+    }
+  | {
       kind: "shorthand-range-list";
       unit: CalendarListPeriod;
       ordinals: number[];

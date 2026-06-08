@@ -46,6 +46,7 @@ export function parseDateWithTemporal(
       input,
       errors: [{ code: "empty-input", message: "Enter a date phrase." }],
       corrections: normalized.corrections,
+      warnings: [],
     };
   }
 
@@ -60,6 +61,7 @@ export function parseDateWithTemporal(
       value: numericCandidates[0].value,
       candidates: [numericCandidates[0]],
       corrections: normalized.corrections,
+      warnings: [],
     };
   }
 
@@ -81,6 +83,7 @@ export function parseDateWithTemporal(
         },
       ],
       corrections: normalized.corrections,
+      warnings: [],
     };
   }
 
@@ -105,6 +108,7 @@ export function parseDateWithTemporal(
       input,
       errors: [{ code: "unsupported-expression", message: "Calchemy does not understand this date phrase yet." }],
       corrections: normalized.corrections,
+      warnings: [],
     };
   }
 
@@ -116,6 +120,7 @@ export function parseDateWithTemporal(
     value,
     candidates: [candidate],
     corrections: normalized.corrections,
+    warnings: [],
   };
 }
 
@@ -225,6 +230,7 @@ function parseKnownExpressionAmbiguity(
       },
     ],
     corrections: source.corrections,
+    warnings: [],
   };
 }
 

@@ -127,7 +127,8 @@ export function getInitialPeriodExtensions(period: ParsedCalendarPeriod): { befo
 }
 
 export function getSelectedValue(state: CalchemyState): DateValue | null {
-  return getResultValue(state) ?? state.value;
+  const resultValue = getResultValue(state);
+  return state.value ?? resultValue;
 }
 
 export function getDateValueAnchor(value: DateValue | null): PlainDate | null {

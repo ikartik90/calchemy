@@ -143,6 +143,12 @@ describe("parseDate", () => {
     ["the monday after next weekend", { kind: "single", date: "2026-06-08" }],
     ["the tuesday after next month's second weekend", { kind: "single", date: "2026-06-16" }],
     ["the tuesday after second weekend of next month", { kind: "single", date: "2026-06-16" }],
+    ["day after tomorrow", { kind: "single", date: "2026-05-29" }],
+    ["day before yesterday", { kind: "single", date: "2026-05-25" }],
+    ["3 days before christmas this year", { kind: "single", date: "2026-12-22" }],
+    ["two weeks after tomorrow", { kind: "single", date: "2026-06-11" }],
+    ["2 days after next weekend", { kind: "single", date: "2026-06-09" }],
+    ["2 days before next weekend", { kind: "single", date: "2026-06-04" }],
     ["jul 1", { kind: "single", date: "2026-07-01" }],
     ["jan 5", { kind: "single", date: "2026-01-05" }],
     ["mar. 6, 27", { kind: "single", date: "2027-03-06" }],
@@ -1189,21 +1195,47 @@ describe("parseDate", () => {
   test("resolves expected value kind mismatches in core", () => {
     const rangeResult = calchemy.parseDate("last 90 days", context);
     const fromNowResult = calchemy.parseDate("12 weeks from now", context);
-    const quarterResult = calchemy.parseDate("3 quarters from now", context);
+    const singleResult = calchemy.parseDate("tomorrow", context);
 
     expect(rangeResult.status).toBe("valid");
     if (rangeResult.status === "valid") {
-      const singleResult = resolveExpectedDateValue(rangeResult, "single");
+      const expectedSingleResult = resolveExpectedDateValue(rangeResult, "single");
       const multipleResult = resolveExpectedDateValue(rangeResult, "multiple");
+      const cappedMultipleResult = resolveExpectedDateValue(rangeResult, "multiple", {
+        multipleRangeExpansionLimit: 3,
+      });
 
-      expect(singleResult.status).toBe("valid");
-      if (singleResult.status === "valid") {
-        expect(calchemy.toJSON(singleResult.value)).toEqual({ kind: "single", date: "2026-02-27" });
+      expect(expectedSingleResult.status).toBe("invalid");
+      if (expectedSingleResult.status === "invalid") {
+        expect(expectedSingleResult.errors[0]?.code).toBe("unexpected-value-kind");
       }
 
-      expect(multipleResult.status).toBe("invalid");
-      if (multipleResult.status === "invalid") {
-        expect(multipleResult.errors[0]?.code).toBe("unexpected-value-kind");
+      expect(multipleResult.status).toBe("valid");
+      if (multipleResult.status === "valid") {
+        const value = calchemy.toJSON(multipleResult.value);
+        expect(value.kind).toBe("multiple");
+        if (value.kind === "multiple") {
+          expect(value.dates).toHaveLength(90);
+          expect(value.dates.at(0)).toBe("2026-02-27");
+          expect(value.dates.at(-1)).toBe("2026-05-27");
+        }
+        expect(multipleResult.warnings).toEqual([]);
+      }
+
+      expect(cappedMultipleResult.status).toBe("valid");
+      if (cappedMultipleResult.status === "valid") {
+        expect(calchemy.toJSON(cappedMultipleResult.value)).toEqual({
+          kind: "multiple",
+          dates: ["2026-02-27", "2026-02-28", "2026-03-01"],
+        });
+        expect(cappedMultipleResult.warnings).toEqual([
+          {
+            code: "maximum-selectable-dates-exceeded",
+            message: "Exceeded maximum selectable dates. Showing the first 3 dates.",
+            limit: 3,
+            total: 90,
+          },
+        ]);
       }
     }
 
@@ -1212,18 +1244,18 @@ describe("parseDate", () => {
       expect(calchemy.toJSON(fromNowResult.value)).toEqual({ kind: "single", date: "2026-08-19" });
 
       const rangeResult = resolveExpectedDateValue(fromNowResult, "range");
-      expect(rangeResult.status).toBe("valid");
-      if (rangeResult.status === "valid") {
-        expect(calchemy.toJSON(rangeResult.value)).toEqual({ kind: "range", start: "2026-05-27", end: "2026-08-19" });
+      expect(rangeResult.status).toBe("invalid");
+      if (rangeResult.status === "invalid") {
+        expect(rangeResult.errors[0]?.code).toBe("unexpected-value-kind");
       }
     }
 
-    expect(quarterResult.status).toBe("valid");
-    if (quarterResult.status === "valid") {
-      const rangeResult = resolveExpectedDateValue(quarterResult, "range");
-      expect(rangeResult.status).toBe("valid");
-      if (rangeResult.status === "valid") {
-        expect(calchemy.toJSON(rangeResult.value)).toEqual({ kind: "range", start: "2026-05-27", end: "2027-02-27" });
+    expect(singleResult.status).toBe("valid");
+    if (singleResult.status === "valid") {
+      const multipleResult = resolveExpectedDateValue(singleResult, "multiple");
+      expect(multipleResult.status).toBe("valid");
+      if (multipleResult.status === "valid") {
+        expect(calchemy.toJSON(multipleResult.value)).toEqual({ kind: "multiple", dates: ["2026-05-28"] });
       }
     }
   });

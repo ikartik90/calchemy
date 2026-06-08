@@ -1,10 +1,17 @@
 import { useMemo, useState } from "react";
 import { resolveExpectedDateValue } from "@calchemy/date-core";
-import type { Calchemy, DateValue, ExpectedDateValue, ParseDateContext, ParseDateResult } from "@calchemy/date-core";
+import type {
+  Calchemy,
+  DateValue,
+  ExpectedDateValue,
+  ParseDateContext,
+  ParseDateResult,
+  ResolveExpectedDateValueOptions,
+} from "@calchemy/date-core";
 
-export type UseCalchemyOptions = {
+export type UseCalchemyOptions = ResolveExpectedDateValueOptions & {
   calchemy: Calchemy;
-  expectedValue?: ExpectedDateValue;
+  expectedValue: ExpectedDateValue;
   value?: DateValue | null;
   defaultValue?: DateValue | null;
   onValueChange?: (value: DateValue | null, result: ParseDateResult) => void;
@@ -20,7 +27,7 @@ export type CalchemyState = {
   inputValue: string;
   value: DateValue | null;
   result: ParseDateResult;
-  expectedValue: ExpectedDateValue | null;
+  expectedValue: ExpectedDateValue;
   valueKindMismatch: boolean;
   inlineCompletion: ReturnType<Calchemy["getInlineCompletion"]>;
   setInputValue(value: string): void;
@@ -47,8 +54,13 @@ export function useCalchemy(options: UseCalchemyOptions): CalchemyState {
     () => options.calchemy.parseDate(inputValue, options.parseContext),
     [inputValue, options.calchemy, options.parseContext],
   );
-  const expectedValue = options.expectedValue ?? null;
-  const expectedResult = expectedValue ? resolveExpectedDateValue(result, expectedValue) : result;
+  const expectedValue = options.expectedValue;
+  const expectedOptions = {
+    ...(options.multipleRangeExpansionLimit === undefined
+      ? {}
+      : { multipleRangeExpansionLimit: options.multipleRangeExpansionLimit }),
+  } satisfies ResolveExpectedDateValueOptions;
+  const expectedResult = resolveExpectedDateValue(result, expectedValue, expectedOptions);
   const valueKindMismatch = expectedResult.status === "invalid" && result.status === "valid";
   const inlineCompletion = useMemo(
     () => options.calchemy.getInlineCompletion(inputValue),
@@ -62,7 +74,7 @@ export function useCalchemy(options: UseCalchemyOptions): CalchemyState {
     options.onInputValueChange?.(nextValue);
 
     const nextResult = options.calchemy.parseDate(nextValue, options.parseContext);
-    const nextExpectedResult = expectedValue ? resolveExpectedDateValue(nextResult, expectedValue) : nextResult;
+    const nextExpectedResult = resolveExpectedDateValue(nextResult, expectedValue, expectedOptions);
     if (nextExpectedResult.status === "valid") {
       updateValue(nextExpectedResult.value, nextExpectedResult);
     }
@@ -99,8 +111,9 @@ export function useCalchemy(options: UseCalchemyOptions): CalchemyState {
       value: candidate.value,
       candidates: [candidate],
       corrections: result.corrections,
+      warnings: result.warnings,
     } satisfies ParseDateResult;
-    const resolvedCandidateResult = expectedValue ? resolveExpectedDateValue(candidateResult, expectedValue) : candidateResult;
+    const resolvedCandidateResult = resolveExpectedDateValue(candidateResult, expectedValue, expectedOptions);
     if (resolvedCandidateResult.status !== "valid") {
       return;
     }
@@ -115,8 +128,9 @@ export function useCalchemy(options: UseCalchemyOptions): CalchemyState {
       value: nextValue,
       candidates: [],
       corrections: [],
+      warnings: [],
     } satisfies ParseDateResult;
-    const resolvedResult = expectedValue ? resolveExpectedDateValue(nextResult, expectedValue) : nextResult;
+    const resolvedResult = resolveExpectedDateValue(nextResult, expectedValue, expectedOptions);
     if (resolvedResult.status !== "valid") {
       return;
     }
@@ -132,7 +146,7 @@ export function useCalchemy(options: UseCalchemyOptions): CalchemyState {
     parseContext: options.parseContext,
     inputValue,
     value,
-    result,
+    result: expectedResult,
     expectedValue,
     valueKindMismatch,
     inlineCompletion,
@@ -153,9 +167,9 @@ export function useCalchemy(options: UseCalchemyOptions): CalchemyState {
           }
         },
         "aria-invalid": expectedResult.status === "invalid",
-        "data-status": valueKindMismatch ? "kind-mismatch" : result.status,
-        "data-expected-value": expectedValue ?? undefined,
-        "data-value-kind": result.status === "valid" ? result.value.kind : undefined,
+        "data-status": valueKindMismatch ? "kind-mismatch" : expectedResult.status,
+        "data-expected-value": expectedValue,
+        "data-value-kind": expectedResult.status === "valid" ? expectedResult.value.kind : undefined,
       };
     },
   };

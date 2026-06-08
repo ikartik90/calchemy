@@ -14,7 +14,7 @@
   "scripts": {
     "build": "tsup src/index.ts --format esm --sourcemap --tsconfig tsconfig.build.json --external react --external react-dom --external react/jsx-runtime --external @calchemy/date-core && tsc -p tsconfig.build.json --emitDeclarationOnly",
     "test": "vitest run --root ../.. --config vitest.config.ts packages/date-react/tests --environment jsdom",
-    "typecheck": "tsc -b",
+    "typecheck": "tsc -b && tsc -p tsconfig.test.json --noEmit",
     "clean": "rm -rf dist tsconfig.tsbuildinfo"
   },
   "dependencies": {

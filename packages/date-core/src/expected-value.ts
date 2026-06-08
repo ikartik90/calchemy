@@ -1,69 +1,111 @@
-import type { DateValue, ParseDateResult, ValidParseDateResult } from "./types";
-import { parseAmount } from "./parser/primitives/numbers";
-import { toDuration } from "./parser/primitives/shared";
-import { createDateVocabulary, createDateVocabularyLookups, normalizeVocabularyValue } from "./parser/vocabulary";
-
-const DefaultDateVocabularyLookups = createDateVocabularyLookups(createDateVocabulary());
+import type { PlainDate } from "./temporal/types";
+import type { DateValue, ParseDateWarning, ParseDateResult, ValidParseDateResult } from "./types";
 
 export type ExpectedDateValue = DateValue["kind"];
 
+export const defaultMultipleRangeExpansionLimit = 1095;
+
+export type ResolveExpectedDateValueOptions = {
+  multipleRangeExpansionLimit?: number;
+};
+
 // Resolves a parse result against an expected output kind, including supported coercions.
-export function resolveExpectedDateValue(result: ParseDateResult, expectedValue: ExpectedDateValue): ParseDateResult {
+export function resolveExpectedDateValue(
+  result: ParseDateResult,
+  expectedValue: ExpectedDateValue,
+  options: ResolveExpectedDateValueOptions = {},
+): ParseDateResult {
   if (result.status !== "valid") {
     return result;
   }
 
-  const coercedValue = coerceExpectedDateValue(result.value, expectedValue, result.input);
-  if (coercedValue) {
-    return withResolvedValue(result, coercedValue);
+  const resolved = coerceExpectedDateValue(result.value, expectedValue, options);
+  if (resolved) {
+    return withResolvedValue(result, resolved.value, resolved.warnings);
   }
 
-  if (result.value.kind !== expectedValue) {
-    return {
-      status: "invalid",
-      input: result.input,
-      errors: [
-        {
-          code: "unexpected-value-kind",
-          message: `Expected a ${expectedValue} date result, but parser returned ${result.value.kind}.`,
-        },
-      ],
-      corrections: result.corrections,
-    };
-  }
-
-  return result;
+  return {
+    status: "invalid",
+    input: result.input,
+    errors: [
+      {
+        code: "unexpected-value-kind",
+        message: `Expected a ${expectedValue} date result, but parser returned ${result.value.kind}.`,
+      },
+    ],
+    corrections: result.corrections,
+    warnings: result.warnings,
+  };
 }
 
-// Coerces colloquial range values to their first date when a single date result is requested.
-export function coerceExpectedDateValue(value: DateValue, expectedValue: ExpectedDateValue, input?: string): DateValue | null {
-  if (expectedValue === "single" && value.kind === "range") {
-    return { kind: "single", date: value.start };
+export function coerceExpectedDateValue(
+  value: DateValue,
+  expectedValue: ExpectedDateValue,
+  options: ResolveExpectedDateValueOptions = {},
+): { value: DateValue; warnings: ParseDateWarning[] } | null {
+  if (value.kind === expectedValue) {
+    return { value, warnings: [] };
   }
 
-  if (expectedValue === "range" && value.kind === "single") {
-    const duration = input ? parseFromNowDuration(input) : null;
-    return duration ? { kind: "range", start: value.date.subtract(duration), end: value.date } : null;
-  }
-
-  return null;
-}
-
-function parseFromNowDuration(input: string): Record<string, number> | null {
-  const match = /^(.+) ([a-z]+) from now$/i.exec(input.trim());
-  if (!match?.[1] || !match[2]) {
+  if (expectedValue !== "multiple") {
     return null;
   }
 
-  const amount = parseAmount(match[1]);
-  const unit = DefaultDateVocabularyLookups.durationUnits.get(normalizeVocabularyValue(match[2]));
-  return amount && unit ? toDuration(amount, unit) : null;
+  if (value.kind === "single") {
+    return { value: { kind: "multiple", dates: [value.date] }, warnings: [] };
+  }
+
+  if (value.kind === "range") {
+    return expandRangeToMultiple(value.start, value.end, getMultipleRangeExpansionLimit(options));
+  }
+
+  return { value, warnings: [] };
 }
 
-function withResolvedValue(result: ValidParseDateResult, value: DateValue): ValidParseDateResult {
+function expandRangeToMultiple(
+  start: PlainDate,
+  end: PlainDate,
+  limit: number,
+): { value: DateValue; warnings: ParseDateWarning[] } {
+  const total = start.until(end, { largestUnit: "days" }).days + 1;
+  const count = Math.min(total, limit);
+  const dates = Array.from({ length: count }, (_, index) => start.add({ days: index }));
+  const warnings =
+    total > limit
+      ? [
+          {
+            code: "maximum-selectable-dates-exceeded",
+            message: `Exceeded maximum selectable dates. Showing the first ${limit} dates.`,
+            limit,
+            total,
+          } satisfies ParseDateWarning,
+        ]
+      : [];
+
+  return {
+    value: { kind: "multiple", dates },
+    warnings,
+  };
+}
+
+function getMultipleRangeExpansionLimit(options: ResolveExpectedDateValueOptions): number {
+  const limit = options.multipleRangeExpansionLimit ?? defaultMultipleRangeExpansionLimit;
+  if (!Number.isInteger(limit) || limit < 1) {
+    throw new Error("multipleRangeExpansionLimit must be a positive integer.");
+  }
+
+  return limit;
+}
+
+function withResolvedValue(
+  result: ValidParseDateResult,
+  value: DateValue,
+  warnings: ParseDateWarning[],
+): ValidParseDateResult {
   return {
     ...result,
     value,
     candidates: result.candidates.map((candidate, index) => (index === 0 ? { ...candidate, value } : candidate)),
+    warnings: [...result.warnings, ...warnings],
   };
 }

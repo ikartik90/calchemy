@@ -50,6 +50,7 @@ export type CalendarState = {
   canExtendPeriods(direction: "before" | "after", windows?: number): boolean;
   extendPeriods(direction: "before" | "after", windows?: number): void;
   selectDate(date: PlainDate): void;
+  selectValue(value: DateValue): void;
 };
 
 export type CalendarScrollContextValue = {
