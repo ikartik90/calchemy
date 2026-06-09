@@ -19,6 +19,16 @@ The parser returns structured results:
 
 `date-holidays` and `date-fuzzy` will become separate packages when those areas need independent ownership.
 
+## Install
+
+```bash
+pnpm add @calchemy/date-react react
+```
+
+`@calchemy/date-core` installs with `@calchemy/date-react`. Import it directly when creating a `Calchemy` instance. `@calchemy/date-react` depends on `@js-temporal/polyfill` through `date-core` and loads it when native `globalThis.Temporal` is missing. React 18.3+ or 19+ is a peer dependency.
+
+When you import `@calchemy/date-react/calendar-scroll`, also install `react-dom` 18.3+ or 19+.
+
 ## Architecture
 
 Calchemy keeps parsing and UI separate. `@calchemy/date-core` owns parser semantics, Temporal values, ambiguity, JSON, and form serialization. `@calchemy/date-react` renders parsed results through `useCalchemy` and the `Calchemy` primitives.
@@ -26,8 +36,10 @@ Calchemy keeps parsing and UI separate. `@calchemy/date-core` owns parser semant
 The parser follows an inspectable pipeline:
 
 ```txt
-normalize -> tokenize -> correct -> parse -> resolve context -> expand -> rank -> detect ambiguity -> return result
+vocabulary -> normalize and tokenize -> standardize chunks -> resolve context -> numeric candidates -> slice language -> resolve values -> return result
 ```
+
+Supported phrase families include relative anchors (`today`, `next friday`), calendar periods (`Q1`, `w52`, `this month`), counted ranges (`last 90 days`, `next 3 fridays`), connectors (`between`, `until`), samplers (`every monday`, `all odd numbered dates in december`), exclusions (`excluding holidays`, `skip weekends`), date math (`next monday in march + 2 weeks`), named dates (with vocabulary), and shorthand correction (`tmrw`, `xmas`). Phrases like `christmas` require `namedDatesVocabulary` at setup.
 
 ## Core usage
 
@@ -37,9 +49,6 @@ import { createCalchemy } from "@calchemy/date-core";
 const calchemy = await createCalchemy();
 
 const result = calchemy.parseDate("last 90 days", {
-  anchor: calchemy.Temporal.ZonedDateTime.from(
-    "2026-05-27T12:00:00-04:00[America/New_York]",
-  ),
   locale: "en-US",
   weekStartsOn: 0,
   dateOrderPreference: ["DMY", "MDY", "YMD"],
@@ -54,21 +63,86 @@ if (result.status === "valid") {
 
 After setup, `calchemy.parseDate()` is synchronous.
 
-## Ambiguity
+### Time zone and reference date
 
-Calchemy returns ambiguous parses with the choices your UI needs.
+Relative phrases like `today`, `tomorrow`, and `last 90 days` resolve against a reference calendar date. Set `timeZone` for live parsing in a specific zone, or `referenceDate` to pin an as-of date (tests, replays):
+
+```ts
+const calchemy = await createCalchemy({
+  defaultContext: {
+    timeZone: "America/New_York",
+  },
+});
+```
+
+```ts
+const result = calchemy.parseDate("today", {
+  referenceDate: Temporal.PlainDate.from("2026-05-27"),
+});
+```
+
+When both are set, `referenceDate` wins. Use `defaultContext` at factory time to apply the same settings to every parse.
+
+### Configuration
+
+`createCalchemy()` accepts factory options:
+
+- `defaultContext` sets default `ParseDateContext` for every parse.
+- `completionSources` drives inline Tab completion. Parser vocabulary is not auto-completed.
+- `namedDatesVocabulary` registers named dates for parsing and calendar styling.
+
+Per-parse `ParseDateContext` fields:
+
+- `locale` for candidate and calendar label formatting.
+- `weekStartsOn`, `dateOrderPreference`.
+- `timeZone` and `referenceDate` for relative phrases (see Time zone and reference date above).
+- `holidays` as a `HolidayProvider` for `excluding holidays` and similar phrases.
+- `lastNDaysIncludesToday` controls whether `last N days` and `past N days` include today (default `true`).
+
+```ts
+const calchemy = await createCalchemy({
+  defaultContext: { locale: "en-US", weekStartsOn: 1, dateOrderPreference: ["MDY", "DMY"] },
+  completionSources: [{ id: "phrases", entries: [{ value: "previous 90 days" }] }],
+  namedDatesVocabulary: [
+    {
+      value: "christmas",
+      shortcuts: ["xmas"],
+      resolveDate({ year, context }) {
+        return context.referenceDate.with({ year, month: 12, day: 25 });
+      },
+    },
+  ],
+});
+```
+
+### Parse results
+
+Every result includes `input`, `corrections` (typo, shorthand, and alias fixes), and `warnings`.
+
+`valid` adds `value`, `candidates`, and `warnings` (for example `maximum-selectable-dates-exceeded` when coercing a range to multiple dates).
+
+`ambiguous` adds `candidates` and `ambiguityGroups`. Today only `date-order` ambiguity is produced (for example `03/04/25` as March 4 vs April 3 vs 2003-04-25). Other ambiguity kinds exist in the type system for future use.
+
+`invalid` adds `errors` with codes like `empty-input`, `unsupported-expression`, `invalid-date`, `invalid-context`, and `unexpected-value-kind`.
 
 ```ts
 const result = calchemy.parseDate("03/04/25");
 
 if (result.status === "ambiguous") {
+  for (const group of result.ambiguityGroups) {
+    console.log(group.message);
+  }
   for (const candidate of result.candidates) {
     console.log(candidate.label);
   }
 }
+
+if (result.status === "invalid") {
+  console.log(result.errors[0]?.message);
+}
 ```
 
-That input can mean March 4, 2025, or April 3, 2025. Your UI can show both choices instead of guessing.
+That input can mean March 4, 2025, April 3, 2025, or 2003-04-25. Your UI can show the choices instead of guessing.
 
 ## React usage
 
@@ -97,11 +171,13 @@ export function InvoiceFilter() {
 }
 ```
 
-`Calchemy.Field` owns inline tab completion. `Calchemy.Candidates` renders parse choices. `Calchemy.Calendar` is optional and renders headless calendar parts.
+`Calchemy.Field` owns inline tab completion from `completionSources`. `Calchemy.Candidates` renders parse choices. `Calchemy.Calendar` is optional; without children it renders a default header, weekdays row, and grid.
 
 ### React state
 
 `Calchemy.Root` wraps the `useCalchemy` hook. Set `expectedValue` to the value kind your field accepts: `single`, `range`, or `multiple`. Pass controlled props when your app owns the input or selected value, or use `defaultInputValue` and `defaultValue` for local state.
+
+`useCalchemy` resolves parses against `expectedValue`. A range typed into a `single` field stays invalid; `single` and `range` parses coerce to `multiple` when needed. Range-to-multiple expansion caps at `multipleRangeExpansionLimit` (default 1095). When the parse succeeds but the value kind does not match, the field reports `data-status="kind-mismatch"` and `aria-invalid`.
 
 ```tsx
 <Calchemy.Root
@@ -111,6 +187,7 @@ export function InvoiceFilter() {
   onInputValueChange={setQuery}
   value={value}
   onValueChange={setValue}
+  multipleRangeExpansionLimit={365}
   parseContext={{
     locale: "en-US",
     weekStartsOn: 1,
@@ -121,11 +198,13 @@ export function InvoiceFilter() {
 </Calchemy.Root>
 ```
 
+`onValueChange` receives the resolved `DateValue` and the full `ParseDateResult`. `Calchemy.Candidates` filters choices to the expected kind for `single` and `range` fields.
+
 Use `useCalchemy()` directly when you want the parser state without the component tree.
 
 ### Calendar periods
 
-`Calchemy.Calendar` renders one visible month by default. Use the `period` prop to render months or weeks in larger windows.
+`Calchemy.Calendar` renders one visible month by default. Use `period` to render multiple months or weeks. `pageSize` on navigation controls uses the same shape: `{ months: n }` or `{ weeks: n }`.
 
 ```tsx
 <Calchemy.Calendar period={{ months: 3 }}>
@@ -136,7 +215,7 @@ Use `useCalchemy()` directly when you want the parser state without the componen
   </Calchemy.CalendarHeader>
 
   <Calchemy.CalendarMonthSelect aria-label="Month" />
-  <Calchemy.CalendarYearSelect aria-label="Year" />
+  <Calchemy.CalendarYearSelect aria-label="Year" startYear={2024} endYear={2030} />
 
   <Calchemy.CalendarPeriodList>
     <Calchemy.CalendarPeriod>
@@ -152,9 +231,9 @@ Calendar parts are composable:
 
 - `CalendarHeading` labels the current visible period window and accepts custom children.
 - `CalendarPrevious` and `CalendarNext` move by `pageSize` from the current visible period, including after scroll.
-- `CalendarMonthSelect` and `CalendarYearSelect` are native select controls. Their values are strings at the DOM boundary and numbers when updating Temporal dates.
+- `CalendarMonthSelect` and `CalendarYearSelect` are native select controls. `CalendarYearSelect` accepts `startYear` and `endYear`. Values are strings at the DOM boundary and numbers when updating Temporal dates.
 - `CalendarWeekdays` uses `parseContext.weekStartsOn`.
-- `CalendarGrid` selects dates on click and can render outside-month bookend days with `showBookends`.
+- `CalendarGrid` selects dates on click, accepts `showBookends` for outside-month days, and `dragSelection` (default `true`) for multiple-date drag toggling.
 
 For `expectedValue="multiple"`, `CalendarGrid` supports click and drag toggling. A click toggles one day. A drag toggles every enabled day cell intersecting the drag rectangle: unselected dates become selected, selected dates become deselected, and dates outside the rectangle keep their current state.
 
@@ -162,18 +241,9 @@ For `expectedValue="multiple"`, `CalendarGrid` supports click and drag toggling.
 <Calchemy.Root calchemy={calchemy} expectedValue="multiple">
   <Calchemy.Calendar>
     <Calchemy.CalendarWeekdays />
-    <Calchemy.CalendarGrid />
+    <Calchemy.CalendarGrid dragSelection />
   </Calchemy.Calendar>
 </Calchemy.Root>
-```
-
-`period` and `pageSize` use Temporal-style duration objects:
-
-```tsx
-<Calchemy.Calendar period={{ months: 3 }}>
-  <Calchemy.CalendarPrevious pageSize={{ months: 1 }} />
-  <Calchemy.CalendarNext pageSize={{ months: 1 }} />
-</Calchemy.Calendar>
 ```
 
 ### Calendar constraints
@@ -184,8 +254,8 @@ Use `bounds` to cap calendar operation. Navigation, scrolling, preloading, gener
 function BookingCalendar() {
   const state = useCalchemyContext();
   const today =
-    state.parseContext?.anchor?.toPlainDate() ??
-    state.calchemy.Temporal.Now.plainDateISO();
+    state.parseContext?.referenceDate ??
+    state.calchemy.Temporal.Now.plainDateISO(state.parseContext?.timeZone);
 
   return (
     <Calchemy.Calendar
@@ -206,7 +276,7 @@ function BookingCalendar() {
 }
 ```
 
-Use `isDateDisabled` for dates that should remain visible but cannot be selected.
+Use `isDateDisabled` for dates that should remain visible but cannot be selected. The callback receives the date and calendar state.
 
 ```tsx
 <Calchemy.Calendar
@@ -227,7 +297,7 @@ const calchemy = await createCalchemy({
       value: "company holiday",
       isHoliday: true,
       resolveDate({ year, context }) {
-        return context.anchor.toPlainDate().with({ year, month: 12, day: 25 });
+        return context.referenceDate.with({ year, month: 12, day: 25 });
       },
     },
   ],
@@ -240,19 +310,22 @@ const calchemy = await createCalchemy({
 </Calchemy.Root>;
 ```
 
-Use `namedDates="all"` to expose all configured named dates or `namedDates="holidays"` to expose entries with `isHoliday: true`. Matching days receive `data-named-date`; holiday matches also receive `data-holiday`.
+Use `namedDates="all"` to expose all configured named dates or `namedDates="holidays"` to expose entries with `isHoliday: true`. Matching days receive `data-named-date` and `data-named-date-labels`; holiday matches also receive `data-holiday`.
 
 ### Scrollable calendars
 
-Wrap `CalendarPeriodList` in `CalendarScroll` to preload periods as the user scrolls. The scroll direction defaults to vertical.
+Wrap `CalendarPeriodList` in `CalendarScroll` to preload periods as the user scrolls. Import scroll from the subpath; it requires `react-dom`. The scroll direction defaults to vertical.
 
 ```tsx
+import { Calchemy } from "@calchemy/date-react";
+import { CalendarScroll } from "@calchemy/date-react/calendar-scroll";
+
 <Calchemy.Calendar period={{ months: 3 }}>
   <Calchemy.CalendarHeader>
     <Calchemy.CalendarHeading />
   </Calchemy.CalendarHeader>
 
-  <Calchemy.CalendarScroll direction="horizontal">
+  <CalendarScroll direction="horizontal">
     <Calchemy.CalendarPeriodList>
       <Calchemy.CalendarPeriod>
         <Calchemy.CalendarPeriodHeading />
@@ -260,7 +333,7 @@ Wrap `CalendarPeriodList` in `CalendarScroll` to preload periods as the user scr
         <Calchemy.CalendarGrid />
       </Calchemy.CalendarPeriod>
     </Calchemy.CalendarPeriodList>
-  </Calchemy.CalendarScroll>
+  </CalendarScroll>
 </Calchemy.Calendar>
 ```
 
@@ -331,9 +404,23 @@ function MonthDropdown() {
 
 Use `calendar.visiblePeriodAnchor` for controls that should follow scrolling. Use `calendar.setPeriodAnchor()` to jump to a new month or year.
 
-## Styling examples
+## Styling
 
-Style the headless primitives with plain CSS, recipes, utility classes, CSS Modules, or your own system.
+Style the headless primitives with plain CSS, recipes, utility classes, CSS Modules, or your own system. Components expose `className` and `data-*` hooks.
+
+### Data attributes
+
+Field: `data-calchemy-field`, `data-calchemy-inline-completion`. Input props from `getInputProps()`: `data-status` (`valid`, `ambiguous`, `invalid`, `kind-mismatch`), `data-expected-value`, `data-value-kind`.
+
+Candidates: `data-calchemy-candidates`, `data-calchemy-candidate`.
+
+Calendar shell: `data-calchemy-calendar`, `data-calchemy-header`, `data-calchemy-heading`, `data-calchemy-previous`, `data-calchemy-next`, `data-calchemy-month-select`, `data-calchemy-year-select`.
+
+Grid: `data-calchemy-weekdays`, `data-calchemy-weekday`, `data-weekend`, `data-calchemy-grid`, `data-calchemy-week`, `data-calchemy-cell`, `data-blank`, `data-calchemy-day`, `data-selected`, `data-today`, `data-outside`, `data-first-of-period`, `data-last-of-period`, `data-disabled`, `data-out-of-bounds`, `data-named-date`, `data-holiday`, `data-named-date-labels`.
+
+Multiple drag: `data-multiple-drag`, `data-dragging`, `data-drag-preview`, `data-drag-preview-selected`, `data-drag-preview-deselected`, `data-calchemy-drag-rect`.
+
+Periods and scroll: `data-calchemy-period`, `data-period-id`, `data-period-index`, `data-calchemy-period-heading`, `data-calchemy-period-list`, `data-calchemy-scroll`, `data-direction`, `data-calchemy-scroll-spacer`.
 
 ### Vanilla CSS
 

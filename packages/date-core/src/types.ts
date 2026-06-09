@@ -1,4 +1,4 @@
-import type { PlainDate, TemporalApi, ZonedDateTime } from "./temporal/types";
+import type { PlainDate, TemporalApi } from "./temporal/types";
 import type { DurationUnit } from "./parser/types";
 
 export type DateValue = SingleDateValue | DateRangeValue | MultipleDatesValue;
@@ -25,7 +25,8 @@ export type DateValueJSON =
   | { kind: "multiple"; dates: string[] };
 
 export type ParseDateContext = {
-  anchor?: ZonedDateTime;
+  timeZone?: string;
+  referenceDate?: PlainDate;
   locale?: string;
   weekStartsOn?: WeekdayIndex;
   dateOrderPreference?: DateOrder[];
@@ -102,7 +103,7 @@ export type CompletionEntry = {
 export type ResolvedParseDateContext = Required<
   Pick<
     ParseDateContext,
-    | "anchor"
+    | "referenceDate"
     | "locale"
     | "weekStartsOn"
     | "dateOrderPreference"
@@ -231,5 +232,5 @@ export type Calchemy = {
   fromJSON(value: unknown): DateValue;
   toFormValue(value: DateValue): string;
   fromFormValue(value: string): DateValue;
-  getInlineCompletion(input: string): InlineCompletion | null;
+  getInlineCompletion(input: string, context?: ParseDateContext): InlineCompletion | null;
 };

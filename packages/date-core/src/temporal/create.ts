@@ -1,6 +1,6 @@
 import { parseDateWithTemporal } from "../parser/parse";
 import { fromFormValueWithTemporal, fromJSONWithTemporal, toFormValue, toJSON } from "../serialize/values";
-import type { Calchemy, CompletionSource, NamedDatesVocabularyEntry, ParseDateContext } from "../types";
+import type { Calchemy, CompletionSource, InlineCompletion, NamedDatesVocabularyEntry, ParseDateContext } from "../types";
 import type { TemporalApi, TemporalGlobal } from "./types";
 
 export type CreateCalchemyOptions = {
@@ -35,8 +35,8 @@ export function createCalchemyWithTemporal(
     fromFormValue(value) {
       return fromFormValueWithTemporal(value, Temporal);
     },
-    getInlineCompletion(input) {
-      return getInlineCompletion(input, options.completionSources ?? []);
+    getInlineCompletion(input, context = {}) {
+      return getInlineCompletion(input, options.completionSources ?? [], { ...options.defaultContext, ...context }, Temporal, parseOptions);
     },
   };
 }
@@ -48,9 +48,10 @@ export function getNativeTemporal(): TemporalApi | undefined {
 function getInlineCompletion(
   input: string,
   completionSources: readonly CompletionSource[],
-): Calchemy["getInlineCompletion"] extends (value: string) => infer Result
-  ? Result
-  : never {
+  context: ParseDateContext,
+  Temporal: TemporalApi,
+  parseOptions: Parameters<typeof parseDateWithTemporal>[3],
+): InlineCompletion | null {
   const normalized = input.trim().toLowerCase();
 
   if (!normalized) {
@@ -59,15 +60,15 @@ function getInlineCompletion(
 
   const match = findCompletionMatch(normalized, completionSources);
 
-  if (!match || match.entry.value.toLowerCase() === normalized) {
-    return null;
+  if (match && match.entry.value.toLowerCase() !== normalized) {
+    return {
+      value: match.entry.value,
+      suffix: match.entry.value.slice(normalized.length),
+      sourceId: match.source.id,
+    };
   }
 
-  return {
-    value: match.entry.value,
-    suffix: match.entry.value.slice(normalized.length),
-    sourceId: match.source.id,
-  };
+  return getNextCalendarCycleCompletion(input, context, Temporal, parseOptions);
 }
 
 function findCompletionMatch(
@@ -82,4 +83,43 @@ function findCompletionMatch(
   }
 
   return null;
+}
+
+function getNextCalendarCycleCompletion(
+  input: string,
+  context: ParseDateContext,
+  Temporal: TemporalApi,
+  parseOptions: Parameters<typeof parseDateWithTemporal>[3],
+): InlineCompletion | null {
+  const trimmed = input.trimEnd();
+  if (!hasFloatingCalendarRangeEnd(trimmed)) {
+    return null;
+  }
+
+  const currentResult = parseDateWithTemporal(trimmed, context, Temporal, parseOptions);
+  if (currentResult.status !== "invalid") {
+    return null;
+  }
+
+  const referenceYear = context.referenceDate?.year ?? Temporal.Now.plainDateISO(context.timeZone).year;
+  for (let year = referenceYear; year <= referenceYear + 10; year += 1) {
+    const value = `${trimmed} ${year}`;
+    const result = parseDateWithTemporal(value, context, Temporal, parseOptions);
+    if (result.status === "valid") {
+      return {
+        value,
+        suffix: value.slice(input.length),
+        sourceId: "calendar-cycle",
+      };
+    }
+  }
+
+  return null;
+}
+
+function hasFloatingCalendarRangeEnd(input: string): boolean {
+  const month = String.raw`jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?`;
+  const quarter = String.raw`q[1-4]|(?:first|second|third|fourth) quarter`;
+  const boundary = String.raw`(?:(?:start|beginning|end) of )?(?:${month}|${quarter})`;
+  return new RegExp(String.raw`\b(?:until|till|up to|upto|to)\s+(?:the\s+)?${boundary}$`, "i").test(input.trim());
 }

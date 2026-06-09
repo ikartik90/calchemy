@@ -15,18 +15,18 @@ export type SamplerSlice =
 
 // Example: `sliceSampler("mondays", "all", lookups)` returns weekday sampler intent.
 export function sliceSampler(input: string, command: SamplerCommand, lookups: DateVocabularyLookups): SamplerSlice | null {
+  const dayNumberParity = parseDayNumberParity(input, lookups);
+  if (dayNumberParity) {
+    return dayNumberParity;
+  }
+
   const occurrence = parseOccurrencePrefix(input);
   const samplerInput = occurrence?.input ?? input;
   const interval = command && AlternatingSamplerCommandSet.has(command) ? 2 : occurrence ? 2 : 1;
   const startIndex = occurrence ? (SamplerParityStartIndexMap.get(occurrence.parity) ?? 0) : 0;
 
-  if (parsePeriod(samplerInput) === "day") {
+  if (parseDayPeriod(samplerInput, lookups)) {
     return { kind: "all-days", interval, startIndex };
-  }
-
-  const parityMatch = /^(.+) numbered (.+)$/.exec(samplerInput);
-  if (parityMatch?.[1] && SamplerParitySet.has(parityMatch[1]) && parityMatch[2] && parsePeriod(parityMatch[2]) === "day") {
-    return { kind: "day-number-parity", parity: parityMatch[1] as SamplerParity };
   }
 
   const weekdays = parseWeekdayList(samplerInput, lookups);
@@ -40,6 +40,21 @@ export function sliceSampler(input: string, command: SamplerCommand, lookups: Da
   }
 
   return null;
+}
+
+// Example: `parseDayNumberParity("even dates", lookups)` returns even day-of-month intent.
+function parseDayNumberParity(input: string, lookups: DateVocabularyLookups): Extract<SamplerSlice, { kind: "day-number-parity" }> | null {
+  const parityMatch = /^(.+?)(?: numbered)? (.+)$/.exec(input);
+  if (!parityMatch?.[1] || !SamplerParitySet.has(parityMatch[1]) || !parityMatch[2] || !parseDayPeriod(parityMatch[2], lookups)) {
+    return null;
+  }
+
+  return { kind: "day-number-parity", parity: parityMatch[1] as SamplerParity };
+}
+
+// Example: `parseDayPeriod("days", lookups)` accepts singular, plural, and date aliases.
+function parseDayPeriod(input: string, lookups: DateVocabularyLookups): boolean {
+  return parsePeriod(input) === "day" || lookups.durationUnits.get(input) === "day";
 }
 
 // Example: `parseOccurrencePrefix("even mondays")` returns even occurrence metadata for `mondays`.

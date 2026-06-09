@@ -104,7 +104,7 @@ The parser should return candidates, corrections, and ambiguity groups rather th
 
 ## Date Values
 
-Use Temporal throughout the parser and public value model. Use `Temporal.PlainDate` for calendar dates, `Temporal.PlainDate` pairs for ranges, and `Temporal.ZonedDateTime` as the current-time anchor for relative phrases like `today`, `now`, or `last 90 days`. Use locale, week-start, and holiday settings as parser context, not as Temporal primitives. Do not use JavaScript `Date` internally; only support it at explicit interop boundaries if a public adapter requires it.
+Use Temporal throughout the parser and public value model. Use `Temporal.PlainDate` for calendar dates and `Temporal.PlainDate` pairs for ranges. Use `ParseDateContext.timeZone` and `ParseDateContext.referenceDate` for relative phrases like `today`, `now`, or `last 90 days`; resolve live dates with `Temporal.Now.plainDateISO(timeZone)`. Use locale, week-start, and holiday settings as parser context, not as Temporal primitives. Do not use JavaScript `Date` internally; only support it at explicit interop boundaries if a public adapter requires it.
 
 The normalized value model should support:
 
@@ -133,7 +133,7 @@ Prefer a deterministic, inspectable pipeline:
 1. Build vocabulary lookups, including configured named dates.
 2. Normalize and tokenize input: clean casing, whitespace, punctuation, aliases, articles, possessives, and known typos while recording corrections.
 3. Standardize tokens into typed chunks such as weekdays, months, periods, connectors, ordinals, shorthands, commands, exclusions, and numbers.
-4. Resolve context: apply the Temporal anchor plus locale, week-start, date-order preference, holiday provider, and relative-range options.
+4. Resolve context: apply the reference date plus locale, week-start, date-order preference, holiday provider, and relative-range options.
 5. Parse numeric date candidates first. Return `valid` for one candidate or `ambiguous` with a date-order group for competing candidates.
 6. Slice known language chunks into typed date intent: boundaries, relations, samplers, transforms, and exclusions.
 7. Resolve the slice into concrete Temporal values by resolving boundaries, applying relations, sampling, transforming, excluding dates, and materializing a `DateValue`.
@@ -203,7 +203,7 @@ Build the parser from a corpus of real phrases and expected results. Cover:
 - Ambiguity: numeric dates, two-digit years, relative anchors.
 - Typos and shorthand: month names, weekdays, common abbreviations.
 
-Tests should fix the Temporal current-time anchor, locale, week-start, and holiday calendars to avoid flaky results.
+Tests should fix the reference date, locale, week-start, and holiday calendars to avoid flaky results.
 
 ## React Tests
 

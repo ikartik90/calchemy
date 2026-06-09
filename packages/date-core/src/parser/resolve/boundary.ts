@@ -302,7 +302,7 @@ function resolveBoundaryEndpoint(
   );
 }
 
-// Example: `resolveRangeEndEndpoint(endOfMarch, MayStart, anchor, ...)` rolls bare March to the next year.
+// Example: `resolveRangeEndEndpoint(endOfMarch, MayStart, anchor, ...)` resolves the written endpoint as-is.
 function resolveRangeEndEndpoint(
   endpoint: BoundaryEndpointSlice,
   start: PlainDate,
@@ -322,38 +322,7 @@ function resolveRangeEndEndpoint(
     return end;
   }
 
-  return resolveFloatingRangeEndAfterStart(endpoint, start, Temporal);
-}
-
-// Example: `resolveFloatingRangeEndAfterStart(marchEndpoint, 2026-05-28, Temporal)` returns March 2027.
-function resolveFloatingRangeEndAfterStart(
-  endpoint: BoundaryEndpointSlice,
-  start: PlainDate,
-  Temporal: TemporalApi,
-): PlainDate | null {
-  if (endpoint.kind !== "boundary") {
-    return null;
-  }
-
-  const boundary = endpoint.boundary;
-  if (boundary.kind !== "month-range" || boundary.year.kind !== "anchor") {
-    return null;
-  }
-
-  const sameYear = resolveMonthRange(boundary.month, start.year, Temporal);
-  if (sameYear.kind !== "range") {
-    return null;
-  }
-  const sameYearEndpoint = endpoint.side === "start" ? sameYear.start : sameYear.end;
-  if (comparePlainDate(start, sameYearEndpoint) <= 0) {
-    return sameYearEndpoint;
-  }
-
-  const nextYear = resolveMonthRange(boundary.month, start.year + 1, Temporal);
-  if (nextYear.kind !== "range") {
-    return null;
-  }
-  return endpoint.side === "start" ? nextYear.start : nextYear.end;
+  return null;
 }
 
 // Example: `resolveBoundaryAsEndpoint(monthBoundary, "end", anchor, Temporal, context, lookups)` returns the month end.

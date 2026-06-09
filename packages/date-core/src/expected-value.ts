@@ -19,7 +19,7 @@ export function resolveExpectedDateValue(
     return result;
   }
 
-  const resolved = coerceExpectedDateValue(result.value, expectedValue, options);
+  const resolved = coerceExpectedDateValue(result.value, expectedValue, options, result.input);
   if (resolved) {
     return withResolvedValue(result, resolved.value, resolved.warnings);
   }
@@ -42,9 +42,14 @@ export function coerceExpectedDateValue(
   value: DateValue,
   expectedValue: ExpectedDateValue,
   options: ResolveExpectedDateValueOptions = {},
+  input?: string,
 ): { value: DateValue; warnings: ParseDateWarning[] } | null {
   if (value.kind === expectedValue) {
     return { value, warnings: [] };
+  }
+
+  if (expectedValue === "single" && value.kind === "range" && input && isDurationFromAnchorInput(input)) {
+    return { value: { kind: "single", date: value.end }, warnings: [] };
   }
 
   if (expectedValue !== "multiple") {
@@ -95,6 +100,10 @@ function getMultipleRangeExpansionLimit(options: ResolveExpectedDateValueOptions
   }
 
   return limit;
+}
+
+function isDurationFromAnchorInput(input: string): boolean {
+  return /^.+ [a-z]+ from (?!now$).+$/i.test(input.trim());
 }
 
 function withResolvedValue(

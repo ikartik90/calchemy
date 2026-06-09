@@ -15,7 +15,6 @@ export type {
   CalchemyCalendarPeriodListProps,
   CalchemyCalendarPeriodProps,
   CalchemyCalendarProps,
-  CalchemyCalendarScrollProps,
   CalchemyCalendarWeekdaysProps,
   CalchemyCalendarYearSelectProps,
   CalchemyCandidatesProps,

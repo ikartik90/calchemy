@@ -63,8 +63,8 @@ export function useCalchemy(options: UseCalchemyOptions): CalchemyState {
   const expectedResult = resolveExpectedDateValue(result, expectedValue, expectedOptions);
   const valueKindMismatch = expectedResult.status === "invalid" && result.status === "valid";
   const inlineCompletion = useMemo(
-    () => options.calchemy.getInlineCompletion(inputValue),
-    [inputValue, options.calchemy],
+    () => options.calchemy.getInlineCompletion(inputValue, options.parseContext),
+    [inputValue, options.calchemy, options.parseContext],
   );
 
   function updateInputValue(nextValue: string) {

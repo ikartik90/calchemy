@@ -23,7 +23,7 @@ const namedDatesVocabulary = [
     shortcuts: ["xmas"],
     isHoliday: true,
     resolveDate({ year, context }) {
-      return context.anchor.toPlainDate().with({ year, month: 12, day: 25 });
+      return context.referenceDate.with({ year, month: 12, day: 25 });
     },
   },
   {
@@ -31,7 +31,7 @@ const namedDatesVocabulary = [
     shortcuts: [],
     isHoliday: true,
     resolveDate({ year, context }) {
-      return context.anchor.toPlainDate().with({ year, month: 7, day: 4 });
+      return context.referenceDate.with({ year, month: 7, day: 4 });
     },
   },
 ];
@@ -40,7 +40,7 @@ const calchemy = await calchemyModule.createCalchemy({
 });
 
 const contextBase = {
-  anchor: resolveAnchor(calchemy.Temporal, options),
+  referenceDate: resolveReferenceDate(calchemy.Temporal, options),
   locale: options.locale ?? process.env.CALCHEMY_LOCALE ?? DEFAULT_LOCALE,
   weekStartsOn: parseWeekStartsOn(
     options.weekStartsOn ?? process.env.CALCHEMY_WEEK_STARTS_ON,
@@ -78,7 +78,7 @@ console.dir(
   {
     input,
     context: {
-      anchor: context.anchor.toString(),
+      referenceDate: context.referenceDate.toString(),
       locale: context.locale,
       weekStartsOn: context.weekStartsOn,
       dateOrderPreference: context.dateOrderPreference,
@@ -152,7 +152,7 @@ function parseCliArgs(args) {
 
     const [flag, inlineValue] = arg.split("=", 2);
     if (
-      flag === "--anchor" ||
+      flag === "--reference-date" ||
       flag === "--locale" ||
       flag === "--time-zone" ||
       flag === "--week-starts-on" ||
@@ -164,7 +164,7 @@ function parseCliArgs(args) {
         throw new Error(`Missing value for ${flag}`);
       }
 
-      if (flag === "--anchor") options.anchor = value;
+      if (flag === "--reference-date") options.referenceDate = value;
       if (flag === "--locale") options.locale = value;
       if (flag === "--time-zone") options.timeZone = value;
       if (flag === "--week-starts-on") options.weekStartsOn = value;
@@ -194,13 +194,13 @@ function parseExpectedKind(value) {
   throw new Error("--expect must be one of: single, multiple, range.");
 }
 
-function resolveAnchor(Temporal, options) {
-  const anchor = options.anchor ?? process.env.CALCHEMY_ANCHOR;
-  if (anchor) {
-    return Temporal.ZonedDateTime.from(anchor);
+function resolveReferenceDate(Temporal, options) {
+  const referenceDate = options.referenceDate ?? process.env.CALCHEMY_REFERENCE_DATE;
+  if (referenceDate) {
+    return Temporal.PlainDate.from(referenceDate);
   }
 
-  return Temporal.Now.zonedDateTimeISO(
+  return Temporal.Now.plainDateISO(
     options.timeZone ?? process.env.CALCHEMY_TIME_ZONE ?? DEFAULT_TIME_ZONE,
   );
 }
@@ -258,11 +258,11 @@ function printUsage() {
   console.log(`Usage:
   pnpm parse-date:single -- "next friday"
   pnpm parse-date:multiple -- "first 10 days of the next month excluding holidays"
-  pnpm parse-date:range -- --anchor "2026-05-27T12:00:00-04:00[America/New_York]" "last 90 days"
+  pnpm parse-date:range -- --reference-date 2026-05-27 "last 90 days"
 
 Options:
-  --anchor <zoned-date-time>   Temporal ZonedDateTime anchor.
-  --time-zone <iana-zone>       Time zone for the default current-time anchor. Defaults to America/New_York.
+  --reference-date <iso-date>  Pinned reference calendar date for relative phrases.
+  --time-zone <iana-zone>      Time zone when no reference date is set. Defaults to America/New_York.
   --locale <locale>            Parser locale. Defaults to en-US.
   --week-starts-on <0-6>       0 is Sunday, 1 is Monday. Defaults to 0.
   --date-order <orders>        Comma-separated preference. Defaults to DMY,MDY,YMD.

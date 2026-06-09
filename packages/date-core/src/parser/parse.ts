@@ -51,7 +51,7 @@ export function parseDateWithTemporal(
   }
 
   const resolved = resolveContext(context, Temporal);
-  const anchorDate = resolved.anchor.toPlainDate();
+  const anchorDate = resolved.referenceDate;
   const numericCandidates = parseNumericCandidates(normalized.normalized, resolved, Temporal, source);
 
   if (numericCandidates.length === 1 && numericCandidates[0]) {
@@ -124,12 +124,13 @@ export function parseDateWithTemporal(
   };
 }
 
-// Example: `resolveContext({}, Temporal)` fills parser defaults around the current Temporal anchor.
+// Example: `resolveContext({}, Temporal)` fills parser defaults around the current reference date.
 function resolveContext(context: ParseDateContext, Temporal: TemporalApi): ResolvedParseDateContext {
-  const anchor = context.anchor ?? Temporal.Now.zonedDateTimeISO();
+  const referenceDate =
+    context.referenceDate ?? Temporal.Now.plainDateISO(context.timeZone);
 
   return {
-    anchor,
+    referenceDate,
     locale: context.locale ?? "en-US",
     weekStartsOn: context.weekStartsOn ?? 0,
     dateOrderPreference: normalizeDateOrderPreference(context.dateOrderPreference),

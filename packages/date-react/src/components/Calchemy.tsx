@@ -10,8 +10,12 @@ import {
 } from "./calendar/Calendar";
 import { CalendarGrid, CalendarWeekdays } from "./calendar/CalendarGrid";
 import { CalendarPeriodHeading } from "./calendar/CalendarPeriodHeading";
-import { CalendarPeriod, CalendarPeriodList, CalendarScroll } from "./calendar/CalendarScroll";
-import { CalendarMonthSelect, CalendarYearSelect } from "./calendar/CalendarSelects";
+import { CalendarPeriod } from "./calendar/CalendarPeriod";
+import { CalendarPeriodList } from "./calendar/CalendarPeriodList";
+import {
+  CalendarMonthSelect,
+  CalendarYearSelect,
+} from "./calendar/CalendarSelects";
 
 export type CalchemyRootProps = UseCalchemyOptions & {
   children: ReactNode;
@@ -21,14 +25,24 @@ function Root(props: CalchemyRootProps) {
   const { children, ...options } = props;
   const state = useCalchemy(options);
 
-  return <CalchemyContext.Provider value={state}>{children}</CalchemyContext.Provider>;
+  return (
+    <CalchemyContext.Provider value={state}>
+      {children}
+    </CalchemyContext.Provider>
+  );
 }
 
-export type CalchemyFieldProps = Omit<ComponentPropsWithoutRef<"input">, "value" | "onChange" | "onKeyDown"> & {
+export type CalchemyFieldProps = Omit<
+  ComponentPropsWithoutRef<"input">,
+  "value" | "onChange" | "onKeyDown"
+> & {
   renderInlineCompletion?: boolean;
 };
 
-function Field({ renderInlineCompletion = true, ...props }: CalchemyFieldProps) {
+function Field({
+  renderInlineCompletion = true,
+  ...props
+}: CalchemyFieldProps) {
   const state = useCalchemyContext();
   const inputProps = state.getInputProps();
 
@@ -53,9 +67,12 @@ function Candidates(props: CalchemyCandidatesProps) {
     return null;
   }
 
-  const candidates = state.expectedValue && state.expectedValue !== "multiple"
-    ? state.result.candidates.filter((candidate) => candidate.value.kind === state.expectedValue)
-    : state.result.candidates;
+  const candidates =
+    state.expectedValue && state.expectedValue !== "multiple"
+      ? state.result.candidates.filter(
+          (candidate) => candidate.value.kind === state.expectedValue,
+        )
+      : state.result.candidates;
 
   if (candidates.length === 0) {
     return null;
@@ -94,14 +111,17 @@ export type {
   CalchemyCalendarNavigationProps,
   CalchemyCalendarProps,
 } from "./calendar/Calendar";
-export type { CalchemyCalendarGridProps, CalchemyCalendarWeekdaysProps } from "./calendar/CalendarGrid";
-export type { CalchemyCalendarPeriodHeadingProps } from "./calendar/CalendarPeriodHeading";
 export type {
-  CalchemyCalendarPeriodListProps,
-  CalchemyCalendarPeriodProps,
-  CalchemyCalendarScrollProps,
-} from "./calendar/CalendarScroll";
-export type { CalchemyCalendarMonthSelectProps, CalchemyCalendarYearSelectProps } from "./calendar/CalendarSelects";
+  CalchemyCalendarGridProps,
+  CalchemyCalendarWeekdaysProps,
+} from "./calendar/CalendarGrid";
+export type { CalchemyCalendarPeriodHeadingProps } from "./calendar/CalendarPeriodHeading";
+export type { CalchemyCalendarPeriodListProps } from "./calendar/CalendarPeriodList";
+export type { CalchemyCalendarPeriodProps } from "./calendar/CalendarPeriod";
+export type {
+  CalchemyCalendarMonthSelectProps,
+  CalchemyCalendarYearSelectProps,
+} from "./calendar/CalendarSelects";
 
 export const Calchemy = {
   Root,
@@ -112,7 +132,6 @@ export const Calchemy = {
   CalendarHeading,
   CalendarPrevious,
   CalendarNext,
-  CalendarScroll,
   CalendarPeriodList,
   CalendarPeriod,
   CalendarPeriodHeading,

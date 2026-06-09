@@ -16,7 +16,7 @@ export function parseNumericCandidates(
 
   return dateOrderCandidates(input, context.dateOrderPreference)
     .map((order, index) => {
-      const date = parseNumericDate(input, order, context.anchor.year, Temporal);
+      const date = parseNumericDate(input, order, context.referenceDate.year, Temporal);
       if (!date) {
         return null;
       }

@@ -4,7 +4,7 @@ import { parseAmount, parseOrdinal } from "../src/parser/primitives/numbers";
 import { createCalchemyWithTemporal, isDateValueJSON, resolveExpectedDateValue } from "../src";
 import type { CompletionSource, DateValueJSON, HolidayProvider, NamedDatesVocabularyEntry, ParseDateContext } from "../src";
 
-const anchor = Temporal.ZonedDateTime.from("2026-05-27T12:00:00-04:00[America/New_York]");
+const referenceDate = Temporal.PlainDate.from("2026-05-27");
 const holidays: HolidayProvider = {
   id: "test",
   label: "Test holidays",
@@ -17,7 +17,7 @@ const namedDatesVocabulary = [
     value: "christmas",
     shortcuts: ["xmas"],
     resolveDate({ year, context }) {
-      return context.anchor.toPlainDate().with({ year, month: 12, day: 25 });
+      return context.referenceDate.with({ year, month: 12, day: 25 });
     },
   },
   {
@@ -30,7 +30,7 @@ const namedDatesVocabulary = [
 ] satisfies readonly NamedDatesVocabularyEntry[];
 const calchemy = createCalchemyWithTemporal(Temporal, { namedDatesVocabulary });
 const context: ParseDateContext = {
-  anchor,
+  referenceDate,
   locale: "en-US",
   weekStartsOn: 0,
   dateOrderPreference: ["DMY", "MDY", "YMD"],
@@ -38,6 +38,18 @@ const context: ParseDateContext = {
 };
 
 describe("parseDate", () => {
+  test("prefers referenceDate over timeZone when both are set", () => {
+    const result = calchemy.parseDate("today", {
+      referenceDate: Temporal.PlainDate.from("2026-01-15"),
+      timeZone: "America/New_York",
+    });
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({ kind: "single", date: "2026-01-15" });
+    }
+  });
+
   test("rejects constrained numeric date interpretations", () => {
     const result = calchemy.parseDate("2026-11-10", context);
 
@@ -169,6 +181,12 @@ describe("parseDate", () => {
     if (result.status === "valid") {
       expect(calchemy.toJSON(result.value)).toEqual(expected);
     }
+  });
+
+  test("keeps floating range endpoints invalid when they resolve before the start", () => {
+    const result = calchemy.parseDate("12 weeks from tomorrow until the end of Q2", context);
+
+    expect(result.status).toBe("invalid");
   });
 
   test.each([
@@ -317,11 +335,14 @@ describe("parseDate", () => {
     }
   });
 
-  test.each([
-    "Every monday from tomorrow up to the end of march",
-    "Every monday from tomorrow up to the end of march 27",
-  ])("selects weekdays from an explicit start through an upper-bound endpoint: %s", (input) => {
-    const result = calchemy.parseDate(input, context);
+  test("keeps sampled ranges invalid when floating upper-bound endpoints resolve before the start", () => {
+    const result = calchemy.parseDate("Every monday from tomorrow up to the end of march", context);
+
+    expect(result.status).toBe("invalid");
+  });
+
+  test("selects weekdays from an explicit start through an explicit-year upper-bound endpoint", () => {
+    const result = calchemy.parseDate("Every monday from tomorrow up to the end of march 27", context);
 
     expect(result.status).toBe("valid");
     if (result.status === "valid") {
@@ -633,6 +654,53 @@ describe("parseDate", () => {
           "2026-12-31",
         ],
       });
+    }
+  });
+
+  test("selects even dates without requiring numbered", () => {
+    const conciseResult = calchemy.parseDate("all even dates in december", context);
+    const numberedResult = calchemy.parseDate("all even numbered dates in december", context);
+
+    expect(conciseResult.status).toBe("valid");
+    expect(numberedResult.status).toBe("valid");
+    if (conciseResult.status === "valid" && numberedResult.status === "valid") {
+      expect(calchemy.toJSON(conciseResult.value)).toEqual(calchemy.toJSON(numberedResult.value));
+      expect(calchemy.toJSON(conciseResult.value)).toEqual({
+        kind: "multiple",
+        dates: [
+          "2026-12-02",
+          "2026-12-04",
+          "2026-12-06",
+          "2026-12-08",
+          "2026-12-10",
+          "2026-12-12",
+          "2026-12-14",
+          "2026-12-16",
+          "2026-12-18",
+          "2026-12-20",
+          "2026-12-22",
+          "2026-12-24",
+          "2026-12-26",
+          "2026-12-28",
+          "2026-12-30",
+        ],
+      });
+    }
+  });
+
+  test("selects even days from a start through an offset quarter endpoint", () => {
+    const result = calchemy.parseDate("all even days from tomorrow until 10 days before end of q4", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      const value = calchemy.toJSON(result.value);
+
+      expect(value.kind).toBe("multiple");
+      if (value.kind === "multiple") {
+        expect(value.dates[0]).toBe("2026-05-28");
+        expect(value.dates.at(-1)).toBe("2026-12-20");
+        expect(value.dates.every((date) => Number(date.slice(-2)) % 2 === 0)).toBe(true);
+      }
     }
   });
 
@@ -1134,7 +1202,7 @@ describe("parseDate", () => {
   test("returns ambiguity for sampled ranges with demo date order preferences", () => {
     const demoCalchemy = createCalchemyWithTemporal(Temporal, {
       defaultContext: {
-        anchor,
+        referenceDate,
         locale: "en-US",
         weekStartsOn: 0,
         dateOrderPreference: ["MDY", "DMY"],
@@ -1178,7 +1246,7 @@ describe("parseDate", () => {
   test("allows date order preference through parser initialization", () => {
     const ymdCalchemy = createCalchemyWithTemporal(Temporal, {
       defaultContext: {
-        anchor,
+        referenceDate,
         dateOrderPreference: ["YMD"],
       },
     });
@@ -1195,6 +1263,7 @@ describe("parseDate", () => {
   test("resolves expected value kind mismatches in core", () => {
     const rangeResult = calchemy.parseDate("last 90 days", context);
     const fromNowResult = calchemy.parseDate("12 weeks from now", context);
+    const fromAnchorResult = calchemy.parseDate("12 weeks from tomorrow", context);
     const singleResult = calchemy.parseDate("tomorrow", context);
 
     expect(rangeResult.status).toBe("valid");
@@ -1247,6 +1316,31 @@ describe("parseDate", () => {
       expect(rangeResult.status).toBe("invalid");
       if (rangeResult.status === "invalid") {
         expect(rangeResult.errors[0]?.code).toBe("unexpected-value-kind");
+      }
+    }
+
+    expect(fromAnchorResult.status).toBe("valid");
+    if (fromAnchorResult.status === "valid") {
+      expect(calchemy.toJSON(fromAnchorResult.value)).toEqual({
+        kind: "range",
+        start: "2026-05-28",
+        end: "2026-08-20",
+      });
+
+      const expectedRangeResult = resolveExpectedDateValue(fromAnchorResult, "range");
+      expect(expectedRangeResult.status).toBe("valid");
+      if (expectedRangeResult.status === "valid") {
+        expect(calchemy.toJSON(expectedRangeResult.value)).toEqual({
+          kind: "range",
+          start: "2026-05-28",
+          end: "2026-08-20",
+        });
+      }
+
+      const expectedSingleResult = resolveExpectedDateValue(fromAnchorResult, "single");
+      expect(expectedSingleResult.status).toBe("valid");
+      if (expectedSingleResult.status === "valid") {
+        expect(calchemy.toJSON(expectedSingleResult.value)).toEqual({ kind: "single", date: "2026-08-20" });
       }
     }
 
@@ -1410,6 +1504,22 @@ describe("inline completions", () => {
       suffix: "ious month",
       sourceId: "user",
     });
+  });
+
+  test("suggests an explicit next calendar cycle for invalid floating range endpoints", () => {
+    const input = "12 weeks from tomorrow until the end of Q2";
+
+    expect(calchemy.getInlineCompletion(input, context)).toEqual({
+      value: "12 weeks from tomorrow until the end of Q2 2027",
+      suffix: " 2027",
+      sourceId: "calendar-cycle",
+    });
+    expect(calchemy.getInlineCompletion("Every monday from tomorrow up to the end of march", context)).toEqual({
+      value: "Every monday from tomorrow up to the end of march 2027",
+      suffix: " 2027",
+      sourceId: "calendar-cycle",
+    });
+    expect(calchemy.getInlineCompletion("12 weeks from tomorrow until the end of Q2 2027", context)).toBeNull();
   });
 });
 

@@ -151,8 +151,8 @@ function getResultValue(state: CalchemyState): DateValue | null {
 }
 
 export function getToday(state: CalchemyState): PlainDate {
-  if (state.parseContext?.anchor) {
-    return state.parseContext.anchor.toPlainDate();
+  if (state.parseContext?.referenceDate) {
+    return state.parseContext.referenceDate;
   }
 
   const todayResult = state.calchemy.parseDate("today", state.parseContext);
@@ -160,7 +160,7 @@ export function getToday(state: CalchemyState): PlainDate {
     return todayResult.value.date;
   }
 
-  return state.calchemy.Temporal.Now.plainDateISO();
+  return state.calchemy.Temporal.Now.plainDateISO(state.parseContext?.timeZone);
 }
 
 export function buildCalendarPeriods(
@@ -299,7 +299,9 @@ function getResolvedNamedDateContext(calendar: CalendarState): NamedDateResolveC
   const context = calendar.calchemy.parseContext;
 
   return {
-    anchor: context?.anchor ?? calendar.calchemy.calchemy.Temporal.Now.zonedDateTimeISO(),
+    referenceDate:
+      context?.referenceDate ??
+      calendar.calchemy.calchemy.Temporal.Now.plainDateISO(context?.timeZone),
     locale: context?.locale ?? "en-US",
     weekStartsOn: context?.weekStartsOn ?? 0,
     dateOrderPreference: normalizeDateOrderPreference(context?.dateOrderPreference),

@@ -5,21 +5,18 @@ import { useState } from "react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createCalchemyWithTemporal } from "@calchemy/date-core";
 import type { ExpectedDateValue } from "@calchemy/date-core";
+import { CalendarScroll } from "../src/calendar-scroll";
 import { Calchemy } from "../src";
 
 const calchemy = createCalchemyWithTemporal(Temporal, {
   defaultContext: {
-    anchor: Temporal.ZonedDateTime.from(
-      "2026-05-27T12:00:00-04:00[America/New_York]",
-    ),
+    referenceDate: Temporal.PlainDate.from("2026-05-27"),
   },
   completionSources: [{ id: "test", entries: [{ value: "previous 90 days" }] }],
 });
 const namedDateCalchemy = createCalchemyWithTemporal(Temporal, {
   defaultContext: {
-    anchor: Temporal.ZonedDateTime.from(
-      "2026-05-27T12:00:00-04:00[America/New_York]",
-    ),
+    referenceDate: Temporal.PlainDate.from("2026-05-27"),
   },
   namedDatesVocabulary: [
     {
@@ -45,7 +42,11 @@ afterEach(() => {
 describe("Calchemy", () => {
   test("accepts inline completion with Tab", () => {
     render(
-      <Calchemy.Root calchemy={calchemy} expectedValue="range" defaultInputValue="prev">
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="range"
+        defaultInputValue="prev"
+      >
         <Calchemy.Field aria-label="Date" />
       </Calchemy.Root>,
     );
@@ -61,7 +62,11 @@ describe("Calchemy", () => {
     const onValueChange = vi.fn();
 
     render(
-      <Calchemy.Root calchemy={calchemy} expectedValue="single" onValueChange={onValueChange}>
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="single"
+        onValueChange={onValueChange}
+      >
         <Calchemy.Field aria-label="Date" />
       </Calchemy.Root>,
     );
@@ -211,7 +216,8 @@ describe("Calchemy", () => {
         warnings: [
           {
             code: "maximum-selectable-dates-exceeded",
-            message: "Exceeded maximum selectable dates. Showing the first 3 dates.",
+            message:
+              "Exceeded maximum selectable dates. Showing the first 3 dates.",
             limit: 3,
             total: 90,
           },
@@ -239,7 +245,11 @@ describe("Calchemy", () => {
 
   test("renders multiple-date queries in multi-period calendars", () => {
     const { container } = render(
-      <Calchemy.Root calchemy={calchemy} expectedValue="multiple" defaultInputValue="next 3 fridays">
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="multiple"
+        defaultInputValue="next 3 fridays"
+      >
         <Calchemy.Calendar period={{ months: 2 }}>
           <Calchemy.CalendarPeriodList>
             <Calchemy.CalendarPeriod>
@@ -258,7 +268,11 @@ describe("Calchemy", () => {
   test("clicking dates toggles multiple calendar selections", () => {
     const onValueChange = vi.fn();
     render(
-      <Calchemy.Root calchemy={calchemy} expectedValue="multiple" onValueChange={onValueChange}>
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="multiple"
+        onValueChange={onValueChange}
+      >
         <Calchemy.Calendar>
           <Calchemy.CalendarGrid />
         </Calchemy.Calendar>
@@ -314,7 +328,9 @@ describe("Calchemy", () => {
       isPrimary: true,
       pointerId: 1,
     });
-    const dragRect = container.querySelector<HTMLElement>("[data-calchemy-drag-rect]");
+    const dragRect = container.querySelector<HTMLElement>(
+      "[data-calchemy-drag-rect]",
+    );
     expect(dragRect).toBeTruthy();
     expect(dragRect?.style.left).toBe("15px");
     expect(dragRect?.style.top).toBe("15px");
@@ -328,7 +344,10 @@ describe("Calchemy", () => {
       <Calchemy.Root
         calchemy={calchemy}
         expectedValue="multiple"
-        defaultValue={{ kind: "multiple", dates: [Temporal.PlainDate.from("2026-05-27")] }}
+        defaultValue={{
+          kind: "multiple",
+          dates: [Temporal.PlainDate.from("2026-05-27")],
+        }}
         onValueChange={onValueChange}
       >
         <Calchemy.Calendar>
@@ -341,7 +360,12 @@ describe("Calchemy", () => {
       "28": rect(10, 10, 20, 20),
       "29": rect(30, 10, 40, 20),
     });
-    dragCalendarSelection(container, screen.getByText("28"), { x: 15, y: 15 }, { x: 35, y: 15 });
+    dragCalendarSelection(
+      container,
+      screen.getByText("28"),
+      { x: 15, y: 15 },
+      { x: 35, y: 15 },
+    );
 
     expect(onValueChange).toHaveBeenLastCalledWith(
       {
@@ -382,7 +406,12 @@ describe("Calchemy", () => {
       "28": rect(10, 10, 20, 20),
       "29": rect(30, 10, 40, 20),
     });
-    dragCalendarSelection(container, screen.getByText("28"), { x: 15, y: 15 }, { x: 35, y: 15 });
+    dragCalendarSelection(
+      container,
+      screen.getByText("28"),
+      { x: 15, y: 15 },
+      { x: 35, y: 15 },
+    );
 
     expect(onValueChange).toHaveBeenLastCalledWith(
       {
@@ -419,7 +448,12 @@ describe("Calchemy", () => {
       "29": rect(30, 10, 40, 20),
       "30": rect(50, 10, 60, 20),
     });
-    dragCalendarSelection(container, screen.getByText("28"), { x: 15, y: 15 }, { x: 55, y: 15 });
+    dragCalendarSelection(
+      container,
+      screen.getByText("28"),
+      { x: 15, y: 15 },
+      { x: 55, y: 15 },
+    );
 
     expect(onValueChange).toHaveBeenLastCalledWith(
       {
@@ -437,7 +471,11 @@ describe("Calchemy", () => {
   test("dragging can start from the calendar period weekdays row", () => {
     const onValueChange = vi.fn();
     const { container } = render(
-      <Calchemy.Root calchemy={calchemy} expectedValue="multiple" onValueChange={onValueChange}>
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="multiple"
+        onValueChange={onValueChange}
+      >
         <Calchemy.Calendar>
           <Calchemy.CalendarPeriodList>
             <Calchemy.CalendarPeriod>
@@ -453,12 +491,19 @@ describe("Calchemy", () => {
       "28": rect(10, 40, 20, 50),
       "29": rect(30, 40, 40, 50),
     });
-    const weekdays = container.querySelector<HTMLElement>("[data-calchemy-weekdays]");
+    const weekdays = container.querySelector<HTMLElement>(
+      "[data-calchemy-weekdays]",
+    );
     if (!weekdays) {
       throw new Error("Expected calendar weekdays row.");
     }
 
-    dragCalendarSelection(container, weekdays, { x: 15, y: 5 }, { x: 35, y: 45 });
+    dragCalendarSelection(
+      container,
+      weekdays,
+      { x: 15, y: 5 },
+      { x: 35, y: 45 },
+    );
 
     expect(onValueChange).toHaveBeenLastCalledWith(
       {
@@ -475,7 +520,11 @@ describe("Calchemy", () => {
   test("dragging can start from a blank grid cell", () => {
     const onValueChange = vi.fn();
     const { container } = render(
-      <Calchemy.Root calchemy={calchemy} expectedValue="multiple" onValueChange={onValueChange}>
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="multiple"
+        onValueChange={onValueChange}
+      >
         <Calchemy.Calendar>
           <Calchemy.CalendarGrid />
         </Calchemy.Calendar>
@@ -486,12 +535,19 @@ describe("Calchemy", () => {
       "28": rect(10, 10, 20, 20),
       "29": rect(30, 10, 40, 20),
     });
-    const blankCell = container.querySelector<HTMLElement>("[data-calchemy-cell][data-blank]");
+    const blankCell = container.querySelector<HTMLElement>(
+      "[data-calchemy-cell][data-blank]",
+    );
     if (!blankCell) {
       throw new Error("Expected blank calendar cell.");
     }
 
-    dragCalendarSelection(container, blankCell, { x: 5, y: 15 }, { x: 35, y: 15 });
+    dragCalendarSelection(
+      container,
+      blankCell,
+      { x: 5, y: 15 },
+      { x: 35, y: 15 },
+    );
 
     expect(onValueChange).toHaveBeenLastCalledWith(
       {
@@ -508,8 +564,16 @@ describe("Calchemy", () => {
   test("dragging ignores disabled dates", () => {
     const onValueChange = vi.fn();
     const { container } = render(
-      <Calchemy.Root calchemy={calchemy} expectedValue="multiple" onValueChange={onValueChange}>
-        <Calchemy.Calendar isDateDisabled={(date) => date.equals(Temporal.PlainDate.from("2026-05-29"))}>
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="multiple"
+        onValueChange={onValueChange}
+      >
+        <Calchemy.Calendar
+          isDateDisabled={(date) =>
+            date.equals(Temporal.PlainDate.from("2026-05-29"))
+          }
+        >
           <Calchemy.CalendarGrid />
         </Calchemy.Calendar>
       </Calchemy.Root>,
@@ -520,7 +584,12 @@ describe("Calchemy", () => {
       "29": rect(30, 10, 40, 20),
       "30": rect(50, 10, 60, 20),
     });
-    dragCalendarSelection(container, screen.getByText("28"), { x: 15, y: 15 }, { x: 55, y: 15 });
+    dragCalendarSelection(
+      container,
+      screen.getByText("28"),
+      { x: 15, y: 15 },
+      { x: 55, y: 15 },
+    );
 
     expect(onValueChange).toHaveBeenLastCalledWith(
       {
@@ -542,7 +611,10 @@ describe("Calchemy", () => {
         expectedValue="multiple"
         inputValue="tomorrow"
         onInputValueChange={() => {}}
-        value={{ kind: "multiple", dates: [Temporal.PlainDate.from("2026-05-28")] }}
+        value={{
+          kind: "multiple",
+          dates: [Temporal.PlainDate.from("2026-05-28")],
+        }}
         onValueChange={onValueChange}
       >
         <Calchemy.Calendar>
@@ -584,7 +656,9 @@ describe("Calchemy", () => {
       </Calchemy.Root>,
     );
 
-    expect(container.querySelectorAll("[data-calchemy-day][data-selected]")).toHaveLength(2);
+    expect(
+      container.querySelectorAll("[data-calchemy-day][data-selected]"),
+    ).toHaveLength(2);
   });
 
   test("renders a complete calendar with blank bookends by default", () => {
@@ -699,14 +773,14 @@ describe("Calchemy", () => {
         <Calchemy.Field aria-label="Date" />
         <Calchemy.Calendar period={{ months: 3 }}>
           <Calchemy.CalendarHeading />
-          <Calchemy.CalendarScroll direction="horizontal">
+          <CalendarScroll direction="horizontal">
             <Calchemy.CalendarPeriodList>
               <Calchemy.CalendarPeriod>
                 <Calchemy.CalendarPeriodHeading />
                 <Calchemy.CalendarGrid />
               </Calchemy.CalendarPeriod>
             </Calchemy.CalendarPeriodList>
-          </Calchemy.CalendarScroll>
+          </CalendarScroll>
         </Calchemy.Calendar>
       </Calchemy.Root>,
     );
@@ -757,7 +831,11 @@ describe("Calchemy", () => {
   test("calendar bounds disable dates and previous navigation outside the range", () => {
     const onValueChange = vi.fn();
     render(
-      <Calchemy.Root calchemy={calchemy} expectedValue="single" onValueChange={onValueChange}>
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="single"
+        onValueChange={onValueChange}
+      >
         <Calchemy.Calendar
           bounds={{
             start: Temporal.PlainDate.from("2026-05-27"),
@@ -800,13 +878,13 @@ describe("Calchemy", () => {
             end: Temporal.PlainDate.from("2026-06-30"),
           }}
         >
-          <Calchemy.CalendarScroll direction="horizontal">
+          <CalendarScroll direction="horizontal">
             <Calchemy.CalendarPeriodList>
               <Calchemy.CalendarPeriod>
                 <Calchemy.CalendarPeriodHeading />
               </Calchemy.CalendarPeriod>
             </Calchemy.CalendarPeriodList>
-          </Calchemy.CalendarScroll>
+          </CalendarScroll>
         </Calchemy.Calendar>
       </Calchemy.Root>,
     );
@@ -820,9 +898,15 @@ describe("Calchemy", () => {
   test("calendar disables custom unavailable dates", () => {
     const onValueChange = vi.fn();
     render(
-      <Calchemy.Root calchemy={calchemy} expectedValue="single" onValueChange={onValueChange}>
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="single"
+        onValueChange={onValueChange}
+      >
         <Calchemy.Calendar
-          isDateDisabled={(date) => date.equals(Temporal.PlainDate.from("2026-05-27"))}
+          isDateDisabled={(date) =>
+            date.equals(Temporal.PlainDate.from("2026-05-27"))
+          }
         >
           <Calchemy.CalendarGrid />
         </Calchemy.Calendar>
@@ -846,8 +930,12 @@ describe("Calchemy", () => {
     );
 
     expect(namedDateCalchemy.namedDatesVocabulary).toHaveLength(2);
-    expect(container.querySelector("[data-named-date-labels='company holiday']")).toBeTruthy();
-    expect(container.querySelector("[data-named-date-labels='payroll day']")).toBeTruthy();
+    expect(
+      container.querySelector("[data-named-date-labels='company holiday']"),
+    ).toBeTruthy();
+    expect(
+      container.querySelector("[data-named-date-labels='payroll day']"),
+    ).toBeTruthy();
   });
 
   test("calendar can expose only holiday named dates", () => {
@@ -860,21 +948,25 @@ describe("Calchemy", () => {
     );
 
     expect(container.querySelector("[data-holiday]")).toBeTruthy();
-    expect(container.querySelector("[data-named-date-labels='company holiday']")).toBeTruthy();
-    expect(container.querySelector("[data-named-date-labels='payroll day']")).toBeNull();
+    expect(
+      container.querySelector("[data-named-date-labels='company holiday']"),
+    ).toBeTruthy();
+    expect(
+      container.querySelector("[data-named-date-labels='payroll day']"),
+    ).toBeNull();
   });
 
   test("scroll viewport can extend generated periods", () => {
     const { container } = render(
       <Calchemy.Root calchemy={calchemy} expectedValue="single">
         <Calchemy.Calendar period={{ months: 1 }}>
-          <Calchemy.CalendarScroll direction="horizontal">
+          <CalendarScroll direction="horizontal">
             <Calchemy.CalendarPeriodList>
               <Calchemy.CalendarPeriod>
                 <Calchemy.CalendarPeriodHeading />
               </Calchemy.CalendarPeriod>
             </Calchemy.CalendarPeriodList>
-          </Calchemy.CalendarScroll>
+          </CalendarScroll>
         </Calchemy.Calendar>
       </Calchemy.Root>,
     );
@@ -898,13 +990,13 @@ describe("Calchemy", () => {
       <Calchemy.Root calchemy={calchemy} expectedValue="single">
         <Calchemy.Calendar period={{ months: 1 }}>
           <Calchemy.CalendarHeading />
-          <Calchemy.CalendarScroll direction="horizontal">
+          <CalendarScroll direction="horizontal">
             <Calchemy.CalendarPeriodList>
               <Calchemy.CalendarPeriod>
                 <Calchemy.CalendarPeriodHeading />
               </Calchemy.CalendarPeriod>
             </Calchemy.CalendarPeriodList>
-          </Calchemy.CalendarScroll>
+          </CalendarScroll>
         </Calchemy.Calendar>
       </Calchemy.Root>,
     );
@@ -925,7 +1017,8 @@ describe("Calchemy", () => {
 
   test("resets the calendar heading after switching expected value modes", () => {
     function ModeSwitchCalendar() {
-      const [expectedValue, setExpectedValue] = useState<ExpectedDateValue>("single");
+      const [expectedValue, setExpectedValue] =
+        useState<ExpectedDateValue>("single");
 
       return (
         <>
@@ -941,13 +1034,13 @@ describe("Calchemy", () => {
           <Calchemy.Root calchemy={calchemy} expectedValue={expectedValue}>
             <Calchemy.Calendar period={{ months: 3 }}>
               <Calchemy.CalendarHeading />
-              <Calchemy.CalendarScroll direction="horizontal">
+              <CalendarScroll direction="horizontal">
                 <Calchemy.CalendarPeriodList>
                   <Calchemy.CalendarPeriod>
                     <Calchemy.CalendarPeriodHeading />
                   </Calchemy.CalendarPeriod>
                 </Calchemy.CalendarPeriodList>
-              </Calchemy.CalendarScroll>
+              </CalendarScroll>
             </Calchemy.Calendar>
           </Calchemy.Root>
         </>
@@ -983,13 +1076,13 @@ describe("Calchemy", () => {
             <Calchemy.CalendarHeading />
             <Calchemy.CalendarNext pageSize={{ months: 1 }} />
           </Calchemy.CalendarHeader>
-          <Calchemy.CalendarScroll direction="horizontal">
+          <CalendarScroll direction="horizontal">
             <Calchemy.CalendarPeriodList>
               <Calchemy.CalendarPeriod>
                 <Calchemy.CalendarPeriodHeading />
               </Calchemy.CalendarPeriod>
             </Calchemy.CalendarPeriodList>
-          </Calchemy.CalendarScroll>
+          </CalendarScroll>
         </Calchemy.Calendar>
       </Calchemy.Root>,
     );
@@ -1011,13 +1104,13 @@ describe("Calchemy", () => {
             endYear={2027}
           />
           <Calchemy.CalendarHeading />
-          <Calchemy.CalendarScroll direction="horizontal">
+          <CalendarScroll direction="horizontal">
             <Calchemy.CalendarPeriodList>
               <Calchemy.CalendarPeriod>
                 <Calchemy.CalendarPeriodHeading />
               </Calchemy.CalendarPeriod>
             </Calchemy.CalendarPeriodList>
-          </Calchemy.CalendarScroll>
+          </CalendarScroll>
         </Calchemy.Calendar>
       </Calchemy.Root>,
     );
@@ -1035,7 +1128,11 @@ describe("Calchemy", () => {
 
   test("orders weekdays from parse context weekStartsOn", () => {
     const { container } = render(
-      <Calchemy.Root calchemy={calchemy} expectedValue="single" parseContext={{ weekStartsOn: 1 }}>
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="single"
+        parseContext={{ weekStartsOn: 1 }}
+      >
         <Calchemy.Calendar />
       </Calchemy.Root>,
     );
@@ -1111,7 +1208,10 @@ describe("Calchemy", () => {
   });
 });
 
-function scrollCalendarToPeriodIndex(container: ParentNode, periodIndex: number): void {
+function scrollCalendarToPeriodIndex(
+  container: ParentNode,
+  periodIndex: number,
+): void {
   const scroll = container.querySelector<HTMLElement>("[data-calchemy-scroll]");
   if (!scroll) {
     throw new Error("Expected calendar scroll container.");
@@ -1119,7 +1219,11 @@ function scrollCalendarToPeriodIndex(container: ParentNode, periodIndex: number)
 
   Object.defineProperties(scroll, {
     clientWidth: { configurable: true, value: 100 },
-    scrollLeft: { configurable: true, writable: true, value: periodIndex * 100 },
+    scrollLeft: {
+      configurable: true,
+      writable: true,
+      value: periodIndex * 100,
+    },
     scrollWidth: { configurable: true, value: 1000 },
     getBoundingClientRect: {
       configurable: true,
@@ -1147,7 +1251,12 @@ function getCalendarHeadingText(): string | null | undefined {
   return document.querySelector("[data-calchemy-heading]")?.textContent;
 }
 
-function rect(left: number, top: number, right: number, bottom: number): DOMRect {
+function rect(
+  left: number,
+  top: number,
+  right: number,
+  bottom: number,
+): DOMRect {
   return {
     left,
     top,
@@ -1161,11 +1270,14 @@ function rect(left: number, top: number, right: number, bottom: number): DOMRect
   } as DOMRect;
 }
 
-function mockCalendarDayRects(container: ParentNode, dayRects: Record<string, DOMRect>): void {
+function mockCalendarDayRects(
+  container: ParentNode,
+  dayRects: Record<string, DOMRect>,
+): void {
   for (const [label, dayRect] of Object.entries(dayRects)) {
-    const day = Array.from(container.querySelectorAll<HTMLButtonElement>("[data-calchemy-day]")).find(
-      (item) => item.textContent === label,
-    );
+    const day = Array.from(
+      container.querySelectorAll<HTMLButtonElement>("[data-calchemy-day]"),
+    ).find((item) => item.textContent === label);
     if (!day) {
       throw new Error(`Expected calendar day ${label}.`);
     }
@@ -1181,8 +1293,12 @@ function dragCalendarSelection(
   end: { x: number; y: number },
 ): void {
   const dragSurface =
-    container.querySelector<HTMLElement>("[data-calchemy-period][data-multiple-drag]") ??
-    container.querySelector<HTMLElement>("[data-calchemy-grid][data-multiple-drag]");
+    container.querySelector<HTMLElement>(
+      "[data-calchemy-period][data-multiple-drag]",
+    ) ??
+    container.querySelector<HTMLElement>(
+      "[data-calchemy-grid][data-multiple-drag]",
+    );
   if (!dragSurface) {
     throw new Error("Expected calendar drag surface.");
   }
