@@ -2257,6 +2257,9 @@ function mockCalendarDayRectInPeriodElement(
 function plainDateFromPeriodIdAndDay(periodId: string, day: number) {
   const start = periodId.replace(/^month-/, "");
   const [year, month] = start.split("-").map(Number);
+  if (year === undefined || month === undefined) {
+    throw new Error(`Invalid period id: ${periodId}`);
+  }
   return Temporal.PlainDate.from({ year, month, day });
 }
 

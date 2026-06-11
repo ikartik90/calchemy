@@ -1,8 +1,24 @@
 {
   "name": "@calchemy/date-core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
-  "description": "Natural language date parsing with Temporal values.",
+  "description": "Natural language date parser with Temporal values.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ikartik90/calchemy.git"
+  },
+  "homepage": "https://github.com/ikartik90/calchemy#readme",
+  "bugs": "https://github.com/ikartik90/calchemy/issues",
+  "keywords": [
+    "date",
+    "parser",
+    "temporal",
+    "natural-language"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "sideEffects": false,
   "exports": {
     ".": {
