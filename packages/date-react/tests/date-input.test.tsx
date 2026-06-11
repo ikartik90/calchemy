@@ -376,7 +376,7 @@ describe("Calchemy", () => {
 
     expect(screen.getByText("February 2026")).toBeTruthy();
     expect(
-      container.querySelectorAll("[calchemy-day][calchemy-selected]"),
+      container.querySelectorAll("[calchemy-date][calchemy-selected]"),
     ).toHaveLength(2);
   });
 
@@ -398,7 +398,7 @@ describe("Calchemy", () => {
     );
 
     expect(
-      container.querySelectorAll("[calchemy-day][calchemy-selected]"),
+      container.querySelectorAll("[calchemy-date][calchemy-selected]"),
     ).toHaveLength(3);
   });
 
@@ -750,6 +750,194 @@ describe("Calchemy", () => {
     );
   });
 
+  test("dragging can start from the gap between scrolled calendar periods", () => {
+    const onValueChange = vi.fn();
+    const { container } = render(
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="multiple"
+        inputMode="calendar"
+        onValueChange={onValueChange}
+      >
+        <Calchemy.Calendar period={{ months: 1 }}>
+          <CalendarScroll direction="horizontal">
+            <Calchemy.CalendarPeriodList>
+              <Calchemy.CalendarPeriod>
+                <Calchemy.CalendarGrid />
+              </Calchemy.CalendarPeriod>
+            </Calchemy.CalendarPeriodList>
+          </CalendarScroll>
+        </Calchemy.Calendar>
+      </Calchemy.Root>,
+    );
+
+    const scroll = container.querySelector<HTMLElement>("[calchemy-scroll]");
+    const periodList = container.querySelector<HTMLElement>("[calchemy-period-list]");
+    if (!scroll || !periodList) {
+      throw new Error("Expected calendar scroll container and period list.");
+    }
+
+    Object.defineProperties(scroll, {
+      clientWidth: { configurable: true, value: 100 },
+      scrollLeft: { configurable: true, writable: true, value: 0 },
+      scrollWidth: { configurable: true, value: 500 },
+    });
+    vi.spyOn(scroll, "getBoundingClientRect").mockReturnValue(rect(0, 0, 100, 100));
+    vi.spyOn(periodList, "getBoundingClientRect").mockReturnValue(rect(0, 0, 500, 100));
+    mockCalendarDayRectInPeriodByIndex(
+      container,
+      0,
+      "28",
+      rect(10, 40, 20, 50),
+    );
+    mockCalendarDayRectInPeriodByIndex(
+      container,
+      0,
+      "29",
+      rect(30, 40, 40, 50),
+    );
+
+    dragCalendarSelection(
+      container,
+      periodList,
+      { x: 15, y: 45 },
+      { x: 35, y: 45 },
+    );
+
+    expect(onValueChange).toHaveBeenLastCalledWith(
+      {
+        kind: "multiple",
+        dates: [
+          Temporal.PlainDate.from("2026-05-28"),
+          Temporal.PlainDate.from("2026-05-29"),
+        ],
+      },
+      expect.objectContaining({ status: "valid" }),
+    );
+  });
+
+  test("dragging can start from the gap between calendar periods without scrolling", () => {
+    const onValueChange = vi.fn();
+    const { container } = render(
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="multiple"
+        inputMode="calendar"
+        onValueChange={onValueChange}
+      >
+        <Calchemy.Calendar period={{ months: 3 }}>
+          <Calchemy.CalendarPeriodList>
+            <Calchemy.CalendarPeriod>
+              <Calchemy.CalendarGrid />
+            </Calchemy.CalendarPeriod>
+          </Calchemy.CalendarPeriodList>
+        </Calchemy.Calendar>
+      </Calchemy.Root>,
+    );
+
+    const periodList = container.querySelector<HTMLElement>("[calchemy-period-list]");
+    if (!periodList) {
+      throw new Error("Expected calendar period list.");
+    }
+
+    vi.spyOn(periodList, "getBoundingClientRect").mockReturnValue(rect(0, 0, 300, 100));
+    mockCalendarDayRectInPeriodByIndex(
+      container,
+      0,
+      "28",
+      rect(10, 40, 20, 50),
+    );
+    mockCalendarDayRectInPeriodByIndex(
+      container,
+      0,
+      "29",
+      rect(30, 40, 40, 50),
+    );
+
+    dragCalendarSelection(
+      container,
+      periodList,
+      { x: 15, y: 45 },
+      { x: 35, y: 45 },
+    );
+
+    expect(onValueChange).toHaveBeenLastCalledWith(
+      {
+        kind: "multiple",
+        dates: [
+          Temporal.PlainDate.from("2026-05-28"),
+          Temporal.PlainDate.from("2026-05-29"),
+        ],
+      },
+      expect.objectContaining({ status: "valid" }),
+    );
+  });
+
+  test("dragging can start from calendar period padding inside a scroll viewport", () => {
+    const onValueChange = vi.fn();
+    const { container } = render(
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="multiple"
+        inputMode="calendar"
+        onValueChange={onValueChange}
+      >
+        <Calchemy.Calendar period={{ months: 1 }}>
+          <CalendarScroll direction="horizontal">
+            <Calchemy.CalendarPeriodList>
+              <Calchemy.CalendarPeriod>
+                <Calchemy.CalendarGrid />
+              </Calchemy.CalendarPeriod>
+            </Calchemy.CalendarPeriodList>
+          </CalendarScroll>
+        </Calchemy.Calendar>
+      </Calchemy.Root>,
+    );
+
+    const scroll = container.querySelector<HTMLElement>("[calchemy-scroll]");
+    const period = container.querySelector<HTMLElement>("[calchemy-period]");
+    if (!scroll || !period) {
+      throw new Error("Expected calendar scroll container and period.");
+    }
+
+    Object.defineProperties(scroll, {
+      clientWidth: { configurable: true, value: 100 },
+      scrollLeft: { configurable: true, writable: true, value: 0 },
+      scrollWidth: { configurable: true, value: 500 },
+    });
+    vi.spyOn(scroll, "getBoundingClientRect").mockReturnValue(rect(0, 0, 100, 100));
+    mockCalendarDayRectInPeriodByIndex(
+      container,
+      0,
+      "28",
+      rect(10, 40, 20, 50),
+    );
+    mockCalendarDayRectInPeriodByIndex(
+      container,
+      0,
+      "29",
+      rect(30, 40, 40, 50),
+    );
+
+    dragCalendarSelection(
+      container,
+      period,
+      { x: 5, y: 5 },
+      { x: 35, y: 45 },
+    );
+
+    expect(onValueChange).toHaveBeenLastCalledWith(
+      {
+        kind: "multiple",
+        dates: [
+          Temporal.PlainDate.from("2026-05-28"),
+          Temporal.PlainDate.from("2026-05-29"),
+        ],
+      },
+      expect.objectContaining({ status: "valid" }),
+    );
+  });
+
   test("dragging can start from the calendar period weekdays row", () => {
     const onValueChange = vi.fn();
     const { container } = render(
@@ -775,7 +963,7 @@ describe("Calchemy", () => {
       "29": rect(30, 40, 40, 50),
     });
     const weekdays = container.querySelector<HTMLElement>(
-      "[calchemy-weekdays]",
+      "[calchemy-days]",
     );
     if (!weekdays) {
       throw new Error("Expected calendar weekdays row.");
@@ -796,6 +984,236 @@ describe("Calchemy", () => {
           Temporal.PlainDate.from("2026-05-29"),
         ],
       },
+      expect.objectContaining({ status: "valid" }),
+    );
+  });
+
+  test("dragging selects dates across visible calendar periods", () => {
+    const onValueChange = vi.fn();
+    const { container } = render(
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="multiple"
+        inputMode="calendar"
+        onValueChange={onValueChange}
+      >
+        <Calchemy.Calendar period={{ months: 2 }}>
+          <Calchemy.CalendarPeriodList>
+            <Calchemy.CalendarPeriod>
+              <Calchemy.CalendarGrid />
+            </Calchemy.CalendarPeriod>
+          </Calchemy.CalendarPeriodList>
+        </Calchemy.Calendar>
+      </Calchemy.Root>,
+    );
+
+    mockCalendarDayRectInPeriod(
+      container,
+      "month-2026-05-01",
+      "28",
+      rect(10, 10, 20, 20),
+    );
+    mockCalendarDayRectInPeriod(
+      container,
+      "month-2026-06-01",
+      "5",
+      rect(10, 100, 20, 110),
+    );
+
+    const mayPeriod = container.querySelector<HTMLElement>(
+      "[calchemy-period-id='month-2026-05-01']",
+    );
+    if (!mayPeriod) {
+      throw new Error("Expected May calendar period.");
+    }
+
+    const startDay = Array.from(
+      mayPeriod.querySelectorAll<HTMLButtonElement>("[calchemy-date]"),
+    ).find((item) => item.textContent === "28");
+    if (!startDay) {
+      throw new Error("Expected May 28 calendar day.");
+    }
+
+    dragCalendarSelection(
+      container,
+      startDay,
+      { x: 15, y: 15 },
+      { x: 15, y: 105 },
+    );
+
+    expect(onValueChange).toHaveBeenLastCalledWith(
+      {
+        kind: "multiple",
+        dates: [
+          Temporal.PlainDate.from("2026-05-28"),
+          Temporal.PlainDate.from("2026-06-05"),
+        ],
+      },
+      expect.objectContaining({ status: "valid" }),
+    );
+  });
+
+  test("dragging ignores dates outside the calendar scroll viewport", () => {
+    const onValueChange = vi.fn();
+    const { container } = render(
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="multiple"
+        inputMode="calendar"
+        onValueChange={onValueChange}
+      >
+        <Calchemy.Calendar period={{ months: 1 }}>
+          <CalendarScroll direction="horizontal">
+            <Calchemy.CalendarPeriodList>
+              <Calchemy.CalendarPeriod>
+                <Calchemy.CalendarGrid />
+              </Calchemy.CalendarPeriod>
+            </Calchemy.CalendarPeriodList>
+          </CalendarScroll>
+        </Calchemy.Calendar>
+      </Calchemy.Root>,
+    );
+
+    const scroll = container.querySelector<HTMLElement>("[calchemy-scroll]");
+    if (!scroll) {
+      throw new Error("Expected calendar scroll container.");
+    }
+
+    Object.defineProperties(scroll, {
+      clientWidth: { configurable: true, value: 100 },
+      scrollLeft: { configurable: true, writable: true, value: 0 },
+      scrollWidth: { configurable: true, value: 500 },
+    });
+    vi.spyOn(scroll, "getBoundingClientRect").mockReturnValue(rect(0, 0, 100, 100));
+
+    for (const period of container.querySelectorAll<HTMLElement>(
+      "[calchemy-period]",
+    )) {
+      const index = Number(period.getAttribute("calchemy-period-index"));
+      const left = index * 100;
+
+      Object.defineProperty(period, "getBoundingClientRect", {
+        configurable: true,
+        value: () => rect(left, 0, left + 100, 100),
+      });
+    }
+
+    mockCalendarDayRectInPeriodByIndex(
+      container,
+      0,
+      "15",
+      rect(10, 40, 20, 50),
+    );
+    mockCalendarDayRectInPeriodByIndex(
+      container,
+      3,
+      "20",
+      rect(310, 40, 320, 50),
+    );
+
+    const visiblePeriod = container.querySelector<HTMLElement>(
+      "[calchemy-period-index='0']",
+    );
+    if (!visiblePeriod) {
+      throw new Error("Expected visible calendar period.");
+    }
+
+    const startDay = Array.from(
+      visiblePeriod.querySelectorAll<HTMLButtonElement>("[calchemy-date]"),
+    ).find((item) => item.textContent === "15");
+    if (!startDay) {
+      throw new Error("Expected visible calendar day 15.");
+    }
+
+    dragCalendarSelection(
+      container,
+      startDay,
+      { x: 15, y: 45 },
+      { x: 315, y: 45 },
+    );
+
+    const periodId = visiblePeriod.getAttribute("calchemy-period-id");
+    if (!periodId) {
+      throw new Error("Expected visible calendar period id.");
+    }
+
+    expect(onValueChange).toHaveBeenLastCalledWith(
+      {
+        kind: "multiple",
+        dates: [plainDateFromPeriodIdAndDay(periodId, 15)],
+      },
+      expect.objectContaining({ status: "valid" }),
+    );
+  });
+
+  test("dragging ignores clipped dates in partially visible calendar periods", () => {
+    const onValueChange = vi.fn();
+    const { container } = render(
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="multiple"
+        inputMode="calendar"
+        onValueChange={onValueChange}
+      >
+        <Calchemy.Calendar period={{ months: 1 }}>
+          <CalendarScroll direction="horizontal">
+            <Calchemy.CalendarPeriodList>
+              <Calchemy.CalendarPeriod>
+                <Calchemy.CalendarGrid />
+              </Calchemy.CalendarPeriod>
+            </Calchemy.CalendarPeriodList>
+          </CalendarScroll>
+        </Calchemy.Calendar>
+      </Calchemy.Root>,
+    );
+
+    const scroll = container.querySelector<HTMLElement>("[calchemy-scroll]");
+    if (!scroll) {
+      throw new Error("Expected calendar scroll container.");
+    }
+
+    Object.defineProperties(scroll, {
+      clientWidth: { configurable: true, value: 100 },
+      scrollLeft: { configurable: true, writable: true, value: 50 },
+      scrollWidth: { configurable: true, value: 1000 },
+    });
+    vi.spyOn(scroll, "getBoundingClientRect").mockReturnValue(rect(0, 0, 100, 100));
+
+    for (const period of container.querySelectorAll<HTMLElement>(
+      "[calchemy-period]",
+    )) {
+      const index = Number(period.getAttribute("calchemy-period-index"));
+      const left = index * 100 - 50;
+
+      Object.defineProperty(period, "getBoundingClientRect", {
+        configurable: true,
+        value: () => rect(left, 0, left + 100, 100),
+      });
+    }
+
+    mockCalendarDayRectInPeriodByIndex(
+      container,
+      0,
+      "15",
+      rect(-40, 40, 20, 50),
+    );
+
+    const clippedPeriod = container.querySelector<HTMLElement>(
+      "[calchemy-period-index='0']",
+    );
+    if (!clippedPeriod) {
+      throw new Error("Expected clipped calendar period.");
+    }
+
+    dragCalendarSelection(
+      container,
+      clippedPeriod,
+      { x: -25, y: 45 },
+      { x: -15, y: 45 },
+    );
+
+    expect(onValueChange).toHaveBeenLastCalledWith(
+      { kind: "multiple", dates: [] },
       expect.objectContaining({ status: "valid" }),
     );
   });
@@ -944,7 +1362,7 @@ describe("Calchemy", () => {
     );
 
     expect(
-      container.querySelectorAll("[calchemy-day][calchemy-selected]"),
+      container.querySelectorAll("[calchemy-date][calchemy-selected]"),
     ).toHaveLength(2);
   });
 
@@ -962,7 +1380,7 @@ describe("Calchemy", () => {
       container.querySelectorAll("[calchemy-cell][calchemy-blank]"),
     ).toHaveLength(11);
     expect(
-      container.querySelector("[calchemy-day][calchemy-outside]"),
+      container.querySelector("[calchemy-date][calchemy-outside]"),
     ).toBeNull();
   });
 
@@ -980,7 +1398,7 @@ describe("Calchemy", () => {
       container.querySelector("[calchemy-cell][calchemy-blank]"),
     ).toBeNull();
     expect(
-      container.querySelectorAll("[calchemy-day][calchemy-outside]"),
+      container.querySelectorAll("[calchemy-date][calchemy-outside]"),
     ).toHaveLength(11);
   });
 
@@ -1052,8 +1470,152 @@ describe("Calchemy", () => {
 
     expect(screen.getByText("May 2026")).toBeTruthy();
     expect(
-      document.querySelectorAll("[calchemy-day][calchemy-selected]"),
+      document.querySelectorAll("[calchemy-date][calchemy-selected]"),
     ).toHaveLength(3);
+  });
+
+  test("calendar selection keeps the scrolled period after navigating with next", () => {
+    const onValueChange = vi.fn();
+    render(
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="multiple"
+        inputMode="calendar"
+        defaultInputValue="tomorrow"
+        onValueChange={onValueChange}
+      >
+        <Calchemy.Calendar period={{ months: 3 }}>
+          <Calchemy.CalendarHeader>
+            <Calchemy.CalendarPrevious />
+            <Calchemy.CalendarHeading />
+            <Calchemy.CalendarNext />
+          </Calchemy.CalendarHeader>
+          <CalendarScroll direction="horizontal">
+            <Calchemy.CalendarPeriodList>
+              <Calchemy.CalendarPeriod>
+                <Calchemy.CalendarPeriodHeading />
+                <Calchemy.CalendarGrid />
+              </Calchemy.CalendarPeriod>
+            </Calchemy.CalendarPeriodList>
+          </CalendarScroll>
+        </Calchemy.Calendar>
+      </Calchemy.Root>,
+    );
+
+    expect(getCalendarHeadingText()).toBe("May 2026 - July 2026");
+
+    fireEvent.click(screen.getByText("Next"));
+    fireEvent.click(screen.getByText("Next"));
+    expect(getCalendarHeadingText()).toBe("November 2026 - January 2027");
+
+    const novemberPeriod = document.querySelector<HTMLElement>(
+      "[calchemy-period-id='month-2026-11-01']",
+    );
+    if (!novemberPeriod) {
+      throw new Error("Expected November 2026 calendar period.");
+    }
+
+    fireEvent.click(within(novemberPeriod).getByText("27"));
+    expect(getCalendarHeadingText()).toBe("November 2026 - January 2027");
+    expect(onValueChange).toHaveBeenLastCalledWith(
+      {
+        kind: "multiple",
+        dates: [Temporal.PlainDate.from("2026-05-28"), Temporal.PlainDate.from("2026-11-27")],
+      },
+      expect.objectContaining({ status: "valid" }),
+    );
+  });
+
+  test("calendar selection keeps the scrolled period when earlier dates stay selected", () => {
+    const onValueChange = vi.fn();
+    const { container } = render(
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="multiple"
+        inputMode="calendar"
+        defaultInputValue="tomorrow"
+        onValueChange={onValueChange}
+      >
+        <Calchemy.Calendar period={{ months: 3 }}>
+          <Calchemy.CalendarHeading />
+          <CalendarScroll direction="horizontal">
+            <Calchemy.CalendarPeriodList>
+              <Calchemy.CalendarPeriod>
+                <Calchemy.CalendarPeriodHeading />
+                <Calchemy.CalendarGrid />
+              </Calchemy.CalendarPeriod>
+            </Calchemy.CalendarPeriodList>
+          </CalendarScroll>
+        </Calchemy.Calendar>
+      </Calchemy.Root>,
+    );
+
+    scrollCalendarToPeriodIndex(container, 2);
+    expect(getCalendarHeadingText()).toBe("July 2026 - September 2026");
+
+    const julyPeriod = container.querySelector<HTMLElement>(
+      "[calchemy-period-id='month-2026-07-01']",
+    );
+    if (!julyPeriod) {
+      throw new Error("Expected July 2026 calendar period.");
+    }
+
+    fireEvent.click(within(julyPeriod).getByText("27"));
+    expect(getCalendarHeadingText()).toBe("July 2026 - September 2026");
+    expect(onValueChange).toHaveBeenLastCalledWith(
+      {
+        kind: "multiple",
+        dates: [Temporal.PlainDate.from("2026-05-28"), Temporal.PlainDate.from("2026-07-27")],
+      },
+      expect.objectContaining({ status: "valid" }),
+    );
+  });
+
+  test("calendar drag selection keeps the scrolled period when earlier dates stay selected", () => {
+    const { container } = render(
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="multiple"
+        inputMode="calendar"
+        defaultInputValue="tomorrow"
+      >
+        <Calchemy.Calendar period={{ months: 3 }}>
+          <Calchemy.CalendarHeading />
+          <CalendarScroll direction="horizontal">
+            <Calchemy.CalendarPeriodList>
+              <Calchemy.CalendarPeriod>
+                <Calchemy.CalendarPeriodHeading />
+                <Calchemy.CalendarGrid />
+              </Calchemy.CalendarPeriod>
+            </Calchemy.CalendarPeriodList>
+          </CalendarScroll>
+        </Calchemy.Calendar>
+      </Calchemy.Root>,
+    );
+
+    scrollCalendarToPeriodIndex(container, 2);
+    expect(getCalendarHeadingText()).toBe("July 2026 - September 2026");
+
+    const julyPeriod = container.querySelector<HTMLElement>(
+      "[calchemy-period-id='month-2026-07-01']",
+    );
+    if (!julyPeriod) {
+      throw new Error("Expected July 2026 calendar period.");
+    }
+
+    const day27 = within(julyPeriod).getByText("27");
+    const day28 = within(julyPeriod).getByText("28");
+    day27.getBoundingClientRect = () => rect(10, 10, 30, 30);
+    day28.getBoundingClientRect = () => rect(40, 10, 60, 30);
+
+    dragCalendarSelection(
+      container,
+      day27,
+      { x: 20, y: 20 },
+      { x: 50, y: 20 },
+    );
+
+    expect(getCalendarHeadingText()).toBe("July 2026 - September 2026");
   });
 
   test("calendar selection keeps the scrolled period when the date is already visible", () => {
@@ -1129,7 +1691,7 @@ describe("Calchemy", () => {
     expect(getCalendarHeadingText()).toBe("May 2026 - July 2026");
     expect(screen.getByText("May 2026")).toBeTruthy();
     expect(
-      container.querySelectorAll("[calchemy-day][calchemy-selected]"),
+      container.querySelectorAll("[calchemy-date][calchemy-selected]"),
     ).toHaveLength(3);
   });
 
@@ -1635,7 +2197,7 @@ function mockCalendarDayRects(
 ): void {
   for (const [label, dayRect] of Object.entries(dayRects)) {
     const day = Array.from(
-      container.querySelectorAll<HTMLButtonElement>("[calchemy-day]"),
+      container.querySelectorAll<HTMLButtonElement>("[calchemy-date]"),
     ).find((item) => item.textContent === label);
     if (!day) {
       throw new Error(`Expected calendar day ${label}.`);
@@ -1645,12 +2207,64 @@ function mockCalendarDayRects(
   }
 }
 
-function clickCalendarDay(
+function mockCalendarDayRectInPeriod(
   container: ParentNode,
-  startElement: HTMLElement,
-  point: { x: number; y: number },
+  periodId: string,
+  label: string,
+  dayRect: DOMRect,
 ): void {
+  const period = container.querySelector<HTMLElement>(
+    `[calchemy-period-id='${periodId}']`,
+  );
+  if (!period) {
+    throw new Error(`Expected calendar period ${periodId}.`);
+  }
+
+  mockCalendarDayRectInPeriodElement(period, label, dayRect);
+}
+
+function mockCalendarDayRectInPeriodByIndex(
+  container: ParentNode,
+  periodIndex: number,
+  label: string,
+  dayRect: DOMRect,
+): void {
+  const period = container.querySelector<HTMLElement>(
+    `[calchemy-period-index='${periodIndex}']`,
+  );
+  if (!period) {
+    throw new Error(`Expected calendar period index ${periodIndex}.`);
+  }
+
+  mockCalendarDayRectInPeriodElement(period, label, dayRect);
+}
+
+function mockCalendarDayRectInPeriodElement(
+  period: HTMLElement,
+  label: string,
+  dayRect: DOMRect,
+): void {
+  const day = Array.from(
+    period.querySelectorAll<HTMLButtonElement>("[calchemy-date]"),
+  ).find((item) => item.textContent === label);
+  if (!day) {
+    throw new Error(`Expected calendar day ${label}.`);
+  }
+
+  day.getBoundingClientRect = () => dayRect;
+}
+
+function plainDateFromPeriodIdAndDay(periodId: string, day: number) {
+  const start = periodId.replace(/^month-/, "");
+  const [year, month] = start.split("-").map(Number);
+  return Temporal.PlainDate.from({ year, month, day });
+}
+
+function getCalendarDragSurface(container: ParentNode): HTMLElement {
   const dragSurface =
+    container.querySelector<HTMLElement>(
+      "[calchemy-period-list][calchemy-multiple-drag]",
+    ) ??
     container.querySelector<HTMLElement>(
       "[calchemy-period][calchemy-multiple-drag]",
     ) ??
@@ -1660,6 +2274,16 @@ function clickCalendarDay(
   if (!dragSurface) {
     throw new Error("Expected calendar drag surface.");
   }
+
+  return dragSurface;
+}
+
+function clickCalendarDay(
+  container: ParentNode,
+  startElement: HTMLElement,
+  point: { x: number; y: number },
+): void {
+  const dragSurface = getCalendarDragSurface(container);
 
   dragSurface.setPointerCapture = () => {};
   fireEvent.pointerDown(startElement, {
@@ -1683,16 +2307,7 @@ function dragCalendarSelection(
   start: { x: number; y: number },
   end: { x: number; y: number },
 ): void {
-  const dragSurface =
-    container.querySelector<HTMLElement>(
-      "[calchemy-period][calchemy-multiple-drag]",
-    ) ??
-    container.querySelector<HTMLElement>(
-      "[calchemy-grid][calchemy-multiple-drag]",
-    );
-  if (!dragSurface) {
-    throw new Error("Expected calendar drag surface.");
-  }
+  const dragSurface = getCalendarDragSurface(container);
 
   dragSurface.setPointerCapture = () => {};
   fireEvent.pointerDown(startElement, {

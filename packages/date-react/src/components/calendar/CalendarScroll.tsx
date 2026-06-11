@@ -9,6 +9,7 @@ import {
   getScrollAnchorPeriod,
   getScrollPosition,
   getScrollSize,
+  scrollPeriodIntoView,
   setScrollPosition,
 } from "./scroll-preload";
 import type { CalendarScrollDirection } from "./types";
@@ -57,12 +58,7 @@ export function CalendarScroll({
     }
 
     positionedPeriodAnchor.current = anchorKey;
-    if (direction === "horizontal") {
-      element.scrollLeft = currentPeriod.offsetLeft - element.offsetLeft;
-      return;
-    }
-
-    element.scrollTop = currentPeriod.offsetTop - element.offsetTop;
+    scrollPeriodIntoView(element, currentPeriod, direction);
   }, [direction, calendar.periodAnchor, calendar.periods]);
 
   function startBeforePreloadTransaction(

@@ -32,7 +32,7 @@ export function CalendarWeekdays({
   const weekdays = buildWeekdays(calendar, weekdayFormat);
 
   return (
-    <div {...props} calchemy-weekdays="">
+    <div {...props} calchemy-days="">
       {weekdays.map((weekday) => (
         <div
           key={weekday.index}
@@ -157,7 +157,7 @@ export function CalendarGrid({
                 ref={(element) =>
                   drag?.registerDay(element, date, dayState.disabled || !calendar.editable)
                 }
-                calchemy-day=""
+                calchemy-date=""
                 calchemy-selected={selected ? "" : undefined}
                 calchemy-drag-preview={dragPreview ? "" : undefined}
                 calchemy-drag-preview-selected={dragPreview && selected ? "" : undefined}

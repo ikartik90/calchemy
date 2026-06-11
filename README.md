@@ -189,12 +189,12 @@ Optional date grid. Skip the children and you get a default header, weekday row,
 
 `bounds` keeps navigation and selection inside a range. `isDateDisabled` greys out specific days. `namedDates="holidays"` marks days from your `namedDatesVocabulary`.
 
-### CalendarGrid `[calchemy-grid]` `[calchemy-day]` `[calchemy-selected?]` `[calchemy-today?]`
+### CalendarGrid `[calchemy-grid]` `[calchemy-date]` `[calchemy-selected?]` `[calchemy-today?]`
 
 The month grid. `showBookends` fills leading and trailing cells with adjacent-month days. In calendar input mode, click or drag to toggle multiple dates.
 
 ```css
-[calchemy-day][calchemy-selected] {
+[calchemy-date][calchemy-selected] {
   background: #111;
   color: white;
 }

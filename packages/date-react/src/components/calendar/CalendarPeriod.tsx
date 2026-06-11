@@ -6,6 +6,7 @@ import {
   CalendarPeriodDragProvider,
   multipleDragSurfaceStyle,
   useCalendarPeriodDragSurface,
+  useOptionalCalendarPeriodDrag,
 } from "./calendar-period-drag";
 
 export type CalchemyCalendarPeriodProps = ComponentPropsWithoutRef<"section"> & {
@@ -25,7 +26,10 @@ export function CalendarPeriod({
 }: CalchemyCalendarPeriodProps) {
   const period = useContext(CalendarPeriodContext);
   const calendar = useCalchemyCalendar();
-  const drag = useCalendarPeriodDragSurface(calendar.editable && dragSelection);
+  const parentDrag = useOptionalCalendarPeriodDrag();
+  const drag = useCalendarPeriodDragSurface(
+    calendar.editable && dragSelection && parentDrag === null,
+  );
 
   const content = drag ? (
     <CalendarPeriodDragProvider value={drag}>
@@ -44,7 +48,13 @@ export function CalendarPeriod({
       calchemy-period-index={period?.index}
       calchemy-multiple-drag={drag ? "" : undefined}
       calchemy-dragging={drag?.dragState ? "" : undefined}
-      style={drag ? { ...multipleDragSurfaceStyle, ...style } : style}
+      style={
+        drag
+          ? { ...multipleDragSurfaceStyle, ...style }
+          : parentDrag
+            ? { touchAction: "none", ...style }
+            : style
+      }
       onPointerDownCapture={
         drag
           ? (event) => {

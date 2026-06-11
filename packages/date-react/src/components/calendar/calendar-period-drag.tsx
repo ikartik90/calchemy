@@ -68,12 +68,19 @@ export const multipleDragSurfaceStyle = {
   touchAction: "none",
 } as const;
 
+export const multiplePeriodListDragSurfaceStyle = {
+  ...multipleDragSurfaceStyle,
+  position: "relative",
+  background: "transparent",
+} as const;
+
 export function useOptionalCalendarPeriodDrag(): CalendarPeriodDragContextValue | null {
   return useContext(CalendarPeriodDragContext);
 }
 
 export function useCalendarPeriodDragSurface(
   dragSelection = true,
+  surfaceElementRef?: RefObject<HTMLElement | null>,
 ): CalendarPeriodDragContextValue | null {
   const calendar = useCalchemyCalendar();
   const multipleSelection = dragSelection && calendar.calchemy.expectedValue === "multiple";
@@ -163,7 +170,7 @@ export function useCalendarPeriodDragSurface(
       return null;
     }
 
-    const button = target.closest("[calchemy-day]");
+    const button = target.closest("[calchemy-date]");
     if (!(button instanceof HTMLButtonElement)) {
       return null;
     }
@@ -213,7 +220,13 @@ export function useCalendarPeriodDragSurface(
       const current = getPointerPoint(event);
       setDragRectangle({ start: activeDrag.start, current });
       const dragRect = getDragRect(activeDrag.start, current);
-      const gestureKeys = getIntersectingDateKeys(dayCells.current, dragRect, activeDrag.cellBounds);
+      const clipRect = getDragClipRect(surfaceRef.current);
+      const gestureKeys = getIntersectingDateKeys(
+        dayCells.current,
+        dragRect,
+        activeDrag.cellBounds,
+        clipRect,
+      );
       const baseKeys = activeDrag.baseDates.map((date) => date.toString());
       const previewKeys = toggleDateKeys(baseKeys, gestureKeys);
       const hasMoved = activeDrag.hasMoved || hasPointerMoved(activeDrag.start, current);
@@ -240,7 +253,7 @@ export function useCalendarPeriodDragSurface(
         document.getSelection()?.removeAllRanges();
       }
 
-      surfaceRef.current = event.currentTarget;
+      surfaceRef.current = surfaceElementRef?.current ?? event.currentTarget;
       surfaceRef.current?.setPointerCapture?.(event.pointerId);
       acquireDragGestureLock();
       const nextDragState: DragState = {
@@ -260,7 +273,7 @@ export function useCalendarPeriodDragSurface(
         current: nextDragState.current,
       });
     },
-    [acquireDragGestureLock, calendar.selected, getDayCellFromTarget, multipleSelection],
+    [acquireDragGestureLock, calendar.selected, getDayCellFromTarget, multipleSelection, surfaceElementRef],
   );
 
   const handlePointerUp = useCallback(
@@ -469,15 +482,62 @@ function snapshotCellBounds(cells: ReadonlyMap<string, DayCell>): Map<string, Ce
   return bounds;
 }
 
+function getDragClipRect(surface: HTMLElement | null): CellBounds | null {
+  if (!surface) {
+    return null;
+  }
+
+  const scrollContainer = surface.closest("[calchemy-scroll]");
+  if (!(scrollContainer instanceof HTMLElement)) {
+    return null;
+  }
+
+  const rect = scrollContainer.getBoundingClientRect();
+
+  return {
+    left: rect.left,
+    right: rect.right,
+    top: rect.top,
+    bottom: rect.bottom,
+  };
+}
+
+function clipBoundsToRect(
+  bounds: Pick<CellBounds, "left" | "right" | "top" | "bottom">,
+  clip: CellBounds,
+): CellBounds | null {
+  const left = Math.max(bounds.left, clip.left);
+  const right = Math.min(bounds.right, clip.right);
+  const top = Math.max(bounds.top, clip.top);
+  const bottom = Math.min(bounds.bottom, clip.bottom);
+
+  if (left > right || top > bottom) {
+    return null;
+  }
+
+  return { left, right, top, bottom };
+}
+
 function getIntersectingDateKeys(
   cells: ReadonlyMap<string, DayCell>,
   dragRect: DOMRect,
   cellBounds: ReadonlyMap<string, CellBounds>,
+  clipRect: CellBounds | null = null,
 ): string[] {
+  const clippedDragRect = clipRect ? clipBoundsToRect(dragRect, clipRect) : dragRect;
+  if (!clippedDragRect) {
+    return [];
+  }
+
   return Array.from(cells.entries())
     .filter(([key, cell]) => {
       const bounds = cellBounds.get(key);
-      return bounds && !cell.disabled && rectsIntersect(dragRect, bounds);
+      if (!bounds || cell.disabled) {
+        return false;
+      }
+
+      const visibleBounds = clipRect ? clipBoundsToRect(bounds, clipRect) : bounds;
+      return visibleBounds && rectsIntersect(clippedDragRect, visibleBounds);
     })
     .map(([key]) => key);
 }

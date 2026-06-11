@@ -106,6 +106,10 @@ export function Calendar({
       return;
     }
 
+    if (selectionChanged && editable) {
+      return;
+    }
+
     const selectionAnchor = clampDateToBounds(getDateValueAnchor(selected) ?? today, bounds);
     const inputReflectsCalendarSelection = state.inputValue === selectionAnchor.toString();
     const shouldRevealSelection = inputChanged && !inputReflectsCalendarSelection;
@@ -127,6 +131,7 @@ export function Calendar({
   }, [
     activeVisiblePeriodIndex,
     bounds,
+    editable,
     parsedPeriod.count,
     periods,
     selected,

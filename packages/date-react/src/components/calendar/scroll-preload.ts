@@ -25,6 +25,22 @@ export function getClientSize(element: HTMLElement, direction: CalendarScrollDir
   return direction === "horizontal" ? element.clientWidth : element.clientHeight;
 }
 
+export function scrollPeriodIntoView(
+  scrollElement: HTMLElement,
+  period: HTMLElement,
+  direction: CalendarScrollDirection,
+): void {
+  const scrollRect = scrollElement.getBoundingClientRect();
+  const periodRect = period.getBoundingClientRect();
+
+  if (direction === "horizontal") {
+    scrollElement.scrollLeft += periodRect.left - scrollRect.left;
+    return;
+  }
+
+  scrollElement.scrollTop += periodRect.top - scrollRect.top;
+}
+
 export function getScrollAnchorPeriod(
   scrollElement: HTMLElement,
   direction: CalendarScrollDirection,
