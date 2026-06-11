@@ -10,6 +10,7 @@ import {
   useCalendarPeriodDragSurface,
   useOptionalCalendarPeriodDrag,
 } from "./calendar-period-drag";
+import type { CalendarWeekdayFormat } from "./types";
 import {
   buildCalendarWeeks,
   buildWeekdays,
@@ -17,19 +18,26 @@ import {
   getFirstVisibleCalendarPeriod,
 } from "./date-model";
 
-export type CalchemyCalendarWeekdaysProps = ComponentPropsWithoutRef<"div">;
+const defaultCalendarWeekdayFormat = "short" satisfies CalendarWeekdayFormat;
 
-export function CalendarWeekdays(props: CalchemyCalendarWeekdaysProps) {
+export type CalchemyCalendarWeekdaysProps = ComponentPropsWithoutRef<"div"> & {
+  weekdayFormat?: CalendarWeekdayFormat;
+};
+
+export function CalendarWeekdays({
+  weekdayFormat = defaultCalendarWeekdayFormat,
+  ...props
+}: CalchemyCalendarWeekdaysProps) {
   const calendar = useCalchemyCalendar();
-  const weekdays = buildWeekdays(calendar);
+  const weekdays = buildWeekdays(calendar, weekdayFormat);
 
   return (
-    <div {...props} data-calchemy-weekdays="">
+    <div {...props} calchemy-weekdays="">
       {weekdays.map((weekday) => (
         <div
           key={weekday.index}
-          data-calchemy-weekday=""
-          data-weekend={weekday.weekend ? "" : undefined}
+          calchemy-weekday=""
+          calchemy-weekend={weekday.weekend ? "" : undefined}
         >
           {weekday.label}
         </div>
@@ -58,7 +66,9 @@ export function CalendarGrid({
   const period = useCalendarPeriod() ?? getFirstVisibleCalendarPeriod(calendar);
   const weeks = buildCalendarWeeks(period, calendar.weekStartsOn);
   const parentDrag = useOptionalCalendarPeriodDrag();
-  const localDrag = useCalendarPeriodDragSurface(dragSelection && parentDrag === null);
+  const localDrag = useCalendarPeriodDragSurface(
+    calendar.editable && dragSelection && parentDrag === null,
+  );
   const drag = parentDrag ?? localDrag;
   const multipleSelection = Boolean(drag?.multipleSelection);
   const useLocalDragHandlers = Boolean(drag && parentDrag === null);
@@ -69,9 +79,9 @@ export function CalendarGrid({
   return (
     <div
       {...props}
-      data-calchemy-grid=""
-      data-multiple-drag={useLocalDragHandlers ? "" : undefined}
-      data-dragging={useLocalDragHandlers && dragState ? "" : undefined}
+      calchemy-grid=""
+      calchemy-multiple-drag={useLocalDragHandlers ? "" : undefined}
+      calchemy-dragging={useLocalDragHandlers && dragState ? "" : undefined}
       style={useLocalDragHandlers ? { ...multipleDragSurfaceStyle, ...style } : style}
       onPointerDownCapture={
         useLocalDragHandlers
@@ -118,7 +128,7 @@ export function CalendarGrid({
         <CalendarDragRectangleOverlay dragRectangle={drag.dragRectangle} surfaceRef={drag.surfaceRef} />
       ) : null}
       {weeks.map((week) => (
-        <div key={week[0]?.toString()} data-calchemy-week="">
+        <div key={week[0]?.toString()} calchemy-week="">
           {week.map((date) => {
             const dayState = getCalendarDayState(calendar, period, date);
             const namedDateLabels = dayState.namedDates.map((item) => item.value).join(", ");
@@ -134,8 +144,8 @@ export function CalendarGrid({
                 <div
                   key={date.toString()}
                   aria-hidden="true"
-                  data-calchemy-cell=""
-                  data-blank=""
+                  calchemy-cell=""
+                  calchemy-blank=""
                 />
               );
             }
@@ -144,24 +154,31 @@ export function CalendarGrid({
               <button
                 type="button"
                 key={date.toString()}
-                ref={(element) => drag?.registerDay(element, date, dayState.disabled)}
-                data-calchemy-day=""
-                data-selected={selected ? "" : undefined}
-                data-drag-preview={dragPreview ? "" : undefined}
-                data-drag-preview-selected={dragPreview && selected ? "" : undefined}
-                data-drag-preview-deselected={dragPreview && !selected ? "" : undefined}
-                data-today={dayState.today ? "" : undefined}
-                data-weekend={dayState.weekend ? "" : undefined}
-                data-outside={dayState.outside ? "" : undefined}
-                data-first-of-period={dayState.firstOfPeriod ? "" : undefined}
-                data-last-of-period={dayState.lastOfPeriod ? "" : undefined}
-                data-disabled={dayState.disabled ? "" : undefined}
-                data-out-of-bounds={!dayState.bounded ? "" : undefined}
-                data-named-date={dayState.namedDates.length > 0 ? "" : undefined}
-                data-holiday={dayState.namedDates.some((item) => item.isHoliday) ? "" : undefined}
-                data-named-date-labels={namedDateLabels || undefined}
+                ref={(element) =>
+                  drag?.registerDay(element, date, dayState.disabled || !calendar.editable)
+                }
+                calchemy-day=""
+                calchemy-selected={selected ? "" : undefined}
+                calchemy-drag-preview={dragPreview ? "" : undefined}
+                calchemy-drag-preview-selected={dragPreview && selected ? "" : undefined}
+                calchemy-drag-preview-deselected={dragPreview && !selected ? "" : undefined}
+                calchemy-today={dayState.today ? "" : undefined}
+                calchemy-weekend={dayState.weekend ? "" : undefined}
+                calchemy-outside={dayState.outside ? "" : undefined}
+                calchemy-first-of-period={dayState.firstOfPeriod ? "" : undefined}
+                calchemy-last-of-period={dayState.lastOfPeriod ? "" : undefined}
+                calchemy-disabled={dayState.disabled ? "" : undefined}
+                calchemy-out-of-bounds={!dayState.bounded ? "" : undefined}
+                calchemy-named-date={dayState.namedDates.length > 0 ? "" : undefined}
+                calchemy-holiday={dayState.namedDates.some((item) => item.isHoliday) ? "" : undefined}
+                calchemy-named-date-labels={namedDateLabels || undefined}
+                aria-disabled={!calendar.editable && !dayState.disabled ? true : undefined}
                 disabled={dayState.disabled}
                 onClick={() => {
+                  if (!calendar.editable) {
+                    return;
+                  }
+
                   if (drag?.suppressClickRef.current) {
                     drag.suppressClickRef.current = false;
                     return;

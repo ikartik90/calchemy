@@ -1,4 +1,5 @@
 import type { PlainDate } from "../../temporal/types";
+import type { WeekdayIndex } from "../../types";
 
 // Example: `expandTwoDigitYear(27, 2026)` returns `2027`.
 export function expandTwoDigitYear(year: number, anchorYear: number): number {
@@ -51,5 +52,22 @@ export function firstWeekdayBefore(date: PlainDate, weekday: number): PlainDate 
   }
 
   return cursor;
+}
+
+// Example: `startOfCalendarWeek(date, 0)` returns the Sunday starting that week.
+export function startOfCalendarWeek(date: PlainDate, weekStartsOn: WeekdayIndex): PlainDate {
+  const temporalWeekday = weekStartsOn === 0 ? 7 : weekStartsOn;
+  let cursor = date;
+
+  while (cursor.dayOfWeek !== temporalWeekday) {
+    cursor = cursor.subtract({ days: 1 });
+  }
+
+  return cursor;
+}
+
+// Example: `endOfCalendarWeek(date, 0)` returns the Saturday ending that week.
+export function endOfCalendarWeek(date: PlainDate, weekStartsOn: WeekdayIndex): PlainDate {
+  return startOfCalendarWeek(date, weekStartsOn).add({ days: 6 });
 }
 

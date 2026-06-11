@@ -4,6 +4,7 @@ import {
   firstWeekdayBefore,
   firstWeekdayOnOrAfter,
 } from "../primitives/date-math";
+import { resolveMonthDayList, resolveMonthDayRange } from "../primitives/month-day-list";
 import { parseNamedDate } from "../primitives/named-date";
 import { parseNumericCandidates } from "../primitives/numeric-date";
 import { comparePlainDate, toDuration } from "../primitives/shared";
@@ -32,6 +33,10 @@ import type {
 } from "../../types";
 import type { DateVocabularyLookups } from "../vocabulary";
 
+export type ResolveBoundaryOptions = {
+  scope?: { start: PlainDate; end: PlainDate };
+};
+
 // Example: `resolveBoundary({ kind: "week-range", week: 52, ... }, anchor, Temporal, context, lookups)` resolves ISO week 52.
 export function resolveBoundary(
   boundary: BoundarySlice,
@@ -39,6 +44,7 @@ export function resolveBoundary(
   Temporal: TemporalApi,
   context: ResolvedParseDateContext,
   lookups: DateVocabularyLookups,
+  options?: ResolveBoundaryOptions,
 ): DateValue | null {
   switch (boundary.kind) {
     case "anchor-until": {
@@ -61,6 +67,76 @@ export function resolveBoundary(
         context,
         lookups,
       );
+    case "month-day-list":
+      return resolveMonthDayList(boundary.month, boundary.days, anchorDate.year, Temporal);
+    case "month-day-range":
+      return resolveMonthDayRange(
+        boundary.month,
+        boundary.startDay,
+        boundary.endDay,
+        anchorDate.year,
+        Temporal,
+      );
+    case "week-of-date": {
+      const dateValue = resolveBoundary(
+        boundary.anchor,
+        anchorDate,
+        Temporal,
+        context,
+        lookups,
+        options,
+      );
+      if (dateValue?.kind !== "single") {
+        return null;
+      }
+
+      return {
+        kind: "range",
+        start: startOfCalendarWeek(dateValue.date, context.weekStartsOn),
+        end: endOfCalendarWeek(dateValue.date, context.weekStartsOn),
+      };
+    }
+    case "ordinal-unit-from-anchor": {
+      const date = resolveBoundaryAsEndpoint(
+        boundary.anchor,
+        "start",
+        anchorDate,
+        Temporal,
+        context,
+        lookups,
+      );
+      if (!date) {
+        return null;
+      }
+
+      const target = shiftDateByDuration(date, boundary.ordinal, boundary.unit);
+      return resolveCalendarUnitContainingDate(
+        target,
+        boundary.unit,
+        Temporal,
+        context,
+      );
+    }
+    case "ordinal-weekday-from-anchor": {
+      const anchor = resolveBoundaryAsEndpoint(
+        boundary.anchor,
+        "start",
+        anchorDate,
+        Temporal,
+        context,
+        lookups,
+      );
+      if (!anchor) {
+        return null;
+      }
+
+      let date = firstWeekdayOnOrAfter(anchor, boundary.weekday);
+      for (let index = 1; index < boundary.ordinal; index += 1) {
+        date = date.add({ days: 7 });
+      }
+
+      return { kind: "single", date };
+    }
     case "boundary-side": {
       const date = resolveBoundaryAsEndpoint(
         boundary.boundary,
@@ -108,13 +184,17 @@ export function resolveBoundary(
         : null;
     }
     case "month-range":
-      return resolveMonthRange(
-        boundary.month,
-        resolveYearReference(boundary.year, anchorDate.year),
-        Temporal,
-      );
+      return options?.scope && boundary.year.kind === "anchor"
+        ? resolveMonthInScope(boundary.month, options.scope)
+        : resolveMonthRange(
+            boundary.month,
+            resolveYearReference(boundary.year, anchorDate.year),
+            Temporal,
+          );
     case "named-month-range":
-      return resolveMonthRange(boundary.month, anchorDate.year, Temporal);
+      return options?.scope
+        ? resolveMonthInScope(boundary.month, options.scope)
+        : resolveMonthRange(boundary.month, anchorDate.year, Temporal);
     case "ordinal-calendar-unit":
       return resolveOrdinalCalendarUnitBoundary(
         boundary,
@@ -219,7 +299,54 @@ export function resolveBoundary(
         resolveYearReference(boundary.year, anchorDate.year),
         Temporal,
       );
+    case "year-range":
+      return resolveYearRange(boundary.year, Temporal);
+    case "holidays":
+      return resolveHolidaysBoundary(options?.scope, context, anchorDate, Temporal);
+    case "day-group-filter":
+      return resolveDayGroupFilterBoundary(boundary.group, anchorDate, context, options?.scope);
+    case "date-list":
+      return resolveDateListBoundary(boundary, anchorDate, Temporal, context, lookups, options);
   }
+}
+
+// Example: `resolveDateListBoundary({ items: [today, tomorrow] }, anchor, Temporal, context, lookups)` returns both dates.
+function resolveDateListBoundary(
+  boundary: Extract<BoundarySlice, { kind: "date-list" }>,
+  anchorDate: PlainDate,
+  Temporal: TemporalApi,
+  context: ResolvedParseDateContext,
+  lookups: DateVocabularyLookups,
+  options?: ResolveBoundaryOptions,
+): DateValue | null {
+  const dates: PlainDate[] = [];
+
+  for (const item of boundary.items) {
+    const value = resolveBoundary(item, anchorDate, Temporal, context, lookups, options);
+    if (!value) {
+      return null;
+    }
+
+    if (value.kind === "single") {
+      dates.push(value.date);
+      continue;
+    }
+
+    if (value.kind === "range") {
+      dates.push(...expandDatesBetween(value.start, value.end));
+      continue;
+    }
+
+    if (value.kind === "multiple") {
+      dates.push(...value.dates);
+      continue;
+    }
+
+    return null;
+  }
+
+  const uniqueDates = Array.from(new Map(dates.map((date) => [date.toString(), date])).values()).sort(comparePlainDate);
+  return uniqueDates.length > 0 ? { kind: "multiple", dates: uniqueDates } : null;
 }
 
 // Example: `resolveAtomBoundary("christmas this year", anchor, Temporal, context, lookups)` resolves a named date atom.
@@ -374,6 +501,14 @@ function resolveYearReference(
   }
 
   return anchorYear;
+}
+
+// Example: `resolveMonthInScope(4, scope)` returns every April date inside a scoped range.
+function resolveMonthInScope(month: number, scope: { start: PlainDate; end: PlainDate }): DateValue {
+  return {
+    kind: "multiple",
+    dates: expandDatesBetween(scope.start, scope.end).filter((date) => date.month === month),
+  };
 }
 
 // Example: `resolveMonthRange(3, 2027, Temporal)` returns March 2027.
@@ -647,6 +782,49 @@ function shiftDateByDuration(
   return cursor;
 }
 
+// Example: `resolveCalendarUnitContainingDate(2026-08-12, "week", Temporal, context)` returns that calendar week.
+function resolveCalendarUnitContainingDate(
+  date: PlainDate,
+  unit: DurationUnit,
+  Temporal: TemporalApi,
+  context: ResolvedParseDateContext,
+): DateValue | null {
+  if (unit === "day") {
+    return { kind: "single", date };
+  }
+
+  if (unit === "week") {
+    return {
+      kind: "range",
+      start: startOfCalendarWeek(date, context.weekStartsOn),
+      end: endOfCalendarWeek(date, context.weekStartsOn),
+    };
+  }
+
+  if (unit === "month") {
+    return {
+      kind: "range",
+      start: startOfCalendarMonth(date),
+      end: endOfCalendarMonth(date),
+    };
+  }
+
+  if (unit === "quarter") {
+    const quarter = Math.floor((date.month - 1) / 3) + 1;
+    return resolveQuarterRange(quarter, date.year, Temporal);
+  }
+
+  if (unit === "year") {
+    return {
+      kind: "range",
+      start: startOfCalendarYear(date),
+      end: endOfCalendarYear(date),
+    };
+  }
+
+  return null;
+}
+
 // Example: `resolveCalendarUnitRange("this", "week", anchor, context)` returns the current configured week.
 function resolveCalendarUnitRange(
   modifier: RelativeModifier,
@@ -757,6 +935,63 @@ function resolveDayGroupRange(
       ? firstWeekdayOnOrAfter(start, 5)
       : firstWeekdayOnOrAfter(start, 7);
   return { kind: "range", start, end };
+}
+
+// Example: `resolveDayGroupFilterBoundary("weekend", anchor, context, scope)` returns weekend dates inside a scope.
+function resolveDayGroupFilterBoundary(
+  group: DayGroupPeriod,
+  anchorDate: PlainDate,
+  context: ResolvedParseDateContext,
+  scope?: { start: PlainDate; end: PlainDate },
+): DateValue {
+  if (scope) {
+    return {
+      kind: "multiple",
+      dates: expandDatesBetween(scope.start, scope.end).filter((date) => matchesDayGroup(date, group)),
+    };
+  }
+
+  return resolveDayGroupRange("this", group, anchorDate, context);
+}
+
+// Example: `resolveHolidaysBoundary(scope, context, anchor, Temporal)` returns configured holidays inside a scope.
+function resolveHolidaysBoundary(
+  scope: { start: PlainDate; end: PlainDate } | undefined,
+  context: ResolvedParseDateContext,
+  anchorDate: PlainDate,
+  Temporal: TemporalApi,
+): DateValue {
+  if (!context.holidays) {
+    return { kind: "multiple", dates: [] };
+  }
+
+  const resolvedScope =
+    scope ??
+    ({
+      start: Temporal.PlainDate.from({ year: anchorDate.year, month: 1, day: 1 }),
+      end: Temporal.PlainDate.from({ year: anchorDate.year, month: 12, day: 31 }),
+    } satisfies { start: PlainDate; end: PlainDate });
+
+  return {
+    kind: "multiple",
+    dates: expandDatesBetween(resolvedScope.start, resolvedScope.end).filter((date) => context.holidays?.includes(date)),
+  };
+}
+
+// Example: `resolveYearRange(2027, Temporal)` returns the full 2027 calendar year.
+function resolveYearRange(year: number, Temporal: TemporalApi): DateValue {
+  return {
+    kind: "range",
+    start: Temporal.PlainDate.from({ year, month: 1, day: 1 }),
+    end: Temporal.PlainDate.from({ year, month: 12, day: 31 }),
+  };
+}
+
+// Example: `matchesDayGroup(date, "weekend")` returns true for Saturday and Sunday.
+function matchesDayGroup(date: PlainDate, group: DayGroupPeriod): boolean {
+  return group === "weekend"
+    ? date.dayOfWeek === 6 || date.dayOfWeek === 7
+    : date.dayOfWeek >= 1 && date.dayOfWeek <= 5;
 }
 
 // Example: `resolveOrdinalCalendarUnitSpanBoundary(spanBoundary, anchor, Temporal, context, lookups)` returns a continuous week or month span.

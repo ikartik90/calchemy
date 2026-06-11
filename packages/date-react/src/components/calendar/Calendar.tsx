@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import type { ComponentPropsWithoutRef, MouseEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { ComponentPropsWithoutRef, CSSProperties, MouseEvent } from "react";
 import type { PlainDate } from "@calchemy/date-core";
 import { CalendarContext, useCalchemyCalendar, useCalchemyContext } from "./context";
 import { CalendarGrid, CalendarWeekdays } from "./CalendarGrid";
@@ -10,18 +10,19 @@ import {
   formatCalendarWindowLabel,
   getCalendarPeriodAtOffset,
   getDateValueAnchor,
+  getDateValueKey,
   getInitialPeriodExtensions,
   getSelectedValue,
   getToday,
+  isBefore,
+  isDateInCalendarViewport,
   parseCalendarDuration,
-  parseCalendarPageSize,
   periodIntersectsBounds,
   validateCalendarBounds,
 } from "./date-model";
 import type { CalendarBounds, CalendarDuration, CalendarNamedDates, CalendarState } from "./types";
 
 const defaultCalendarPeriod = { months: 1 } satisfies CalendarDuration;
-const defaultCalendarPageSize = { months: 1 } satisfies CalendarDuration;
 
 export type CalchemyCalendarProps = Omit<ComponentPropsWithoutRef<"div">, "onSelect"> & {
   period?: CalendarDuration;
@@ -39,11 +40,14 @@ export function Calendar({
   ...divProps
 }: CalchemyCalendarProps) {
   const state = useCalchemyContext();
+  const editable = state.inputMode === "calendar";
   validateCalendarBounds(bounds);
   const parsedPeriod = useMemo(() => parseCalendarDuration(period, "period"), [period]);
   const selected = getSelectedValue(state);
   const today = getToday(state);
-  const derivedAnchor = getDateValueAnchor(selected) ?? today;
+  const [periodAnchor, setPeriodAnchor] = useState(() =>
+    clampDateToBounds(getDateValueAnchor(selected) ?? today, bounds),
+  );
   const [navigationAnchor, setNavigationAnchor] = useState<{ date: PlainDate; inputValue: string } | null>(null);
   const [periodExtensions, setPeriodExtensions] = useState(() => getInitialPeriodExtensions(parsedPeriod));
   const [visiblePeriodIndex, setScrolledVisiblePeriodIndex] = useState<{
@@ -51,13 +55,21 @@ export function Calendar({
     inputValue: string;
     index: number;
   } | null>(null);
+  const prevInputValueRef = useRef(state.inputValue);
+  const prevSelectedKeyRef = useRef(getDateValueKey(selected));
+  const prevExpectedValueRef = useRef(state.expectedValue);
   useEffect(() => {
+    if (prevExpectedValueRef.current === state.expectedValue) {
+      return;
+    }
+
+    prevExpectedValueRef.current = state.expectedValue;
     setScrolledVisiblePeriodIndex(null);
-  }, [state.expectedValue]);
-  const periodAnchor = clampDateToBounds(
-    navigationAnchor?.inputValue === state.inputValue ? navigationAnchor.date : derivedAnchor,
-    bounds,
-  );
+    setNavigationAnchor(null);
+    setPeriodAnchor(clampDateToBounds(getDateValueAnchor(selected) ?? today, bounds));
+    prevInputValueRef.current = state.inputValue;
+    prevSelectedKeyRef.current = getDateValueKey(selected);
+  }, [bounds, selected, state.expectedValue, state.inputValue, today]);
   const periodAnchorKey = periodAnchor.toString();
   const activeVisiblePeriodIndex =
     visiblePeriodIndex?.anchor === periodAnchorKey && visiblePeriodIndex.inputValue === state.inputValue
@@ -82,8 +94,50 @@ export function Calendar({
   );
   const visiblePeriodAnchor = visiblePeriods[0]?.start ?? periodAnchor;
 
+  useLayoutEffect(() => {
+    const inputChanged = prevInputValueRef.current !== state.inputValue;
+    prevInputValueRef.current = state.inputValue;
+
+    const selectedKey = getDateValueKey(selected);
+    const selectionChanged = prevSelectedKeyRef.current !== selectedKey;
+    prevSelectedKeyRef.current = selectedKey;
+
+    if (!inputChanged && !selectionChanged) {
+      return;
+    }
+
+    const selectionAnchor = clampDateToBounds(getDateValueAnchor(selected) ?? today, bounds);
+    const inputReflectsCalendarSelection = state.inputValue === selectionAnchor.toString();
+    const shouldRevealSelection = inputChanged && !inputReflectsCalendarSelection;
+
+    if (
+      !shouldRevealSelection &&
+      isDateInCalendarViewport(
+        selectionAnchor,
+        periods,
+        activeVisiblePeriodIndex,
+        parsedPeriod.count,
+      )
+    ) {
+      return;
+    }
+
+    setPeriodAnchor((current) => (current.equals(selectionAnchor) ? current : selectionAnchor));
+    setScrolledVisiblePeriodIndex(null);
+  }, [
+    activeVisiblePeriodIndex,
+    bounds,
+    parsedPeriod.count,
+    periods,
+    selected,
+    state.inputValue,
+    today,
+  ]);
+
   function setCalendarPeriodAnchor(date: PlainDate) {
-    setNavigationAnchor({ date: clampDateToBounds(date, bounds), inputValue: state.inputValue });
+    const clamped = clampDateToBounds(date, bounds);
+    setPeriodAnchor(clamped);
+    setNavigationAnchor({ date: clamped, inputValue: state.inputValue });
     setPeriodExtensions(getInitialPeriodExtensions(parsedPeriod));
     setScrolledVisiblePeriodIndex(null);
   }
@@ -122,6 +176,7 @@ export function Calendar({
         locale,
         bounds,
         namedDates,
+        editable,
         isDateDisabled,
         setPeriodAnchor: setCalendarPeriodAnchor,
         setVisiblePeriodIndex(index) {
@@ -143,8 +198,10 @@ export function Calendar({
             return;
           }
 
+          const clamped = clampDateToBounds(addCalendarPeriod(visiblePeriodAnchor, unit, count), bounds);
+          setPeriodAnchor(clamped);
           setNavigationAnchor({
-            date: clampDateToBounds(addCalendarPeriod(visiblePeriodAnchor, unit, count), bounds),
+            date: clamped,
             inputValue: state.inputValue,
           });
           setPeriodExtensions(getInitialPeriodExtensions(parsedPeriod));
@@ -162,9 +219,30 @@ export function Calendar({
           }));
         },
         selectDate(date) {
+          if (!editable) {
+            return;
+          }
+
+          if (state.expectedValue === "range") {
+            const current = selected;
+            if (current?.kind === "range" && current.start.equals(current.end)) {
+              const start = isBefore(current.start, date) ? current.start : date;
+              const end = isBefore(current.start, date) ? date : current.start;
+              state.selectDate({ kind: "range", start, end });
+              return;
+            }
+
+            state.selectDate({ kind: "range", start: date, end: date });
+            return;
+          }
+
           state.selectDate({ kind: "single", date });
         },
         selectValue(value) {
+          if (!editable) {
+            return;
+          }
+
           state.selectDate(value);
         },
       }) satisfies CalendarState,
@@ -182,6 +260,7 @@ export function Calendar({
       locale,
       bounds,
       namedDates,
+      editable,
       isDateDisabled,
     ],
   );
@@ -189,9 +268,9 @@ export function Calendar({
   const content = children ?? (
     <>
       <CalendarHeader>
-        <CalendarPrevious pageSize={defaultCalendarPageSize} />
+        <CalendarPrevious />
         <CalendarHeading />
-        <CalendarNext pageSize={defaultCalendarPageSize} />
+        <CalendarNext />
       </CalendarHeader>
       <CalendarWeekdays />
       <CalendarGrid />
@@ -200,7 +279,17 @@ export function Calendar({
 
   return (
     <CalendarContext.Provider value={calendarState}>
-      <div {...divProps} data-calchemy-calendar="">
+      <div
+        {...divProps}
+        calchemy-calendar=""
+        calchemy-editable={editable ? "" : undefined}
+        style={
+          {
+            ...divProps.style,
+            "--calchemy-calendar-period-count": parsedPeriod.count,
+          } as CSSProperties
+        }
+      >
         {content}
       </div>
     </CalendarContext.Provider>
@@ -210,7 +299,7 @@ export function Calendar({
 export type CalchemyCalendarHeaderProps = ComponentPropsWithoutRef<"div">;
 
 export function CalendarHeader(props: CalchemyCalendarHeaderProps) {
-  return <div {...props} data-calchemy-header="" />;
+  return <div {...props} calchemy-header="" />;
 }
 
 export type CalchemyCalendarHeadingProps = ComponentPropsWithoutRef<"h2">;
@@ -219,19 +308,17 @@ export function CalendarHeading(props: CalchemyCalendarHeadingProps) {
   const calendar = useCalchemyCalendar();
 
   return (
-    <h2 {...props} data-calchemy-heading="">
+    <h2 {...props} calchemy-heading="">
       {props.children ?? formatCalendarWindowLabel(calendar.visiblePeriods, calendar.locale)}
     </h2>
   );
 }
 
 export type CalchemyCalendarNavigationProps = Omit<ComponentPropsWithoutRef<"button">, "onClick"> & {
-  pageSize?: CalendarDuration;
   onClick?: ComponentPropsWithoutRef<"button">["onClick"];
 };
 
 export function CalendarPrevious({
-  pageSize = defaultCalendarPageSize,
   onClick,
   children,
   ...props
@@ -239,9 +326,8 @@ export function CalendarPrevious({
   return (
     <CalendarNavigationButton
       {...props}
-      pageSize={pageSize}
       direction={-1}
-      data-calchemy-previous=""
+      calchemy-previous=""
       onClick={onClick}
     >
       {children ?? "Previous"}
@@ -250,7 +336,6 @@ export function CalendarPrevious({
 }
 
 export function CalendarNext({
-  pageSize = defaultCalendarPageSize,
   onClick,
   children,
   ...props
@@ -258,9 +343,8 @@ export function CalendarNext({
   return (
     <CalendarNavigationButton
       {...props}
-      pageSize={pageSize}
       direction={1}
-      data-calchemy-next=""
+      calchemy-next=""
       onClick={onClick}
     >
       {children ?? "Next"}
@@ -273,15 +357,14 @@ type CalendarNavigationButtonProps = CalchemyCalendarNavigationProps & {
 };
 
 function CalendarNavigationButton({
-  pageSize,
   direction,
   onClick,
   type = "button",
   ...props
 }: CalendarNavigationButtonProps) {
   const calendar = useCalchemyCalendar();
-  const increment = parseCalendarPageSize(pageSize ?? defaultCalendarPageSize);
-  const disabled = props.disabled ?? !calendar.canMove(increment.unit, increment.count * direction);
+  const disabled =
+    props.disabled ?? !calendar.canMove(calendar.period.unit, calendar.period.count * direction);
 
   function handleClick(event: MouseEvent<HTMLButtonElement>) {
     onClick?.(event);
@@ -289,7 +372,7 @@ function CalendarNavigationButton({
       return;
     }
 
-    calendar.move(increment.unit, increment.count * direction);
+    calendar.move(calendar.period.unit, calendar.period.count * direction);
   }
 
   return <button {...props} type={type} disabled={disabled} onClick={handleClick} />;

@@ -50,7 +50,7 @@ export function CalendarScroll({
 
     const element = scrollRef.current;
     const currentPeriod = element?.querySelector<HTMLElement>(
-      "[data-calchemy-period][data-period-index='0']",
+      "[calchemy-period][calchemy-period-index='0']",
     );
     if (!element || !currentPeriod) {
       return;
@@ -156,8 +156,8 @@ export function CalendarScroll({
     }
 
     const anchor = getScrollAnchorPeriod(element, direction);
-    const anchorIndex = anchor?.dataset.periodIndex
-      ? Number(anchor.dataset.periodIndex)
+    const anchorIndex = anchor?.getAttribute("calchemy-period-index")
+      ? Number(anchor.getAttribute("calchemy-period-index"))
       : NaN;
     if (Number.isFinite(anchorIndex)) {
       calendar.setVisiblePeriodIndex(anchorIndex);
@@ -198,8 +198,8 @@ export function CalendarScroll({
       <div
         {...props}
         ref={scrollRef}
-        data-calchemy-scroll=""
-        data-direction={direction}
+        calchemy-scroll=""
+        calchemy-direction={direction}
         onScroll={handleScroll}
       />
     </CalendarScrollContext.Provider>

@@ -20,7 +20,7 @@ const calchemyModule = await importBuiltCore(moduleUrl);
 const namedDatesVocabulary = [
   {
     value: "christmas",
-    shortcuts: ["xmas"],
+    aliases: ["xmas"],
     isHoliday: true,
     resolveDate({ year, context }) {
       return context.referenceDate.with({ year, month: 12, day: 25 });
@@ -28,7 +28,7 @@ const namedDatesVocabulary = [
   },
   {
     value: "independence day",
-    shortcuts: [],
+    aliases: [],
     isHoliday: true,
     resolveDate({ year, context }) {
       return context.referenceDate.with({ year, month: 7, day: 4 });
@@ -49,12 +49,7 @@ const contextBase = {
     options.dateOrder ?? process.env.CALCHEMY_DATE_ORDER,
   ),
 };
-const context = {
-  ...contextBase,
-  holidays: createNamedDateHolidayProvider(namedDatesVocabulary, contextBase),
-};
-
-const result = calchemy.parseDate(input, context);
+const result = calchemy.parseDate(input, contextBase);
 const expectedKind = parseExpectedKind(options.expect);
 const resolvedResult = expectedKind
   ? calchemyModule.resolveExpectedDateValue(result, expectedKind)
@@ -78,10 +73,10 @@ console.dir(
   {
     input,
     context: {
-      referenceDate: context.referenceDate.toString(),
-      locale: context.locale,
-      weekStartsOn: context.weekStartsOn,
-      dateOrderPreference: context.dateOrderPreference,
+      referenceDate: contextBase.referenceDate.toString(),
+      locale: contextBase.locale,
+      weekStartsOn: contextBase.weekStartsOn,
+      dateOrderPreference: contextBase.dateOrderPreference,
     },
     result: serializedResult,
   },
@@ -203,23 +198,6 @@ function resolveReferenceDate(Temporal, options) {
   return Temporal.Now.plainDateISO(
     options.timeZone ?? process.env.CALCHEMY_TIME_ZONE ?? DEFAULT_TIME_ZONE,
   );
-}
-
-function createNamedDateHolidayProvider(namedDatesVocabulary, context) {
-  const holidayEntries = namedDatesVocabulary.filter(
-    (entry) => entry.isHoliday,
-  );
-
-  return {
-    id: "dev-named-date-holidays",
-    label: "Dev named-date holidays",
-    includes(date) {
-      return holidayEntries.some((entry) => {
-        const holiday = entry.resolveDate({ year: date.year, context });
-        return holiday?.equals(date) ?? false;
-      });
-    },
-  };
 }
 
 function parseWeekStartsOn(value) {

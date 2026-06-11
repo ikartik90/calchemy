@@ -6,6 +6,7 @@ export type {
   CalendarPeriodModel,
   CalendarPeriodUnit,
   CalendarState,
+  CalendarWeekdayFormat,
   CalchemyCalendarGridProps,
   CalchemyCalendarHeaderProps,
   CalchemyCalendarHeadingProps,
@@ -19,9 +20,10 @@ export type {
   CalchemyCalendarYearSelectProps,
   CalchemyCandidatesProps,
   CalchemyFieldProps,
+  CalchemyInputModeProps,
   CalchemyRootProps,
   ParsedCalendarPeriod,
 } from "./components/Calchemy";
 export { useCalchemy } from "./hooks/useCalchemy";
 export type { ExpectedDateValue } from "@calchemy/date-core";
-export type { CalchemyState, UseCalchemyOptions } from "./hooks/useCalchemy";
+export type { CalchemyInputMode, CalchemyState, UseCalchemyOptions } from "./hooks/useCalchemy";

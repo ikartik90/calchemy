@@ -1,5 +1,5 @@
 import { firstWeekdayAfter, firstWeekdayBefore, firstWeekdayOnOrAfter } from "../primitives/date-math";
-import type { RelationDirection, RelationSlice } from "../slice";
+import type { DayGroupPeriod, RelationDirection, RelationSlice } from "../slice";
 import type { PlainDate } from "../../temporal/types";
 import type { DateValue } from "../../types";
 
@@ -22,6 +22,11 @@ export function applyRelations(value: DateValue, relation: RelationSlice | null)
     return isInsideRange(date, value) ? { kind: "single", date } : null;
   }
 
+  if (relation.kind === "day-group-near-boundary") {
+    const anchor = getRelationAnchor(value, relation.direction);
+    return anchor ? resolveDayGroupNearAnchor(relation.group, relation.direction, relation.ordinal, anchor) : null;
+  }
+
   const anchor = getRelationAnchor(value, relation.direction);
   if (!anchor) {
     return null;
@@ -38,6 +43,50 @@ export function applyRelations(value: DateValue, relation: RelationSlice | null)
   }
 
   return { kind: "single", date };
+}
+
+// Example: `resolveDayGroupNearAnchor("weekend", "before", 1, christmas)` returns the Sat-Sun before Christmas.
+function resolveDayGroupNearAnchor(
+  group: DayGroupPeriod,
+  direction: RelationDirection,
+  ordinal: number,
+  anchor: PlainDate,
+): DateValue | null {
+  const isBefore = direction === "before" || direction === "preceding";
+
+  if (group === "weekend") {
+    if (isBefore) {
+      let sunday = firstWeekdayBefore(anchor, 7);
+      for (let index = 1; index < ordinal; index += 1) {
+        sunday = sunday.subtract({ days: 7 });
+      }
+
+      return { kind: "range", start: sunday.subtract({ days: 1 }), end: sunday };
+    }
+
+    let saturday = firstWeekdayAfter(anchor, 6);
+    for (let index = 1; index < ordinal; index += 1) {
+      saturday = saturday.add({ days: 7 });
+    }
+
+    return { kind: "range", start: saturday, end: saturday.add({ days: 1 }) };
+  }
+
+  if (isBefore) {
+    let friday = firstWeekdayBefore(anchor, 5);
+    for (let index = 1; index < ordinal; index += 1) {
+      friday = friday.subtract({ days: 7 });
+    }
+
+    return { kind: "range", start: friday.subtract({ days: 4 }), end: friday };
+  }
+
+  let monday = firstWeekdayAfter(anchor, 1);
+  for (let index = 1; index < ordinal; index += 1) {
+    monday = monday.add({ days: 7 });
+  }
+
+  return { kind: "range", start: monday, end: monday.add({ days: 4 }) };
 }
 
 // Example: `getRelationAnchor(range, "before")` returns the range start.

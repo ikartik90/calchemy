@@ -1,12 +1,19 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { cleanup } from "@testing-library/react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createCalchemyWithTemporal } from "@calchemy/date-core";
 import type { ExpectedDateValue } from "@calchemy/date-core";
 import { CalendarScroll } from "../src/calendar-scroll";
+import { PARSE_QUERY_DEBOUNCE_MS } from "../src/hooks/useDebouncedValue";
 import { Calchemy } from "../src";
+
+function flushParseQuery() {
+  act(() => {
+    vi.advanceTimersByTime(PARSE_QUERY_DEBOUNCE_MS);
+  });
+}
 
 const calchemy = createCalchemyWithTemporal(Temporal, {
   defaultContext: {
@@ -36,10 +43,14 @@ const namedDateCalchemy = createCalchemyWithTemporal(Temporal, {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   cleanup();
 });
 
 describe("Calchemy", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
   test("accepts inline completion with Tab", () => {
     render(
       <Calchemy.Root
@@ -58,6 +69,126 @@ describe("Calchemy", () => {
     expect(input).toHaveProperty("value", "previous 90 days");
   });
 
+  test("renders inline completion backdrop and aria-description", () => {
+    render(
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="range"
+        defaultInputValue="prev"
+      >
+        <Calchemy.Field aria-label="Date" />
+      </Calchemy.Root>,
+    );
+
+    const input = screen.getByLabelText("Date");
+    const field = input.closest("[calchemy-field]");
+
+    expect(field?.querySelector("[calchemy-field-backdrop]")).toBeTruthy();
+    expect(field?.getAttribute("calchemy-has-completion")).toBe("");
+    expect(input.getAttribute("aria-description")).toBe(
+      "Suggestion: previous 90 days. Press Tab to accept.",
+    );
+  });
+
+  test("omits backdrop and aria-description when there is no completion", () => {
+    render(
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="range"
+        defaultInputValue="previous 90 days"
+      >
+        <Calchemy.Field aria-label="Date" />
+      </Calchemy.Root>,
+    );
+
+    const input = screen.getByLabelText("Date");
+    const field = input.closest("[calchemy-field]");
+
+    expect(field?.querySelector("[calchemy-field-backdrop]")).toBeNull();
+    expect(field?.getAttribute("calchemy-has-completion")).toBeNull();
+    expect(input.getAttribute("aria-description")).toBeNull();
+  });
+
+  test("uses composed casing in aria-description and Tab acceptance", () => {
+    render(
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="range"
+        defaultInputValue="Prev"
+      >
+        <Calchemy.Field aria-label="Date" />
+      </Calchemy.Root>,
+    );
+
+    const input = screen.getByLabelText("Date");
+
+    expect(input.getAttribute("aria-description")).toBe(
+      "Suggestion: Previous 90 days. Press Tab to accept.",
+    );
+    fireEvent.keyDown(input, { key: "Tab" });
+    expect(input).toHaveProperty("value", "Previous 90 days");
+  });
+
+  test("debounces parse and completion queries", () => {
+    vi.useFakeTimers();
+
+    render(
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="range"
+        defaultInputValue=""
+      >
+        <Calchemy.Field aria-label="Date" />
+      </Calchemy.Root>,
+    );
+
+    const input = screen.getByLabelText("Date");
+
+    fireEvent.change(input, { target: { value: "p" } });
+    expect(screen.queryByText("ious 90 days")).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(149);
+    });
+    expect(screen.queryByText("ious 90 days")).toBeNull();
+
+    fireEvent.change(input, { target: { value: "pr" } });
+    expect(screen.queryByText("revious 90 days")).toBeNull();
+    expect(screen.queryByText("ious 90 days")).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(149);
+    });
+    expect(screen.queryByText("evious 90 days")).toBeNull();
+
+    fireEvent.change(input, { target: { value: "prev" } });
+    flushParseQuery();
+    expect(screen.getByText("ious 90 days")).toBeTruthy();
+    expect(input.getAttribute("aria-description")).toBe(
+      "Suggestion: previous 90 days. Press Tab to accept.",
+    );
+  });
+
+  test("keeps aria-description when inline completion rendering is disabled", () => {
+    render(
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="range"
+        defaultInputValue="prev"
+      >
+        <Calchemy.Field aria-label="Date" renderInlineCompletion={false} />
+      </Calchemy.Root>,
+    );
+
+    const input = screen.getByLabelText("Date");
+    const field = input.closest("[calchemy-field]");
+
+    expect(field?.querySelector("[calchemy-field-backdrop]")).toBeNull();
+    expect(input.getAttribute("aria-description")).toBe(
+      "Suggestion: previous 90 days. Press Tab to accept.",
+    );
+  });
+
   test("emits valid values while typing", () => {
     const onValueChange = vi.fn();
 
@@ -74,6 +205,7 @@ describe("Calchemy", () => {
     fireEvent.change(screen.getByLabelText("Date"), {
       target: { value: "tomorrow" },
     });
+    flushParseQuery();
 
     expect(onValueChange).toHaveBeenCalledWith(
       { kind: "single", date: Temporal.PlainDate.from("2026-05-28") },
@@ -96,6 +228,7 @@ describe("Calchemy", () => {
 
     const input = screen.getByLabelText("Date");
     fireEvent.change(input, { target: { value: "last 90 days" } });
+    flushParseQuery();
 
     expect(onValueChange).not.toHaveBeenCalled();
     expect(input.getAttribute("aria-invalid")).toBe("true");
@@ -117,6 +250,7 @@ describe("Calchemy", () => {
     fireEvent.change(screen.getByLabelText("Date"), {
       target: { value: "last 90 days" },
     });
+    flushParseQuery();
 
     expect(onValueChange).toHaveBeenCalledWith(
       {
@@ -144,6 +278,7 @@ describe("Calchemy", () => {
     fireEvent.change(screen.getByLabelText("Date"), {
       target: { value: "next 3 fridays" },
     });
+    flushParseQuery();
 
     expect(onValueChange).toHaveBeenCalledWith(
       {
@@ -174,6 +309,7 @@ describe("Calchemy", () => {
     fireEvent.change(screen.getByLabelText("Date"), {
       target: { value: "tomorrow" },
     });
+    flushParseQuery();
 
     expect(onValueChange).toHaveBeenCalledWith(
       {
@@ -201,6 +337,7 @@ describe("Calchemy", () => {
     fireEvent.change(screen.getByLabelText("Date"), {
       target: { value: "last 90 days" },
     });
+    flushParseQuery();
 
     expect(onValueChange).toHaveBeenCalledWith(
       {
@@ -239,7 +376,7 @@ describe("Calchemy", () => {
 
     expect(screen.getByText("February 2026")).toBeTruthy();
     expect(
-      container.querySelectorAll("[data-calchemy-day][data-selected]"),
+      container.querySelectorAll("[calchemy-day][calchemy-selected]"),
     ).toHaveLength(2);
   });
 
@@ -261,8 +398,116 @@ describe("Calchemy", () => {
     );
 
     expect(
-      container.querySelectorAll("[data-calchemy-day][data-selected]"),
+      container.querySelectorAll("[calchemy-day][calchemy-selected]"),
     ).toHaveLength(3);
+  });
+
+  test("does not select dates from the calendar by default", () => {
+    const onValueChange = vi.fn();
+    const { container } = render(
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="single"
+        onValueChange={onValueChange}
+      >
+        <Calchemy.Calendar>
+          <Calchemy.CalendarGrid />
+        </Calchemy.Calendar>
+      </Calchemy.Root>,
+    );
+
+    expect(container.querySelector("[calchemy-calendar]")?.getAttribute("calchemy-editable")).toBeNull();
+    fireEvent.click(screen.getByText("27"));
+    expect(onValueChange).not.toHaveBeenCalled();
+  });
+
+  test("input mode toggle switches between field and calendar editing", () => {
+    const onInputModeChange = vi.fn();
+    const onValueChange = vi.fn();
+    const { container } = render(
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="single"
+        onInputModeChange={onInputModeChange}
+        onValueChange={onValueChange}
+      >
+        <Calchemy.Field aria-label="Date" />
+        <Calchemy.InputMode aria-label="Input mode" />
+        <Calchemy.Calendar>
+          <Calchemy.CalendarGrid />
+        </Calchemy.Calendar>
+      </Calchemy.Root>,
+    );
+
+    const input = screen.getByLabelText("Date");
+    expect(input).toHaveProperty("readOnly", false);
+    expect(container.querySelector("[calchemy-calendar]")?.getAttribute("calchemy-editable")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Pick" }));
+    expect(onInputModeChange).toHaveBeenLastCalledWith("calendar");
+    expect(input).toHaveProperty("readOnly", true);
+    expect(container.querySelector("[calchemy-calendar]")?.getAttribute("calchemy-editable")).toBe("");
+
+    fireEvent.click(screen.getByText("27"));
+    expect(onValueChange).toHaveBeenCalledWith(
+      { kind: "single", date: Temporal.PlainDate.from("2026-05-27") },
+      expect.objectContaining({ status: "valid" }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Type" }));
+    expect(onInputModeChange).toHaveBeenLastCalledWith("field");
+    expect(input).toHaveProperty("readOnly", false);
+  });
+
+  test("hides candidates while calendar input mode is active", () => {
+    render(
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="single"
+        defaultInputValue="03/04/25"
+        inputMode="calendar"
+      >
+        <Calchemy.Candidates />
+      </Calchemy.Root>,
+    );
+
+    expect(screen.queryByText("March 4, 2025")).toBeNull();
+  });
+
+  test("clicking two dates selects an inclusive range in range fields", () => {
+    const onValueChange = vi.fn();
+    render(
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="range"
+        inputMode="calendar"
+        onValueChange={onValueChange}
+      >
+        <Calchemy.Calendar>
+          <Calchemy.CalendarGrid />
+        </Calchemy.Calendar>
+      </Calchemy.Root>,
+    );
+
+    fireEvent.click(screen.getByText("20"));
+    expect(onValueChange).toHaveBeenLastCalledWith(
+      {
+        kind: "range",
+        start: Temporal.PlainDate.from("2026-05-20"),
+        end: Temporal.PlainDate.from("2026-05-20"),
+      },
+      expect.objectContaining({ status: "valid" }),
+    );
+
+    fireEvent.click(screen.getByText("27"));
+    expect(onValueChange).toHaveBeenLastCalledWith(
+      {
+        kind: "range",
+        start: Temporal.PlainDate.from("2026-05-20"),
+        end: Temporal.PlainDate.from("2026-05-27"),
+      },
+      expect.objectContaining({ status: "valid" }),
+    );
   });
 
   test("clicking dates toggles multiple calendar selections", () => {
@@ -271,6 +516,7 @@ describe("Calchemy", () => {
       <Calchemy.Root
         calchemy={calchemy}
         expectedValue="multiple"
+        inputMode="calendar"
         onValueChange={onValueChange}
       >
         <Calchemy.Calendar>
@@ -295,9 +541,42 @@ describe("Calchemy", () => {
     );
   });
 
+  test("pointer clicking toggles multiple calendar selections through CalendarPeriod", () => {
+    const onValueChange = vi.fn();
+    const { container } = render(
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="multiple"
+        inputMode="calendar"
+        onValueChange={onValueChange}
+      >
+        <Calchemy.Calendar>
+          <Calchemy.CalendarPeriod>
+            <Calchemy.CalendarGrid />
+          </Calchemy.CalendarPeriod>
+        </Calchemy.Calendar>
+      </Calchemy.Root>,
+    );
+
+    clickCalendarDay(container, screen.getByText("27"), { x: 15, y: 15 });
+    expect(onValueChange).toHaveBeenLastCalledWith(
+      {
+        kind: "multiple",
+        dates: [Temporal.PlainDate.from("2026-05-27")],
+      },
+      expect.objectContaining({ status: "valid" }),
+    );
+
+    clickCalendarDay(container, screen.getByText("27"), { x: 15, y: 15 });
+    expect(onValueChange).toHaveBeenLastCalledWith(
+      { kind: "multiple", dates: [] },
+      expect.objectContaining({ status: "valid" }),
+    );
+  });
+
   test("dragging renders a rectangle between the start point and cursor", () => {
     const { container } = render(
-      <Calchemy.Root calchemy={calchemy} expectedValue="multiple">
+      <Calchemy.Root calchemy={calchemy} expectedValue="multiple" inputMode="calendar">
         <Calchemy.Calendar>
           <Calchemy.CalendarGrid />
         </Calchemy.Calendar>
@@ -309,7 +588,7 @@ describe("Calchemy", () => {
       "29": rect(30, 10, 40, 20),
     });
 
-    const grid = container.querySelector<HTMLElement>("[data-calchemy-grid]");
+    const grid = container.querySelector<HTMLElement>("[calchemy-grid]");
     if (!grid) {
       throw new Error("Expected calendar grid.");
     }
@@ -329,7 +608,7 @@ describe("Calchemy", () => {
       pointerId: 1,
     });
     const dragRect = container.querySelector<HTMLElement>(
-      "[data-calchemy-drag-rect]",
+      "[calchemy-drag-rect]",
     );
     expect(dragRect).toBeTruthy();
     expect(dragRect?.style.left).toBe("15px");
@@ -344,6 +623,7 @@ describe("Calchemy", () => {
       <Calchemy.Root
         calchemy={calchemy}
         expectedValue="multiple"
+        inputMode="calendar"
         defaultValue={{
           kind: "multiple",
           dates: [Temporal.PlainDate.from("2026-05-27")],
@@ -386,6 +666,7 @@ describe("Calchemy", () => {
       <Calchemy.Root
         calchemy={calchemy}
         expectedValue="multiple"
+        inputMode="calendar"
         defaultValue={{
           kind: "multiple",
           dates: [
@@ -428,6 +709,7 @@ describe("Calchemy", () => {
       <Calchemy.Root
         calchemy={calchemy}
         expectedValue="multiple"
+        inputMode="calendar"
         defaultValue={{
           kind: "multiple",
           dates: [
@@ -474,6 +756,7 @@ describe("Calchemy", () => {
       <Calchemy.Root
         calchemy={calchemy}
         expectedValue="multiple"
+        inputMode="calendar"
         onValueChange={onValueChange}
       >
         <Calchemy.Calendar>
@@ -492,7 +775,7 @@ describe("Calchemy", () => {
       "29": rect(30, 40, 40, 50),
     });
     const weekdays = container.querySelector<HTMLElement>(
-      "[data-calchemy-weekdays]",
+      "[calchemy-weekdays]",
     );
     if (!weekdays) {
       throw new Error("Expected calendar weekdays row.");
@@ -523,6 +806,7 @@ describe("Calchemy", () => {
       <Calchemy.Root
         calchemy={calchemy}
         expectedValue="multiple"
+        inputMode="calendar"
         onValueChange={onValueChange}
       >
         <Calchemy.Calendar>
@@ -536,7 +820,7 @@ describe("Calchemy", () => {
       "29": rect(30, 10, 40, 20),
     });
     const blankCell = container.querySelector<HTMLElement>(
-      "[data-calchemy-cell][data-blank]",
+      "[calchemy-cell][calchemy-blank]",
     );
     if (!blankCell) {
       throw new Error("Expected blank calendar cell.");
@@ -567,6 +851,7 @@ describe("Calchemy", () => {
       <Calchemy.Root
         calchemy={calchemy}
         expectedValue="multiple"
+        inputMode="calendar"
         onValueChange={onValueChange}
       >
         <Calchemy.Calendar
@@ -609,6 +894,7 @@ describe("Calchemy", () => {
       <Calchemy.Root
         calchemy={calchemy}
         expectedValue="multiple"
+        inputMode="calendar"
         inputValue="tomorrow"
         onInputValueChange={() => {}}
         value={{
@@ -639,6 +925,7 @@ describe("Calchemy", () => {
       <Calchemy.Root
         calchemy={calchemy}
         expectedValue="multiple"
+        inputMode="calendar"
         inputValue="tomorrow"
         onInputValueChange={() => {}}
         value={{
@@ -657,7 +944,7 @@ describe("Calchemy", () => {
     );
 
     expect(
-      container.querySelectorAll("[data-calchemy-day][data-selected]"),
+      container.querySelectorAll("[calchemy-day][calchemy-selected]"),
     ).toHaveLength(2);
   });
 
@@ -672,10 +959,10 @@ describe("Calchemy", () => {
     expect(screen.getByText("Sun")).toBeTruthy();
     expect(screen.getByText("Sat")).toBeTruthy();
     expect(
-      container.querySelectorAll("[data-calchemy-cell][data-blank]"),
+      container.querySelectorAll("[calchemy-cell][calchemy-blank]"),
     ).toHaveLength(11);
     expect(
-      container.querySelector("[data-calchemy-day][data-outside]"),
+      container.querySelector("[calchemy-day][calchemy-outside]"),
     ).toBeNull();
   });
 
@@ -690,21 +977,21 @@ describe("Calchemy", () => {
     );
 
     expect(
-      container.querySelector("[data-calchemy-cell][data-blank]"),
+      container.querySelector("[calchemy-cell][calchemy-blank]"),
     ).toBeNull();
     expect(
-      container.querySelectorAll("[data-calchemy-day][data-outside]"),
+      container.querySelectorAll("[calchemy-day][calchemy-outside]"),
     ).toHaveLength(11);
   });
 
-  test("navigates by whole month increments", () => {
+  test("navigates by the calendar period", () => {
     render(
       <Calchemy.Root calchemy={calchemy} expectedValue="single">
-        <Calchemy.Calendar>
+        <Calchemy.Calendar period={{ months: 2 }}>
           <Calchemy.CalendarHeader>
-            <Calchemy.CalendarPrevious pageSize={{ months: 2 }} />
+            <Calchemy.CalendarPrevious />
             <Calchemy.CalendarHeading />
-            <Calchemy.CalendarNext pageSize={{ months: 2 }} />
+            <Calchemy.CalendarNext />
           </Calchemy.CalendarHeader>
           <Calchemy.CalendarGrid />
         </Calchemy.Calendar>
@@ -713,7 +1000,7 @@ describe("Calchemy", () => {
 
     fireEvent.click(screen.getByText("Next"));
 
-    expect(screen.getByText("July 2026")).toBeTruthy();
+    expect(screen.getByText("July 2026 - August 2026")).toBeTruthy();
   });
 
   test("query changes update the visible period after manual navigation", () => {
@@ -736,6 +1023,7 @@ describe("Calchemy", () => {
     fireEvent.change(screen.getByLabelText("Date"), {
       target: { value: "last 90 days" },
     });
+    flushParseQuery();
 
     expect(screen.getByText("February 2026")).toBeTruthy();
   });
@@ -760,11 +1048,56 @@ describe("Calchemy", () => {
     fireEvent.change(screen.getByLabelText("Date"), {
       target: { value: "past 3 mondays" },
     });
+    flushParseQuery();
 
     expect(screen.getByText("May 2026")).toBeTruthy();
     expect(
-      document.querySelectorAll("[data-calchemy-day][data-selected]"),
+      document.querySelectorAll("[calchemy-day][calchemy-selected]"),
     ).toHaveLength(3);
+  });
+
+  test("calendar selection keeps the scrolled period when the date is already visible", () => {
+    const onValueChange = vi.fn();
+    const { container } = render(
+      <Calchemy.Root
+        calchemy={calchemy}
+        expectedValue="multiple"
+        inputMode="calendar"
+        onValueChange={onValueChange}
+      >
+        <Calchemy.Calendar period={{ months: 3 }}>
+          <Calchemy.CalendarHeading />
+          <CalendarScroll direction="horizontal">
+            <Calchemy.CalendarPeriodList>
+              <Calchemy.CalendarPeriod>
+                <Calchemy.CalendarPeriodHeading />
+                <Calchemy.CalendarGrid />
+              </Calchemy.CalendarPeriod>
+            </Calchemy.CalendarPeriodList>
+          </CalendarScroll>
+        </Calchemy.Calendar>
+      </Calchemy.Root>,
+    );
+
+    scrollCalendarToPeriodIndex(container, 2);
+    expect(getCalendarHeadingText()).toBe("July 2026 - September 2026");
+
+    const julyPeriod = container.querySelector<HTMLElement>(
+      "[calchemy-period-id='month-2026-07-01']",
+    );
+    if (!julyPeriod) {
+      throw new Error("Expected July 2026 calendar period.");
+    }
+
+    fireEvent.click(within(julyPeriod).getByText("27"));
+    expect(getCalendarHeadingText()).toBe("July 2026 - September 2026");
+    expect(onValueChange).toHaveBeenLastCalledWith(
+      {
+        kind: "multiple",
+        dates: [Temporal.PlainDate.from("2026-07-27")],
+      },
+      expect.objectContaining({ status: "valid" }),
+    );
   });
 
   test("multiple query changes scroll the first selected date into view", () => {
@@ -791,11 +1124,12 @@ describe("Calchemy", () => {
     fireEvent.change(screen.getByLabelText("Date"), {
       target: { value: "past 3 mondays" },
     });
+    flushParseQuery();
 
     expect(getCalendarHeadingText()).toBe("May 2026 - July 2026");
     expect(screen.getByText("May 2026")).toBeTruthy();
     expect(
-      container.querySelectorAll("[data-calchemy-day][data-selected]"),
+      container.querySelectorAll("[calchemy-day][calchemy-selected]"),
     ).toHaveLength(3);
   });
 
@@ -834,6 +1168,7 @@ describe("Calchemy", () => {
       <Calchemy.Root
         calchemy={calchemy}
         expectedValue="single"
+        inputMode="calendar"
         onValueChange={onValueChange}
       >
         <Calchemy.Calendar
@@ -855,8 +1190,8 @@ describe("Calchemy", () => {
     const may26 = screen.getByText("26");
 
     expect(previous).toHaveProperty("disabled", true);
-    expect(may26.getAttribute("data-disabled")).toBe("");
-    expect(may26.getAttribute("data-out-of-bounds")).toBe("");
+    expect(may26.getAttribute("calchemy-disabled")).toBe("");
+    expect(may26.getAttribute("calchemy-out-of-bounds")).toBe("");
 
     fireEvent.click(may26);
     expect(onValueChange).not.toHaveBeenCalled();
@@ -931,10 +1266,10 @@ describe("Calchemy", () => {
 
     expect(namedDateCalchemy.namedDatesVocabulary).toHaveLength(2);
     expect(
-      container.querySelector("[data-named-date-labels='company holiday']"),
+      container.querySelector("[calchemy-named-date-labels='company holiday']"),
     ).toBeTruthy();
     expect(
-      container.querySelector("[data-named-date-labels='payroll day']"),
+      container.querySelector("[calchemy-named-date-labels='payroll day']"),
     ).toBeTruthy();
   });
 
@@ -947,12 +1282,12 @@ describe("Calchemy", () => {
       </Calchemy.Root>,
     );
 
-    expect(container.querySelector("[data-holiday]")).toBeTruthy();
+    expect(container.querySelector("[calchemy-holiday]")).toBeTruthy();
     expect(
-      container.querySelector("[data-named-date-labels='company holiday']"),
+      container.querySelector("[calchemy-named-date-labels='company holiday']"),
     ).toBeTruthy();
     expect(
-      container.querySelector("[data-named-date-labels='payroll day']"),
+      container.querySelector("[calchemy-named-date-labels='payroll day']"),
     ).toBeNull();
   });
 
@@ -970,7 +1305,7 @@ describe("Calchemy", () => {
         </Calchemy.Calendar>
       </Calchemy.Root>,
     );
-    const scroll = container.querySelector("[data-calchemy-scroll]");
+    const scroll = container.querySelector("[calchemy-scroll]");
     if (!scroll) {
       throw new Error("Expected calendar scroll container.");
     }
@@ -1001,9 +1336,9 @@ describe("Calchemy", () => {
       </Calchemy.Root>,
     );
     const scroll = container.querySelector<HTMLElement>(
-      "[data-calchemy-scroll]",
+      "[calchemy-scroll]",
     );
-    const heading = container.querySelector("[data-calchemy-heading]");
+    const heading = container.querySelector("[calchemy-heading]");
     if (!heading) {
       throw new Error("Expected calendar scroll container and heading.");
     }
@@ -1048,7 +1383,7 @@ describe("Calchemy", () => {
     }
 
     const { container } = render(<ModeSwitchCalendar />);
-    const heading = container.querySelector("[data-calchemy-heading]");
+    const heading = container.querySelector("[calchemy-heading]");
     if (!heading) {
       throw new Error("Expected calendar heading.");
     }
@@ -1074,7 +1409,7 @@ describe("Calchemy", () => {
         <Calchemy.Calendar period={{ months: 1 }}>
           <Calchemy.CalendarHeader>
             <Calchemy.CalendarHeading />
-            <Calchemy.CalendarNext pageSize={{ months: 1 }} />
+            <Calchemy.CalendarNext />
           </Calchemy.CalendarHeader>
           <CalendarScroll direction="horizontal">
             <Calchemy.CalendarPeriodList>
@@ -1138,8 +1473,32 @@ describe("Calchemy", () => {
     );
 
     expect(
-      container.querySelector("[data-calchemy-weekday]")?.textContent,
+      container.querySelector("[calchemy-weekday]")?.textContent,
     ).toBe("Mon");
+  });
+
+  test("formats weekdays from weekdayFormat", () => {
+    const { container: narrowContainer } = render(
+      <Calchemy.Root calchemy={calchemy} expectedValue="single">
+        <Calchemy.Calendar>
+          <Calchemy.CalendarWeekdays weekdayFormat="narrow" />
+        </Calchemy.Calendar>
+      </Calchemy.Root>,
+    );
+    const { container: longContainer } = render(
+      <Calchemy.Root calchemy={calchemy} expectedValue="single">
+        <Calchemy.Calendar>
+          <Calchemy.CalendarWeekdays weekdayFormat="long" />
+        </Calchemy.Calendar>
+      </Calchemy.Root>,
+    );
+
+    expect(
+      narrowContainer.querySelector("[calchemy-weekday]")?.textContent,
+    ).toBe("S");
+    expect(
+      longContainer.querySelector("[calchemy-weekday]")?.textContent,
+    ).toBe("Sunday");
   });
 
   test("month and year selects update the visible period", () => {
@@ -1212,7 +1571,7 @@ function scrollCalendarToPeriodIndex(
   container: ParentNode,
   periodIndex: number,
 ): void {
-  const scroll = container.querySelector<HTMLElement>("[data-calchemy-scroll]");
+  const scroll = container.querySelector<HTMLElement>("[calchemy-scroll]");
   if (!scroll) {
     throw new Error("Expected calendar scroll container.");
   }
@@ -1232,9 +1591,9 @@ function scrollCalendarToPeriodIndex(
   });
 
   for (const period of container.querySelectorAll<HTMLElement>(
-    "[data-calchemy-period]",
+    "[calchemy-period]",
   )) {
-    const index = Number(period.dataset.periodIndex);
+    const index = Number(period.getAttribute("calchemy-period-index"));
     const left = (index - periodIndex) * 100;
 
     Object.defineProperty(period, "getBoundingClientRect", {
@@ -1248,7 +1607,7 @@ function scrollCalendarToPeriodIndex(
 }
 
 function getCalendarHeadingText(): string | null | undefined {
-  return document.querySelector("[data-calchemy-heading]")?.textContent;
+  return document.querySelector("[calchemy-heading]")?.textContent;
 }
 
 function rect(
@@ -1276,7 +1635,7 @@ function mockCalendarDayRects(
 ): void {
   for (const [label, dayRect] of Object.entries(dayRects)) {
     const day = Array.from(
-      container.querySelectorAll<HTMLButtonElement>("[data-calchemy-day]"),
+      container.querySelectorAll<HTMLButtonElement>("[calchemy-day]"),
     ).find((item) => item.textContent === label);
     if (!day) {
       throw new Error(`Expected calendar day ${label}.`);
@@ -1284,6 +1643,38 @@ function mockCalendarDayRects(
 
     day.getBoundingClientRect = () => dayRect;
   }
+}
+
+function clickCalendarDay(
+  container: ParentNode,
+  startElement: HTMLElement,
+  point: { x: number; y: number },
+): void {
+  const dragSurface =
+    container.querySelector<HTMLElement>(
+      "[calchemy-period][calchemy-multiple-drag]",
+    ) ??
+    container.querySelector<HTMLElement>(
+      "[calchemy-grid][calchemy-multiple-drag]",
+    );
+  if (!dragSurface) {
+    throw new Error("Expected calendar drag surface.");
+  }
+
+  dragSurface.setPointerCapture = () => {};
+  fireEvent.pointerDown(startElement, {
+    button: 0,
+    clientX: point.x,
+    clientY: point.y,
+    isPrimary: true,
+    pointerId: 1,
+  });
+  fireEvent.pointerUp(dragSurface, {
+    clientX: point.x,
+    clientY: point.y,
+    isPrimary: true,
+    pointerId: 1,
+  });
 }
 
 function dragCalendarSelection(
@@ -1294,10 +1685,10 @@ function dragCalendarSelection(
 ): void {
   const dragSurface =
     container.querySelector<HTMLElement>(
-      "[data-calchemy-period][data-multiple-drag]",
+      "[calchemy-period][calchemy-multiple-drag]",
     ) ??
     container.querySelector<HTMLElement>(
-      "[data-calchemy-grid][data-multiple-drag]",
+      "[calchemy-grid][calchemy-multiple-drag]",
     );
   if (!dragSurface) {
     throw new Error("Expected calendar drag surface.");

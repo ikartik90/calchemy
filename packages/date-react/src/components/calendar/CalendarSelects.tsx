@@ -15,7 +15,7 @@ export function CalendarMonthSelect({ onChange, ...props }: CalchemyCalendarMont
   return (
     <select
       {...props}
-      data-calchemy-month-select=""
+      calchemy-month-select=""
       value={String(calendar.visiblePeriodAnchor.month)}
       onChange={(event) =>
         handleCalendarSelectChange(event, onChange, (value) =>
@@ -50,7 +50,7 @@ export function CalendarYearSelect({ startYear, endYear, onChange, ...props }: C
   return (
     <select
       {...props}
-      data-calchemy-year-select=""
+      calchemy-year-select=""
       value={String(visibleYear)}
       onChange={(event) =>
         handleCalendarSelectChange(event, onChange, (value) =>

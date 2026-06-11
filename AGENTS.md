@@ -147,6 +147,7 @@ React should provide headless primitives and hooks:
 
 - `Calchemy.Root`
 - `Calchemy.Field`
+- `Calchemy.InputMode`
 - `Calchemy.Candidates`
 - `Calchemy.Calendar`
 - `useCalchemy`

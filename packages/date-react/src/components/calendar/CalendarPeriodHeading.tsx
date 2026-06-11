@@ -9,7 +9,7 @@ export function CalendarPeriodHeading(props: CalchemyCalendarPeriodHeadingProps)
   const period = useCalendarPeriod() ?? getFirstVisibleCalendarPeriod(calendar);
 
   return (
-    <h3 {...props} data-calchemy-period-heading="">
+    <h3 {...props} calchemy-period-heading="">
       {props.children ?? period.label}
     </h3>
   );

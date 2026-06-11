@@ -1,16 +1,22 @@
 import { parseAmount } from "../primitives/numbers";
 import { parseConnector } from "../primitives/connectors";
+import { parseExclusionMarker } from "../primitives/exclusion-markers";
 import { parseOrdinal } from "../primitives/numbers";
 import { parsePeriod } from "../primitives/periods";
 import { parseStructuralShorthand } from "../primitives/shorthands";
-import { ExclusionMarkerValues, SamplerChunkCommandValues } from "../types";
+import {
+  MultiTokenExclusionMarkerValues,
+  SamplerChunkCommandValues,
+} from "../types";
 import type { StandardChunk } from "./types";
 import type { Token } from "../../types";
 import type { DateVocabularyLookups } from "../vocabulary";
 
 // Example: `standardizeChunks(tokensFor("all mondays"), lookups)` emits command and weekday chunks.
 export function standardizeChunks(tokens: readonly Token[], lookups: DateVocabularyLookups): StandardChunk[] {
-  return standardizeCalendarRangeChunks(tokens.map((token) => standardizeToken(token, lookups)));
+  return standardizeExclusionMarkerChunks(
+    standardizeCalendarRangeChunks(tokens.map((token) => standardizeToken(token, lookups))),
+  );
 }
 
 // Example: `standardizeToken(monthToken("march"), lookups)` emits a month chunk with value `3`.
@@ -29,7 +35,7 @@ function standardizeToken(token: Token, lookups: DateVocabularyLookups): Standar
     return { kind: "connector", value: connector, token };
   }
 
-  const exclusionMarker = ExclusionMarkerValues.find((value) => value === token.normalized);
+  const exclusionMarker = parseExclusionMarker(token.normalized);
   if (exclusionMarker) {
     return { kind: "exclusion-marker", value: exclusionMarker, token };
   }
@@ -76,6 +82,42 @@ function standardizeToken(token: Token, lookups: DateVocabularyLookups): Standar
   return { kind: "word", value: token.normalized, token };
 }
 
+// Example: `standardizeExclusionMarkerChunks(chunksFor("other than weekends"))` emits an exclusion-marker chunk.
+function standardizeExclusionMarkerChunks(chunks: readonly StandardChunk[]): StandardChunk[] {
+  const standardized: StandardChunk[] = [];
+
+  for (let index = 0; index < chunks.length; index += 1) {
+    const chunk = chunks[index];
+    const next = chunks[index + 1];
+    const multiTokenMarker = MultiTokenExclusionMarkerValues.find((marker) => {
+      const [first, second] = marker.split(" ");
+      return chunk?.kind === "word" && chunk.value === first && next?.kind === "word" && next.value === second;
+    });
+
+    if (multiTokenMarker && chunk && next) {
+      standardized.push({
+        kind: "exclusion-marker",
+        value: multiTokenMarker,
+        token: {
+          kind: "word",
+          raw: `${chunk.token.raw} ${next.token.raw}`,
+          normalized: multiTokenMarker,
+          start: chunk.token.start,
+          end: next.token.end,
+        },
+      });
+      index += 1;
+      continue;
+    }
+
+    if (chunk) {
+      standardized.push(chunk);
+    }
+  }
+
+  return standardized;
+}
+
 // Example: `standardizeCalendarRangeChunks(chunksFor("3rd quarter"))` emits a structural Q3 shorthand chunk.
 function standardizeCalendarRangeChunks(chunks: readonly StandardChunk[]): StandardChunk[] {
   const standardized: StandardChunk[] = [];
@@ -93,6 +135,12 @@ function standardizeCalendarRangeChunks(chunks: readonly StandardChunk[]): Stand
       chunk.value >= 1 &&
       chunk.value <= 4
     ) {
+      const afterQuarter = chunks[index + 2];
+      if (afterQuarter?.kind === "connector" && afterQuarter.value === "from") {
+        standardized.push(chunk);
+        continue;
+      }
+
       standardized.push({
         kind: "shorthand",
         value: { kind: "quarter", ordinal: chunk.value },
@@ -119,6 +167,12 @@ function standardizeCalendarRangeChunks(chunks: readonly StandardChunk[]): Stand
       chunk.value >= 1 &&
       chunk.value <= 4
     ) {
+      const afterQuarter = chunks[index + 3];
+      if (afterQuarter?.kind === "connector" && afterQuarter.value === "from") {
+        standardized.push(chunk);
+        continue;
+      }
+
       standardized.push({
         kind: "shorthand",
         value: { kind: "quarter", ordinal: chunk.value },

@@ -35,41 +35,40 @@ export function createDateVocabularyLookups(vocabulary: DateVocabulary): DateVoc
   const namedDates = vocabulary.namedDates ?? [];
 
   for (const entry of vocabulary.months) {
-    addAliasEntries(aliases, entry.value, entry.shortcuts);
-    addFuzzyEntries(fuzzyValues, entry.value, entry.shortcuts);
+    addVocabularyAliasEntries(aliases, entry.value, entry.aliases);
+    addFuzzyEntries(fuzzyValues, entry.value, entry.aliases);
     months.set(entry.value, entry.month);
-    for (const shortcut of entry.shortcuts) {
-      months.set(shortcut, entry.month);
+    for (const alias of entry.aliases) {
+      months.set(alias, entry.month);
     }
   }
 
   for (const entry of vocabulary.weekdays) {
-    addAliasEntries(aliases, entry.value, entry.shortcuts);
-    addFuzzyEntries(fuzzyValues, entry.value, entry.shortcuts);
+    addVocabularyAliasEntries(aliases, entry.value, entry.aliases);
+    addFuzzyEntries(fuzzyValues, entry.value, entry.aliases);
     weekdays.set(entry.value, entry.weekday);
   }
 
   for (const entry of vocabulary.relatives) {
-    addAliasEntries(aliases, entry.value, entry.shortcuts ?? []);
-    addFuzzyEntries(fuzzyValues, entry.value, entry.shortcuts ?? []);
+    addVocabularyAliasEntries(aliases, entry.value, entry.aliases ?? []);
+    addFuzzyEntries(fuzzyValues, entry.value, entry.aliases ?? []);
     relativeValues.add(entry.value);
   }
 
   for (const entry of vocabulary.durationUnits) {
-    addAliasEntries(aliases, entry.value, entry.shortcuts ?? []);
-    addFuzzyEntries(fuzzyValues, entry.value, entry.shortcuts ?? []);
+    addFuzzyEntries(fuzzyValues, entry.value, []);
     durationUnits.set(entry.value, entry.unit);
   }
 
   for (const entry of vocabulary.recurrenceFrequencies) {
-    addAliasEntries(aliases, entry.value, entry.shortcuts ?? []);
-    addFuzzyEntries(fuzzyValues, entry.value, entry.shortcuts ?? []);
+    addVocabularyAliasEntries(aliases, entry.value, entry.aliases ?? []);
+    addFuzzyEntries(fuzzyValues, entry.value, entry.aliases ?? []);
   }
 
   for (const entry of namedDates) {
     const value = normalizeVocabularyValue(entry.value);
-    addAliasEntries(aliases, value, entry.shortcuts ?? []);
-    addFuzzyEntries(fuzzyValues, value, entry.shortcuts ?? []);
+    addVocabularyAliasEntries(aliases, value, entry.aliases ?? []);
+    addFuzzyEntries(fuzzyValues, value, entry.aliases ?? []);
   }
 
   return {
@@ -83,18 +82,22 @@ export function createDateVocabularyLookups(vocabulary: DateVocabulary): DateVoc
   };
 }
 
-// Example: `addAliasEntries(map, "january", ["jan"])` maps `jan` to `january`.
-function addAliasEntries(aliases: Map<string, string>, value: string, shortcuts: readonly string[]): void {
-  for (const shortcut of shortcuts) {
-    aliases.set(normalizeVocabularyValue(shortcut), normalizeVocabularyValue(value));
+// Example: `addVocabularyAliasEntries(map, "january", ["jan"])` maps `jan` to `january`.
+function addVocabularyAliasEntries(
+  aliases: Map<string, string>,
+  value: string,
+  aliasEntries: readonly string[],
+): void {
+  for (const alias of aliasEntries) {
+    aliases.set(normalizeVocabularyValue(alias), normalizeVocabularyValue(value));
   }
 }
 
 // Example: `addFuzzyEntries(values, "february", ["feb"])` marks words eligible for typo matching.
-function addFuzzyEntries(values: Set<string>, value: string, shortcuts: readonly string[]): void {
+function addFuzzyEntries(values: Set<string>, value: string, aliasEntries: readonly string[]): void {
   values.add(normalizeVocabularyValue(value));
-  for (const shortcut of shortcuts) {
-    values.add(normalizeVocabularyValue(shortcut));
+  for (const alias of aliasEntries) {
+    values.add(normalizeVocabularyValue(alias));
   }
 }
 

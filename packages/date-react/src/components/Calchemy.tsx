@@ -41,20 +41,62 @@ export type CalchemyFieldProps = Omit<
 
 function Field({
   renderInlineCompletion = true,
+  readOnly,
   ...props
 }: CalchemyFieldProps) {
   const state = useCalchemyContext();
   const inputProps = state.getInputProps();
+  const completion =
+    state.inputMode === "field" ? state.inlineCompletion : null;
 
   return (
-    <span data-calchemy-field="">
-      <input {...props} {...inputProps} />
-      {renderInlineCompletion && state.inlineCompletion ? (
-        <span aria-hidden="true" data-calchemy-inline-completion="">
-          {state.inlineCompletion.suffix}
+    <span
+      calchemy-field=""
+      calchemy-input-mode={state.inputMode}
+      calchemy-has-completion={completion ? "" : undefined}
+    >
+      {renderInlineCompletion && completion ? (
+        <span calchemy-field-backdrop="" aria-hidden="true">
+          <span calchemy-field-typed="">{state.inputValue}</span>
+          <span calchemy-completions="">{completion.suffix}</span>
         </span>
       ) : null}
+      <input {...props} {...inputProps} readOnly={readOnly ?? inputProps.readOnly} />
     </span>
+  );
+}
+
+export type CalchemyInputModeProps = ComponentPropsWithoutRef<"div"> & {
+  fieldLabel?: ReactNode;
+  calendarLabel?: ReactNode;
+};
+
+function InputMode({
+  fieldLabel = "Type",
+  calendarLabel = "Pick",
+  ...props
+}: CalchemyInputModeProps) {
+  const state = useCalchemyContext();
+
+  return (
+    <div {...props} calchemy-mode="" calchemy-active={state.inputMode} role="group">
+      <button
+        type="button"
+        calchemy-value="field"
+        aria-pressed={state.inputMode === "field"}
+        onClick={() => state.setInputMode("field")}
+      >
+        {fieldLabel}
+      </button>
+      <button
+        type="button"
+        calchemy-value="calendar"
+        aria-pressed={state.inputMode === "calendar"}
+        onClick={() => state.setInputMode("calendar")}
+      >
+        {calendarLabel}
+      </button>
+    </div>
   );
 }
 
@@ -63,7 +105,7 @@ export type CalchemyCandidatesProps = ComponentPropsWithoutRef<"div">;
 function Candidates(props: CalchemyCandidatesProps) {
   const state = useCalchemyContext();
 
-  if (state.result.status !== "ambiguous") {
+  if (state.inputMode !== "field" || state.result.status !== "ambiguous") {
     return null;
   }
 
@@ -79,12 +121,12 @@ function Candidates(props: CalchemyCandidatesProps) {
   }
 
   return (
-    <div {...props} data-calchemy-candidates="">
+    <div {...props} calchemy-candidates="">
       {candidates.map((candidate) => (
         <button
           type="button"
           key={candidate.id}
-          data-calchemy-candidate=""
+          calchemy-candidate=""
           onClick={() => state.selectCandidate(candidate.id)}
         >
           {candidate.label}
@@ -103,6 +145,7 @@ export type {
   CalendarPeriodModel,
   CalendarPeriodUnit,
   CalendarState,
+  CalendarWeekdayFormat,
   ParsedCalendarPeriod,
 } from "./calendar/types";
 export type {
@@ -126,6 +169,7 @@ export type {
 export const Calchemy = {
   Root,
   Field,
+  InputMode,
   Candidates,
   Calendar,
   CalendarHeader,

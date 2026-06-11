@@ -79,7 +79,26 @@ export type BoundarySlice =
       range: BoundarySlice;
     }
   | { kind: "relative-month"; month: number; modifier: RelativeModifier }
-  | { kind: "anchor-until"; end: BoundaryEndpointSlice };
+  | { kind: "anchor-until"; end: BoundaryEndpointSlice }
+  | { kind: "year-range"; year: number }
+  | { kind: "holidays" }
+  | { kind: "day-group-filter"; group: DayGroupPeriod }
+  | { kind: "month-day-list"; month: number; days: number[] }
+  | { kind: "month-day-range"; month: number; startDay: number; endDay: number }
+  | { kind: "date-list"; items: BoundarySlice[] }
+  | { kind: "week-of-date"; anchor: BoundarySlice }
+  | {
+      kind: "ordinal-unit-from-anchor";
+      ordinal: number;
+      unit: DurationUnit;
+      anchor: BoundarySlice;
+    }
+  | {
+      kind: "ordinal-weekday-from-anchor";
+      ordinal: number;
+      weekday: number;
+      anchor: BoundarySlice;
+    };
 
 export type BoundaryEndpointSlice =
   | { kind: "boundary"; boundary: BoundarySlice; side: BoundaryEndpointSide }
@@ -121,6 +140,12 @@ export type RelationSlice =
       weekday: number;
     }
   | {
+      kind: "day-group-near-boundary";
+      direction: RelationDirection;
+      ordinal: number;
+      group: DayGroupPeriod;
+    }
+  | {
       kind: "weekday-in-boundary";
       placement: BoundaryPlacement;
       weekday: number;
@@ -132,13 +157,7 @@ export type TransformSlice = {
   unit: DurationUnit;
 };
 
-export type ExclusionSlice =
-  | { kind: "boundary"; boundary: BoundarySlice }
-  | { kind: "holidays" }
-  | { kind: "months"; months: number[] }
-  | { kind: "weekdays" }
-  | { kind: "weekends" }
-  | { kind: "years"; years: number[] };
+export type ExclusionSlice = DateSlice;
 
 export type DateSlice = {
   boundary: BoundarySlice;

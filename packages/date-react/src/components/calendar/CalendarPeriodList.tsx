@@ -20,11 +20,11 @@ export function CalendarPeriodList({
       : { blockSize: `${scrollContext?.leadingSpacerPixelSize ?? 0}px` };
 
   return (
-    <div {...props} data-calchemy-period-list="">
+    <div {...props} calchemy-period-list="">
       {scrollContext && scrollContext.leadingSpacerPeriodCount > 0 ? (
         <div
           aria-hidden="true"
-          data-calchemy-scroll-spacer=""
+          calchemy-scroll-spacer=""
           style={spacerStyle}
         />
       ) : null}

@@ -1,25 +1,39 @@
-import { resolveBoundary } from "./boundary";
+import { startOfCalendarWeek } from "../primitives/date-math";
+import { materializeDateValue } from "./materialize";
+import { resolveDateSliceWithoutExclusions } from "./slice";
 import { expandValueDates } from "./sampler";
 import { comparePlainDate } from "../primitives/shared";
-import type { ExclusionSlice } from "../slice";
+import type { DateSlice, SamplerSlice } from "../slice";
 import type { PlainDate, TemporalApi } from "../../temporal/types";
 import type { DateValue, ResolvedParseDateContext } from "../../types";
 import type { DateVocabularyLookups } from "../vocabulary";
 
-// Example: `applyExclusions(range, [{ kind: "weekends" }], anchor, Temporal, context, lookups)` removes weekend dates.
+export type ApplyExclusionsOptions = {
+  sampler?: SamplerSlice | null;
+};
+
+// Example: `applyExclusions(range, [weekendSlice], anchor, Temporal, context, lookups)` removes resolved exclusion dates.
 export function applyExclusions(
   value: DateValue,
-  exclusions: readonly ExclusionSlice[],
+  exclusions: readonly DateSlice[],
   anchorDate: PlainDate,
   Temporal: TemporalApi,
   context: ResolvedParseDateContext,
   lookups: DateVocabularyLookups,
+  options: ApplyExclusionsOptions = {},
 ): DateValue | null {
   if (exclusions.length === 0) {
     return value;
   }
 
-  const predicates = exclusions.map((exclusion) => createExclusionPredicate(exclusion, anchorDate, Temporal, context, lookups));
+  const scope = getValueDateScope(value);
+  if (!scope) {
+    return null;
+  }
+
+  const predicates = exclusions.map((exclusion) =>
+    createExclusionPredicate(exclusion, scope, anchorDate, Temporal, context, lookups, options),
+  );
   if (predicates.some((predicate) => !predicate)) {
     return null;
   }
@@ -28,34 +42,53 @@ export function applyExclusions(
   return { kind: "multiple", dates };
 }
 
-// Example: `createExclusionPredicate({ kind: "holidays" }, anchor, Temporal, context, lookups)` checks configured holidays.
+// Example: `createExclusionPredicate(weekendSlice, scope, anchor, Temporal, context, lookups)` checks resolved exclusion dates.
 function createExclusionPredicate(
-  exclusion: ExclusionSlice,
+  exclusion: DateSlice,
+  scope: { start: PlainDate; end: PlainDate },
   anchorDate: PlainDate,
   Temporal: TemporalApi,
   context: ResolvedParseDateContext,
   lookups: DateVocabularyLookups,
+  options: ApplyExclusionsOptions,
 ): ((date: PlainDate) => boolean) | null {
-  switch (exclusion.kind) {
-    case "boundary": {
-      const value = resolveBoundary(exclusion.boundary, anchorDate, Temporal, context, lookups);
-      return value ? createDateValuePredicate(value) : null;
-    }
-    case "holidays":
-      return (date) => context.holidays?.includes(date) ?? false;
-    case "months":
-      return (date) => exclusion.months.includes(date.month);
-    case "weekdays":
-      return (date) => date.dayOfWeek >= 1 && date.dayOfWeek <= 5;
-    case "weekends":
-      return (date) => date.dayOfWeek === 6 || date.dayOfWeek === 7;
-    case "years":
-      return (date) => exclusion.years.includes(date.year);
+  const transformed = resolveDateSliceWithoutExclusions(
+    exclusion,
+    anchorDate,
+    Temporal,
+    context,
+    lookups,
+    { scope },
+  );
+  if (!transformed) {
+    return null;
   }
+
+  const filtered = applyExclusions(
+    transformed,
+    exclusion.exclusions,
+    anchorDate,
+    Temporal,
+    context,
+    lookups,
+    { sampler: exclusion.sampler },
+  );
+  const value = filtered ? materializeDateValue(filtered) : null;
+  return value
+    ? createDateValuePredicate(value, options.sampler, context.weekStartsOn)
+    : null;
 }
 
 // Example: `createDateValuePredicate(christmasValue)` matches a single resolved date or range.
-function createDateValuePredicate(value: DateValue): (date: PlainDate) => boolean {
+function createDateValuePredicate(
+  value: DateValue,
+  sampler: SamplerSlice | null | undefined,
+  weekStartsOn: ResolvedParseDateContext["weekStartsOn"],
+): (date: PlainDate) => boolean {
+  if (sampler?.kind === "weeks" && value.kind === "range") {
+    return createCalendarWeekRangePredicate(value.start, value.end, weekStartsOn);
+  }
+
   if (value.kind === "single") {
     return (date) => date.equals(value.date);
   }
@@ -65,4 +98,40 @@ function createDateValuePredicate(value: DateValue): (date: PlainDate) => boolea
   }
 
   return (date) => value.dates.some((excludedDate) => excludedDate.equals(date));
+}
+
+// Example: `createCalendarWeekRangePredicate("2026-08-15", "2026-08-21", 0)` excludes every date in overlapping calendar weeks.
+function createCalendarWeekRangePredicate(
+  start: PlainDate,
+  end: PlainDate,
+  weekStartsOn: ResolvedParseDateContext["weekStartsOn"],
+): (date: PlainDate) => boolean {
+  const excludedWeekStarts = new Set<string>();
+  let weekStart = startOfCalendarWeek(start, weekStartsOn);
+  const lastWeekStart = startOfCalendarWeek(end, weekStartsOn);
+
+  while (comparePlainDate(weekStart, lastWeekStart) <= 0) {
+    excludedWeekStarts.add(weekStart.toString());
+    weekStart = weekStart.add({ weeks: 1 });
+  }
+
+  return (date) => excludedWeekStarts.has(startOfCalendarWeek(date, weekStartsOn).toString());
+}
+
+// Example: `getValueDateScope({ kind: "range", start, end })` returns the inclusive bounds of a value.
+function getValueDateScope(value: DateValue): { start: PlainDate; end: PlainDate } | null {
+  if (value.kind === "single") {
+    return { start: value.date, end: value.date };
+  }
+
+  if (value.kind === "range") {
+    return { start: value.start, end: value.end };
+  }
+
+  if (value.dates.length === 0) {
+    return null;
+  }
+
+  const sorted = [...value.dates].sort(comparePlainDate);
+  return { start: sorted[0]!, end: sorted[sorted.length - 1]! };
 }

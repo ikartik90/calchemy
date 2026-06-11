@@ -1,12 +1,12 @@
+import { parseMonthDayListFromInput, parseMonthDayRangeFromInput } from "../primitives/month-day-list";
 import { parseAmount, parseOrdinal } from "../primitives/numbers";
-import { parsePeriod } from "../primitives/periods";
+import { parseDayGroup, parsePeriod } from "../primitives/periods";
 import { parseStructuralShorthand } from "../primitives/shorthands";
 import {
   type BoundaryPlacement,
   type BoundaryEndpointSide,
   type CalendarListPeriod,
   type CalendarRangePeriod,
-  type DayGroupPeriod,
   type DurationUnit,
   type RelationDirection,
   type RelativeDateValue,
@@ -14,7 +14,6 @@ import {
   type YearReferenceModifier,
   CalendarListPeriodSet,
   CalendarRangePeriodSet,
-  DayGroupPeriodSet,
   RelativeDateSet,
   RelativeModifierSet,
   YearReferenceModifierSet,
@@ -28,23 +27,73 @@ import type { DateVocabularyLookups } from "../vocabulary";
 
 export type { RelativeModifier };
 
+export type ParseBoundaryOptions = {
+  preferDay?: boolean;
+};
+
 // Example: `parseBoundary("w52 next year", lookups)` returns a typed week boundary.
-export function parseBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice {
+export function parseBoundary(
+  input: string,
+  lookups: DateVocabularyLookups,
+  options?: ParseBoundaryOptions,
+): BoundarySlice {
   const normalized = normalizeBoundaryInput(input);
   return (
     parseBoundarySideBoundary(normalized, lookups) ??
+    parseOrdinalUnitFromAnchorBoundary(normalized, lookups) ??
+    parseOrdinalWeekdayFromAnchorBoundary(normalized, lookups) ??
     parseDurationFromAnchorBoundary(normalized, lookups) ??
     parseDurationNearBoundary(normalized, lookups) ??
+    parseYearBoundary(normalized) ??
+    parseHolidaysBoundary(normalized) ??
+    parseDayGroupFilterBoundary(normalized) ??
     parseRelativeBoundary(normalized, lookups) ??
     parseShorthandRangeListBoundary(normalized) ??
+    parseMonthDayBoundary(normalized, lookups, options) ??
+    parseMonthDayRangeBoundary(normalized, lookups) ??
+    parseMonthDayListBoundary(normalized, lookups) ??
     parseNamedMonthBoundary(normalized, lookups) ??
     parseMonthBoundary(normalized) ??
     parseQuarterBoundary(normalized) ??
     parseWeekBoundary(normalized) ??
+    parseWeekOfDateBoundary(normalized, lookups) ??
     parseCompositeAnchorBoundary(normalized, lookups) ??
     parseRangeBoundary(normalized, lookups) ??
+    parseDateListBoundary(normalized, lookups) ??
     atomBoundary(normalized)
   );
+}
+
+// Example: `parseDateListBoundary("today and tomorrow", lookups)` returns discrete date list intent.
+function parseDateListBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
+  if (!/(?:\s+(?:and|or)\s+|,\s*)/.test(input)) {
+    return null;
+  }
+
+  if (/\b(?:between|until|from)\b/.test(input) || /\s(?:until|to)\s/.test(input)) {
+    return null;
+  }
+
+  if (
+    parseShorthandRangeListBoundary(input) ||
+    parseOrdinalCalendarUnitBoundary(input, lookups) ||
+    parseOrdinalCalendarUnitSpanBoundary(input, lookups) ||
+    parseMonthDayListBoundary(input, lookups) ||
+    parseMonthDayRangeBoundary(input, lookups) ||
+    parseRangeBoundary(input, lookups)
+  ) {
+    return null;
+  }
+
+  const parts = input
+    .split(/\s+(?:and|or)\s+|,\s*/)
+    .map((value) => normalizeBoundaryInput(value))
+    .filter(Boolean);
+  if (parts.length < 2) {
+    return null;
+  }
+
+  return { kind: "date-list", items: parts.map((part) => parseBoundary(part, lookups)) };
 }
 
 // Example: `atomBoundary("christmas this year")` defers named-date atom parsing to primitives.
@@ -81,12 +130,18 @@ export function parseBoundaryEndpoint(
   input: string,
   lookups: DateVocabularyLookups,
   side: BoundaryEndpointSide,
+  options?: ParseBoundaryOptions,
 ): BoundaryEndpointSlice {
   const normalized = normalizeBoundaryInput(input);
+  const relationReference = parseBoundaryRelationReference(normalized, lookups);
+  if (relationReference) {
+    return relationReference;
+  }
+
   const boundarySideInput = parseBoundarySideInput(normalized);
   return boundarySideInput
     ? boundaryEndpoint(parseBoundary(boundarySideInput.input, lookups), boundarySideInput.side)
-    : boundaryEndpoint(parseBoundary(normalized, lookups), side);
+    : boundaryEndpoint(parseBoundary(normalized, lookups, options), side);
 }
 
 // Example: `parseBoundaryRelationReference("first monday after end of next month", lookups)` returns relation endpoint intent.
@@ -173,6 +228,65 @@ function parseWeekBoundary(input: string): BoundarySlice | null {
   return week && week >= 1 ? { kind: "week-range", week, year: parseYearReference(match?.[3], match?.[4]) } : null;
 }
 
+// Example: `parseWeekOfDateBoundary("week of aug 10", lookups)` returns the week containing August 10.
+function parseWeekOfDateBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
+  const match = /^(?:the )?week of (?:the )?(.+)$/.exec(input);
+  return match?.[1] ? { kind: "week-of-date", anchor: parseBoundary(match[1], lookups) } : null;
+}
+
+// Example: `parseMonthDayBoundary("august 10", lookups)` returns a named month-day atom boundary.
+export function parseMonthDayBoundary(
+  input: string,
+  lookups: DateVocabularyLookups,
+  options?: ParseBoundaryOptions,
+): BoundarySlice | null {
+  const match = /^([a-z]+) (\d{1,2})(?:st|nd|rd|th)?$/.exec(input);
+  const monthName = match?.[1];
+  const day = match?.[2] ? Number(match[2]) : NaN;
+  const month = monthName ? lookups.months.get(monthName) : undefined;
+  if (!month || day < 1 || day > 31) {
+    return null;
+  }
+
+  // Keep `june 27` as a month+year shorthand unless an endpoint explicitly prefers a calendar day.
+  if (day > 12 && !options?.preferDay) {
+    return null;
+  }
+
+  return atomBoundary(`${monthName} ${day}`);
+}
+
+// Example: `parseMonthDayListBoundary("august 10 14 and 17", lookups)` returns multiple August day intent.
+export function parseMonthDayListBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
+  const parsed = parseMonthDayListFromInput(input, lookups);
+  return parsed ? { kind: "month-day-list", month: parsed.month, days: parsed.days } : null;
+}
+
+// Example: `parseMonthDayRangeBoundary("august 10-14", lookups)` returns August 10 through 14 in the anchor year.
+export function parseMonthDayRangeBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
+  const parsed = parseMonthDayRangeFromInput(input, lookups);
+  return parsed
+    ? { kind: "month-day-range", month: parsed.month, startDay: parsed.startDay, endDay: parsed.endDay }
+    : null;
+}
+
+// Example: `parseYearBoundary("2027")` returns a full-year boundary.
+function parseYearBoundary(input: string): BoundarySlice | null {
+  const match = /^(\d{4})$/.exec(input);
+  return match ? { kind: "year-range", year: Number(match[1]) } : null;
+}
+
+// Example: `parseHolidaysBoundary("holidays")` returns configured holiday intent.
+function parseHolidaysBoundary(input: string): BoundarySlice | null {
+  return input === "holidays" ? { kind: "holidays" } : null;
+}
+
+// Example: `parseDayGroupFilterBoundary("weekends")` returns weekend day-group intent.
+function parseDayGroupFilterBoundary(input: string): BoundarySlice | null {
+  const group = parseDayGroup(input);
+  return group ? { kind: "day-group-filter", group } : null;
+}
+
 // Example: `parseNamedMonthBoundary("march 27", lookups)` returns a full-month boundary.
 function parseNamedMonthBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
   const match = /^([a-z]+)(?: (?:(this|next|last|previous) year|(\d{2,4})))?$/.exec(input);
@@ -213,6 +327,81 @@ function parseRangeParts(input: string): [string, string] | null {
   return hyphenParts.length === 2 && hyphenParts[0] && hyphenParts[1] ? [hyphenParts[0], hyphenParts[1]] : null;
 }
 
+// Example: `parseOrdinalUnitFromAnchorBoundary("ninth week from christmas", lookups)` returns the calendar unit N steps after any anchor date.
+export function parseOrdinalUnitFromAnchorBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
+  const shorthandMatch = /^([qwm])(\d+) from (.+)$/i.exec(input);
+  if (shorthandMatch?.[1] && shorthandMatch[2] && shorthandMatch[3]) {
+    const unit = parseStructuralShorthandUnit(shorthandMatch[1]);
+    const ordinal = Number(shorthandMatch[2]);
+    return unit && ordinal >= 1
+      ? {
+          kind: "ordinal-unit-from-anchor",
+          ordinal,
+          unit,
+          anchor: parseBoundary(shorthandMatch[3], lookups),
+        }
+      : null;
+  }
+
+  const match = /^(?:the )?(.+?) ([a-z]+) from (.+)$/.exec(input);
+  if (!match?.[1] || !match[2] || !match[3]) {
+    return null;
+  }
+
+  const unitToken = match[2];
+  const unit = parseDurationUnit(unitToken, lookups);
+  if (!unit || unit === "weekdays" || unit === "weekend" || unitToken.endsWith("s")) {
+    return null;
+  }
+
+  const ordinal = parseOrdinal(match[1]);
+  return ordinal && ordinal >= 1
+    ? {
+        kind: "ordinal-unit-from-anchor",
+        ordinal,
+        unit,
+        anchor: parseBoundary(match[3], lookups),
+      }
+    : null;
+}
+
+// Example: `parseOrdinalWeekdayFromAnchorBoundary("third monday from this monday", lookups)` returns the Nth weekday on or after an anchor.
+export function parseOrdinalWeekdayFromAnchorBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
+  const match = /^(?:the )?(.+?) ([a-z]+) from (.+)$/.exec(input);
+  if (!match?.[1] || !match[2] || !match[3]) {
+    return null;
+  }
+
+  const weekday = lookups.weekdays.get(match[2]);
+  if (!weekday) {
+    return null;
+  }
+
+  const ordinal = parseOrdinal(match[1]);
+  return ordinal && ordinal >= 1
+    ? {
+        kind: "ordinal-weekday-from-anchor",
+        ordinal,
+        weekday,
+        anchor: parseBoundary(match[3], lookups),
+      }
+    : null;
+}
+
+// Example: `parseStructuralShorthandUnit("q")` returns `quarter`.
+function parseStructuralShorthandUnit(letter: string): DurationUnit | null {
+  switch (letter.toLowerCase()) {
+    case "w":
+      return "week";
+    case "m":
+      return "month";
+    case "q":
+      return "quarter";
+    default:
+      return null;
+  }
+}
+
 // Example: `parseDurationFromAnchorBoundary("12 weeks from 3/6/26", lookups)` returns duration-plus-anchor intent.
 function parseDurationFromAnchorBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
   const match = /^(.+) ([a-z]+) from (.+)$/.exec(input);
@@ -233,7 +422,7 @@ function parseDurationNearBoundary(input: string, lookups: DateVocabularyLookups
   }
 
   const unit = parseDurationUnit(match[2], lookups);
-  if (!unit) {
+  if (!unit || parseDayGroup(match[2])) {
     return null;
   }
 
@@ -254,11 +443,6 @@ function parseRelativeBoundary(input: string, lookups: DateVocabularyLookups): B
   const bare = RelativeDateSet.has(input as never) ? input : null;
   if (bare) {
     return { kind: "relative", expression: { kind: "bare", value: bare as RelativeDateValue } };
-  }
-
-  const dayGroup = parseDayGroup(input);
-  if (dayGroup) {
-    return { kind: "relative", expression: { kind: "modifier", modifier: "this", target: { kind: "day-group", group: dayGroup } } };
   }
 
   const bareCalendarUnit = parseDurationUnit(input, lookups);
@@ -309,8 +493,8 @@ function parseRelativeBoundary(input: string, lookups: DateVocabularyLookups): B
 
 // Example: `parseLeadingOrTrailingDaysBoundary("first 10 days of next month", lookups)` returns a subrange boundary.
 function parseLeadingOrTrailingDaysBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
-  const skipHolidays = /\s+(?:excluding|skip) holidays$/.test(input);
-  const rangeInput = skipHolidays ? input.replace(/\s+(?:excluding|skip) holidays$/, "") : input;
+  const skipHolidays = /\s+(?:excluding|excl|skip) holidays$/.test(input);
+  const rangeInput = skipHolidays ? input.replace(/\s+(?:excluding|excl|skip) holidays$/, "") : input;
   const singularMatch = /^(first|last) day (?:of|in) (?:the )?(.+)$/.exec(rangeInput);
   if (singularMatch?.[1] && singularMatch[2]) {
     return {
@@ -617,12 +801,6 @@ function parseCalendarUnit(input: string | undefined, allowed: readonly Calendar
 function parseCalendarRangeUnit(input: string | undefined): CalendarRangePeriod | null {
   const period = input ? parsePeriod(input) : null;
   return period && CalendarRangePeriodSet.has(period) ? (period as CalendarRangePeriod) : null;
-}
-
-// Example: `parseDayGroup("weekends")` returns `weekend`.
-function parseDayGroup(input: string): DayGroupPeriod | null {
-  const period = parsePeriod(input);
-  return period && DayGroupPeriodSet.has(period) ? (period as DayGroupPeriod) : null;
 }
 
 // Example: `parseRelativeModifier("previous")` returns `previous`.

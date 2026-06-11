@@ -18,6 +18,7 @@ export function normalizeInput(input: string, lookups: DateVocabularyLookups = D
     .toLowerCase()
     .replace(/[’]/g, "'")
     .replace(/\+/g, " plus ")
+    .replace(/\s*&\s*/g, " and ")
     .replace(/[–—]/g, "-")
     .replace(/\s+/g, " ");
 
@@ -76,12 +77,12 @@ export function normalizeInput(input: string, lookups: DateVocabularyLookups = D
 
 // Example: `tokenize("q4-next year")` returns word, number, separator, and word tokens.
 function tokenize(input: string): Token[] {
-  const matches = input.matchAll(/\d+|[a-z']+|[.,/-]/g);
+  const matches = input.matchAll(/\d+(?:st|nd|rd|th)?|[a-z']+|[.,/-]/g);
 
   return Array.from(matches, (match) => {
     const raw = match[0];
     const start = match.index ?? 0;
-    const kind = /^\d+$/.test(raw) ? "number" : /^[a-z']+$/.test(raw) ? "word" : "separator";
+    const kind = /^\d+$/.test(raw) ? "number" : /^[a-z']+$/.test(raw) || /^\d+(?:st|nd|rd|th)$/.test(raw) ? "word" : "separator";
 
     return {
       kind,

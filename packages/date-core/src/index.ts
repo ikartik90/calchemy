@@ -36,7 +36,6 @@ export type {
   DateVocabulary,
   DurationAmount,
   DurationUnitVocabularyEntry,
-  HolidayProvider,
   InlineCompletion,
   InvalidParseDateResult,
   MonthVocabularyEntry,

@@ -13,6 +13,7 @@ import type {
   CalendarPeriodModel,
   CalendarPeriodUnit,
   CalendarState,
+  CalendarWeekdayFormat,
   ParsedCalendarPeriod,
 } from "./types";
 
@@ -67,10 +68,6 @@ export function parseCalendarDuration(value: CalendarDuration, propName: string)
     unit: hasMonths ? "month" : "week",
     count,
   };
-}
-
-export function parseCalendarPageSize(value: CalendarDuration): ParsedCalendarPeriod {
-  return parseCalendarDuration(value, "pageSize");
 }
 
 export function validateCalendarBounds(bounds: CalendarBounds | undefined): void {
@@ -146,6 +143,35 @@ export function getDateValueAnchor(value: DateValue | null): PlainDate | null {
   }
 }
 
+export function getDateValueKey(value: DateValue | null): string {
+  if (!value) {
+    return "";
+  }
+
+  switch (value.kind) {
+    case "single":
+      return `single:${value.date.toString()}`;
+    case "range":
+      return `range:${value.start.toString()}:${value.end.toString()}`;
+    case "multiple":
+      return `multiple:${value.dates.map((date) => date.toString()).join(",")}`;
+  }
+}
+
+export function isDateInCalendarViewport(
+  date: PlainDate,
+  periods: readonly CalendarPeriodModel[],
+  visiblePeriodIndex: number,
+  windowCount: number,
+): boolean {
+  return periods
+    .filter(
+      (period) =>
+        period.index >= visiblePeriodIndex && period.index < visiblePeriodIndex + windowCount,
+    )
+    .some((period) => !isBefore(date, period.start) && !isAfter(date, period.end));
+}
+
 function getResultValue(state: CalchemyState): DateValue | null {
   return state.result.status === "valid" ? state.result.value : null;
 }
@@ -194,7 +220,10 @@ export function buildCalendarWeeks(period: CalendarPeriodModel, weekStartsOn: We
   return weeks;
 }
 
-export function buildWeekdays(calendar: CalendarState): Array<{ index: number; label: string; weekend: boolean }> {
+export function buildWeekdays(
+  calendar: CalendarState,
+  weekdayFormat: CalendarWeekdayFormat = "short",
+): Array<{ index: number; label: string; weekend: boolean }> {
   const sunday = startOfWeek(calendar.today, 0);
   const first = startOfWeek(calendar.today, calendar.weekStartsOn);
 
@@ -203,7 +232,7 @@ export function buildWeekdays(calendar: CalendarState): Array<{ index: number; l
     const weekdayIndex = sunday.until(date).days % 7;
     return {
       index: weekdayIndex,
-      label: date.toLocaleString(calendar.locale, { weekday: "short" }),
+      label: date.toLocaleString(calendar.locale, { weekday: weekdayFormat }),
       weekend: isWeekend(date),
     };
   });
@@ -306,7 +335,6 @@ function getResolvedNamedDateContext(calendar: CalendarState): NamedDateResolveC
     weekStartsOn: context?.weekStartsOn ?? 0,
     dateOrderPreference: normalizeDateOrderPreference(context?.dateOrderPreference),
     lastNDaysIncludesToday: context?.lastNDaysIncludesToday ?? true,
-    ...(context?.holidays ? { holidays: context.holidays } : {}),
   };
 }
 

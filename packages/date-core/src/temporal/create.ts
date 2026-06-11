@@ -63,12 +63,20 @@ function getInlineCompletion(
   if (match && match.entry.value.toLowerCase() !== normalized) {
     return {
       value: match.entry.value,
-      suffix: match.entry.value.slice(normalized.length),
+      suffix: inlineCompletionSuffix(input, match.entry.value),
       sourceId: match.source.id,
     };
   }
 
   return getNextCalendarCycleCompletion(input, context, Temporal, parseOptions);
+}
+
+function inlineCompletionSuffix(input: string, completionValue: string): string {
+  if (completionValue.toLowerCase().startsWith(input.toLowerCase())) {
+    return completionValue.slice(input.length);
+  }
+
+  return completionValue.slice(input.trim().toLowerCase().length);
 }
 
 function findCompletionMatch(

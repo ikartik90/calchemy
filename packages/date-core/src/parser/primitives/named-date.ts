@@ -28,12 +28,12 @@ function parseMonthNameDate(
   Temporal: TemporalApi,
   lookups: DateVocabularyLookups,
 ): PlainDate | null {
-  const monthFirst = /^([a-z]+) (\d{1,2})(?: (\d{2,4}))?$/.exec(input);
+  const monthFirst = /^([a-z]+) (\d{1,2})(?:st|nd|rd|th)?(?: (\d{2,4}))?$/.exec(input);
   if (monthFirst?.[1] && monthFirst[2]) {
     return createMonthNameDate(monthFirst[1], monthFirst[2], monthFirst[3], anchorYear, Temporal, lookups);
   }
 
-  const dayFirst = /^(\d{1,2}) ([a-z]+)(?: (\d{2,4}))?$/.exec(input);
+  const dayFirst = /^(\d{1,2})(?:st|nd|rd|th)? ([a-z]+)(?: (\d{2,4}))?$/.exec(input);
   if (dayFirst?.[1] && dayFirst[2]) {
     return createMonthNameDate(dayFirst[2], dayFirst[1], dayFirst[3], anchorYear, Temporal, lookups);
   }

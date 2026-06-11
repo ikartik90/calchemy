@@ -30,7 +30,6 @@ export type ParseDateContext = {
   locale?: string;
   weekStartsOn?: WeekdayIndex;
   dateOrderPreference?: DateOrder[];
-  holidays?: HolidayProvider;
   lastNDaysIncludesToday?: boolean;
 };
 
@@ -45,36 +44,35 @@ export type RecurrenceCadence =
 
 export type MonthVocabularyEntry = {
   value: string;
-  shortcuts: readonly string[];
+  aliases: readonly string[];
   month: number;
 };
 
 export type WeekdayVocabularyEntry = {
   value: string;
-  shortcuts: readonly string[];
+  aliases: readonly string[];
   weekday: number;
 };
 
 export type RelativeVocabularyEntry = {
   value: string;
-  shortcuts?: readonly string[];
+  aliases?: readonly string[];
 };
 
 export type DurationUnitVocabularyEntry = {
   value: string;
   unit: DurationUnit;
-  shortcuts?: readonly string[];
 };
 
 export type RecurrenceFrequencyVocabularyEntry = {
   value: string;
   cadence: RecurrenceCadence;
-  shortcuts?: readonly string[];
+  aliases?: readonly string[];
 };
 
 export type NamedDatesVocabularyEntry = {
   value: string;
-  shortcuts?: readonly string[];
+  aliases?: readonly string[];
   isHoliday?: boolean;
   resolveDate(args: {
     year: number;
@@ -109,8 +107,9 @@ export type ResolvedParseDateContext = Required<
     | "dateOrderPreference"
     | "lastNDaysIncludesToday"
   >
-> &
-  Pick<ParseDateContext, "holidays">;
+> & {
+  holidays?: HolidayProvider;
+};
 
 export type DateOrder = "MDY" | "DMY" | "YMD";
 export type WeekdayIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -156,6 +155,8 @@ export type AmbiguityGroup = {
   kind:
     | "date-order"
     | "two-digit-year"
+    | "month-day-list"
+    | "month-day-year"
     | "relative-anchor"
     | "range-boundary"
     | "holiday-calendar";

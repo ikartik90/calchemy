@@ -1,112 +1,88 @@
-# Calchemy parses dates people type
+# Calchemy
 
-Calchemy is a natural language date engine with headless React components. It turns phrases like `three weeks from now`, `last 90 days`, and `Christmas 2026-Jul 1, 27` into Temporal values.
-
-The parser returns structured results:
-
-- A single date.
-- A date range.
-- Multiple discrete dates.
-- An ambiguous result when the phrase has more than one plausible meaning.
-- An invalid result when Calchemy needs clearer input.
-
-## Packages
-
-```txt
-@calchemy/date-core
-@calchemy/date-react
-```
-
-`date-holidays` and `date-fuzzy` will become separate packages when those areas need independent ownership.
+Calchemy is a headless date engine that parses natural language input. It turns phrases like `8 weeks from now` (single date), `Christmas 2026-Jul 1, 27` (date range), and `mondays and wednesdays next month` (multiple dates) into Temporal values.
 
 ## Install
 
 ```bash
-pnpm add @calchemy/date-react react
-```
+# Core natural language date parsing engine
+pnpm add @calchemy/date-core
 
-`@calchemy/date-core` installs with `@calchemy/date-react`. Import it directly when creating a `Calchemy` instance. `@calchemy/date-react` depends on `@js-temporal/polyfill` through `date-core` and loads it when native `globalThis.Temporal` is missing. React 18.3+ or 19+ is a peer dependency.
+# Optional headless react date-picker.
+pnpm add @calchemy/date-react react
+# Requires @calchemy/date-core.
+# React 18.3+ or 19+ is a peer dependency.
+```
 
 When you import `@calchemy/date-react/calendar-scroll`, also install `react-dom` 18.3+ or 19+.
 
-## Architecture
-
-Calchemy keeps parsing and UI separate. `@calchemy/date-core` owns parser semantics, Temporal values, ambiguity, JSON, and form serialization. `@calchemy/date-react` renders parsed results through `useCalchemy` and the `Calchemy` primitives.
-
-The parser follows an inspectable pipeline:
-
-```txt
-vocabulary -> normalize and tokenize -> standardize chunks -> resolve context -> numeric candidates -> slice language -> resolve values -> return result
-```
-
-Supported phrase families include relative anchors (`today`, `next friday`), calendar periods (`Q1`, `w52`, `this month`), counted ranges (`last 90 days`, `next 3 fridays`), connectors (`between`, `until`), samplers (`every monday`, `all odd numbered dates in december`), exclusions (`excluding holidays`, `skip weekends`), date math (`next monday in march + 2 weeks`), named dates (with vocabulary), and shorthand correction (`tmrw`, `xmas`). Phrases like `christmas` require `namedDatesVocabulary` at setup.
-
-## Core usage
+## Using Date Core (`@calchemy/date-core`)
 
 ```ts
 import { createCalchemy } from "@calchemy/date-core";
 
+// Returns promise immediately if the client already supports Temporal
 const calchemy = await createCalchemy();
-
-const result = calchemy.parseDate("last 90 days", {
-  locale: "en-US",
-  weekStartsOn: 0,
-  dateOrderPreference: ["DMY", "MDY", "YMD"],
-});
-
-if (result.status === "valid") {
-  console.log(calchemy.toJSON(result.value));
-}
+console.log(calchemy.parseDate("tomorrow"));
 ```
 
-`createCalchemy()` uses native `globalThis.Temporal` when the runtime supports Temporal and returns a Promise immediately. When Temporal is missing, `@js-temporal/polyfill` is dynamically imported as a fallback.
+`createCalchemy()` evaluates whether the client supports Temporal by reading `globalThis.Temporal` from the runtime, and returns the promise immediately if it does. Otherwise, it loads `@js-temporal/polyfill` asynchronously.
 
-After setup, `calchemy.parseDate()` is synchronous.
+If you would rather skip auto-detection and prefer a synchronous approach instead, use `createCalchemyWithTemporal(Temporal)`:
 
-### Time zone and reference date
+```ts
+import { createCalchemyWithTemporal } from "@calchemy/date-core";
 
-Relative phrases like `today`, `tomorrow`, and `last 90 days` resolve against a reference calendar date. Set `timeZone` for live parsing in a specific zone, or `referenceDate` to pin an as-of date (tests, replays):
+const calchemy = createCalchemyWithTemporal(globalThis.Temporal);
+```
+
+## Configuring calchemy options
+
+`createCalchemy()` takes three optional settings. Set them once at startup; override any of the parse settings on a single call with the second argument to `parseDate()`.
 
 ```ts
 const calchemy = await createCalchemy({
   defaultContext: {
+    locale: "en-US",
     timeZone: "America/New_York",
+    weekStartsOn: 1,
+    dateOrderPreference: ["MDY", "DMY"],
   },
+  completionSources: [
+    { id: "phrases", entries: [{ value: "previous 90 days" }] },
+  ],
 });
 ```
 
+**`defaultContext`** — parse settings applied to every call unless you override them. You can put any of these inside it:
+
+- `locale` — how dates are labeled in results and the calendar.
+- `timeZone` — which "today" means for phrases like `tomorrow` and `last 90 days`.
+- `referenceDate` — fix the as-of date (useful in tests). Overrides `timeZone` when both are set.
+- `weekStartsOn` — which day starts the week (`0` = Sunday, `1` = Monday, and so on).
+- `dateOrderPreference` — how to read numeric dates like `03/04/25`.
+- `lastNDaysIncludesToday` — whether `last 90 days` counts today (default yes).
+
 ```ts
-const result = calchemy.parseDate("today", {
+// Override just for this one parse
+calchemy.parseDate("today", {
   referenceDate: Temporal.PlainDate.from("2026-05-27"),
 });
 ```
 
-When both are set, `referenceDate` wins. Use `defaultContext` at factory time to apply the same settings to every parse.
+**`completionSources`** — phrases to suggest while the user types (press Tab to accept). Calchemy does not auto-suggest built-in words like `tomorrow` or `july`; add whatever phrases you want the field to offer.
 
-### Configuration
+### Named dates vocabulary
 
-`createCalchemy()` accepts factory options:
-
-- `defaultContext` sets default `ParseDateContext` for every parse.
-- `completionSources` drives inline Tab completion. Parser vocabulary is not auto-completed.
-- `namedDatesVocabulary` registers named dates for parsing and calendar styling.
-
-Per-parse `ParseDateContext` fields:
-
-- `locale` for candidate and calendar label formatting.
-- `weekStartsOn`, `dateOrderPreference`.
-- `timeZone` and `referenceDate` for relative phrases (see Time zone and reference date above).
-- `holidays` as a `HolidayProvider` for `excluding holidays` and similar phrases.
-- `lastNDaysIncludesToday` controls whether `last N days` and `past N days` include today (default `true`).
+`namedDatesVocabulary` registers phrases the parser can resolve, such as `christmas` or `company offsite`. Each entry has `value`, optional `aliases`, optional `isHoliday`, and `resolveDate`.
 
 ```ts
 const calchemy = await createCalchemy({
-  defaultContext: { locale: "en-US", weekStartsOn: 1, dateOrderPreference: ["MDY", "DMY"] },
-  completionSources: [{ id: "phrases", entries: [{ value: "previous 90 days" }] }],
   namedDatesVocabulary: [
     {
       value: "christmas",
-      shortcuts: ["xmas"],
+      aliases: ["xmas"],
+      isHoliday: true,
       resolveDate({ year, context }) {
         return context.referenceDate.with({ year, month: 12, day: 25 });
       },
@@ -115,36 +91,11 @@ const calchemy = await createCalchemy({
 });
 ```
 
-### Parse results
+Setting `isHoliday: true` on an entry allows Calchemy to use it for parsing phrases like `excluding holidays` and holiday styling in the calendar.
 
-Every result includes `input`, `corrections` (typo, shorthand, and alias fixes), and `warnings`.
+## Using Date React (`@calchemy/date-react`)
 
-`valid` adds `value`, `candidates`, and `warnings` (for example `maximum-selectable-dates-exceeded` when coercing a range to multiple dates).
-
-`ambiguous` adds `candidates` and `ambiguityGroups`. Today only `date-order` ambiguity is produced (for example `03/04/25` as March 4 vs April 3 vs 2003-04-25). Other ambiguity kinds exist in the type system for future use.
-
-`invalid` adds `errors` with codes like `empty-input`, `unsupported-expression`, `invalid-date`, `invalid-context`, and `unexpected-value-kind`.
-
-```ts
-const result = calchemy.parseDate("03/04/25");
-
-if (result.status === "ambiguous") {
-  for (const group of result.ambiguityGroups) {
-    console.log(group.message);
-  }
-  for (const candidate of result.candidates) {
-    console.log(candidate.label);
-  }
-}
-
-if (result.status === "invalid") {
-  console.log(result.errors[0]?.message);
-}
-```
-
-That input can mean March 4, 2025, April 3, 2025, or 2003-04-25. Your UI can show the choices instead of guessing.
-
-## React usage
+Headless React primitives on top of `date-core`. You compose the field, candidate list, and calendar; Calchemy parses the query and keeps the value in sync.
 
 ```tsx
 import { createCalchemy } from "@calchemy/date-core";
@@ -159,9 +110,9 @@ export function InvoiceFilter() {
       <Calchemy.Candidates />
       <Calchemy.Calendar>
         <Calchemy.CalendarHeader>
-          <Calchemy.CalendarPrevious pageSize={{ months: 1 }} />
+          <Calchemy.CalendarPrevious />
           <Calchemy.CalendarHeading />
-          <Calchemy.CalendarNext pageSize={{ months: 1 }} />
+          <Calchemy.CalendarNext />
         </Calchemy.CalendarHeader>
         <Calchemy.CalendarWeekdays />
         <Calchemy.CalendarGrid />
@@ -171,13 +122,117 @@ export function InvoiceFilter() {
 }
 ```
 
-`Calchemy.Field` owns inline tab completion from `completionSources`. `Calchemy.Candidates` renders parse choices. `Calchemy.Calendar` is optional; without children it renders a default header, weekdays row, and grid.
+Put `Candidates` and `Calendar` in a popover, dialog, or inline panel. Calchemy does not ship a popover.
 
-### React state
+## Parts and styling
 
-`Calchemy.Root` wraps the `useCalchemy` hook. Set `expectedValue` to the value kind your field accepts: `single`, `range`, or `multiple`. Pass controlled props when your app owns the input or selected value, or use `defaultInputValue` and `defaultValue` for local state.
+Parts forward props, including `ref`, to the underlying element. Each part exposes a `calchemy-*` attribute you can target in CSS. Nothing ships styled.
 
-`useCalchemy` resolves parses against `expectedValue`. A range typed into a `single` field stays invalid; `single` and `range` parses coerce to `multiple` when needed. Range-to-multiple expansion caps at `multipleRangeExpansionLimit` (default 1095). When the parse succeeds but the value kind does not match, the field reports `data-status="kind-mismatch"` and `aria-invalid`.
+### Root
+
+Wraps your field, candidates, and calendar in shared parser state. Set `expectedValue` to the kind of date your UI accepts.
+
+```tsx
+<Calchemy.Root calchemy={calchemy} expectedValue="range">
+  <Calchemy.Field />
+  <Calchemy.Candidates />
+</Calchemy.Root>
+```
+
+Control the query with `inputValue` and `onInputValueChange`. Control the resolved date with `value` and `onValueChange`. Pass per-parse settings through `parseContext`.
+
+`useCalchemy()` returns the same state if you want to build the UI yourself.
+
+### Field `[calchemy-field]` `[calchemy-completions]`
+
+The text input for natural language date query. The `[calchemy-field]` offers inline completions by setting `calchemy-has-completion` with values from `completionSources`. `[calchemy-field-backdrop]` holds `[calchemy-field-typed]` (invisible typed text) and `[calchemy-completions]` (ghost suffix).
+
+```tsx
+<Calchemy.Field placeholder="last 90 days" />
+```
+
+`getInputProps()` forwards `calchemy-status` (`valid`, `ambiguous`, `invalid`, or `kind-mismatch`) and `aria-description` with the composed suggestion. Set `renderInlineCompletion={false}` to turn off completions.
+
+### Candidates `[calchemy-candidates]` `[calchemy-candidate]`
+
+Renders choices when a phrase could mean more than one date, like `03/04/25`.
+
+```tsx
+<Calchemy.Candidates />
+```
+
+### InputMode `[calchemy-mode]`
+
+Switches between typing in the field and picking on the calendar. `Root` owns the mode; pass `inputMode` and `onInputModeChange` to control it.
+
+```tsx
+<Calchemy.InputMode fieldLabel="Type" calendarLabel="Pick" />
+```
+
+In calendar mode the field is read-only and the calendar gets `calchemy-editable`.
+
+### Calendar `[calchemy-calendar]`
+
+Optional date grid. Skip the children and you get a default header, weekday row, and month grid.
+
+```tsx
+<Calchemy.Calendar period={{ months: 2 }}>
+  <Calchemy.CalendarHeader>
+    <Calchemy.CalendarPrevious />
+    <Calchemy.CalendarHeading />
+    <Calchemy.CalendarNext />
+  </Calchemy.CalendarHeader>
+  <Calchemy.CalendarWeekdays />
+  <Calchemy.CalendarGrid />
+</Calchemy.Calendar>
+```
+
+`bounds` keeps navigation and selection inside a range. `isDateDisabled` greys out specific days. `namedDates="holidays"` marks days from your `namedDatesVocabulary`.
+
+### CalendarGrid `[calchemy-grid]` `[calchemy-day]` `[calchemy-selected?]` `[calchemy-today?]`
+
+The month grid. `showBookends` fills leading and trailing cells with adjacent-month days. In calendar input mode, click or drag to toggle multiple dates.
+
+```css
+[calchemy-day][calchemy-selected] {
+  background: #111;
+  color: white;
+}
+```
+
+### CalendarScroll `[calchemy-scroll]`
+
+Import from `@calchemy/date-react/calendar-scroll`. Requires `react-dom` 18.3+ or 19+ as a peer dependency. Wrap `CalendarPeriodList` to load more months as the user scrolls.
+
+```tsx
+import { CalendarScroll } from "@calchemy/date-react/calendar-scroll";
+
+<Calchemy.Calendar period={{ months: 3 }}>
+  <CalendarScroll direction="horizontal">
+    <Calchemy.CalendarPeriodList>
+      <Calchemy.CalendarPeriod>
+        <Calchemy.CalendarGrid />
+      </Calchemy.CalendarPeriod>
+    </Calchemy.CalendarPeriodList>
+  </CalendarScroll>
+</Calchemy.Calendar>;
+```
+
+### `useCalchemyCalendar()`
+
+Use inside `Calchemy.Calendar` when you want your own month or year controls.
+
+```tsx
+const calendar = useCalchemyCalendar();
+
+calendar.setPeriodAnchor(
+  calendar.visiblePeriodAnchor.with({ month: 6, day: 1 }),
+);
+```
+
+## Examples
+
+### Controlled field
 
 ```tsx
 <Calchemy.Root
@@ -187,315 +242,40 @@ export function InvoiceFilter() {
   onInputValueChange={setQuery}
   value={value}
   onValueChange={setValue}
-  multipleRangeExpansionLimit={365}
-  parseContext={{
-    locale: "en-US",
-    weekStartsOn: 1,
-  }}
+  parseContext={{ locale: "en-US", weekStartsOn: 1 }}
 >
   <Calchemy.Field placeholder="Try 'next week'" />
   <Calchemy.Candidates />
 </Calchemy.Root>
 ```
 
-`onValueChange` receives the resolved `DateValue` and the full `ParseDateResult`. `Calchemy.Candidates` filters choices to the expected kind for `single` and `range` fields.
-
-Use `useCalchemy()` directly when you want the parser state without the component tree.
-
-### Calendar periods
-
-`Calchemy.Calendar` renders one visible month by default. Use `period` to render multiple months or weeks. `pageSize` on navigation controls uses the same shape: `{ months: n }` or `{ weeks: n }`.
-
-```tsx
-<Calchemy.Calendar period={{ months: 3 }}>
-  <Calchemy.CalendarHeader>
-    <Calchemy.CalendarPrevious pageSize={{ months: 3 }} />
-    <Calchemy.CalendarHeading />
-    <Calchemy.CalendarNext pageSize={{ months: 3 }} />
-  </Calchemy.CalendarHeader>
-
-  <Calchemy.CalendarMonthSelect aria-label="Month" />
-  <Calchemy.CalendarYearSelect aria-label="Year" startYear={2024} endYear={2030} />
-
-  <Calchemy.CalendarPeriodList>
-    <Calchemy.CalendarPeriod>
-      <Calchemy.CalendarPeriodHeading />
-      <Calchemy.CalendarWeekdays />
-      <Calchemy.CalendarGrid showBookends />
-    </Calchemy.CalendarPeriod>
-  </Calchemy.CalendarPeriodList>
-</Calchemy.Calendar>
-```
-
-Calendar parts are composable:
-
-- `CalendarHeading` labels the current visible period window and accepts custom children.
-- `CalendarPrevious` and `CalendarNext` move by `pageSize` from the current visible period, including after scroll.
-- `CalendarMonthSelect` and `CalendarYearSelect` are native select controls. `CalendarYearSelect` accepts `startYear` and `endYear`. Values are strings at the DOM boundary and numbers when updating Temporal dates.
-- `CalendarWeekdays` uses `parseContext.weekStartsOn`.
-- `CalendarGrid` selects dates on click, accepts `showBookends` for outside-month days, and `dragSelection` (default `true`) for multiple-date drag toggling.
-
-For `expectedValue="multiple"`, `CalendarGrid` supports click and drag toggling. A click toggles one day. A drag toggles every enabled day cell intersecting the drag rectangle: unselected dates become selected, selected dates become deselected, and dates outside the rectangle keep their current state.
-
-```tsx
-<Calchemy.Root calchemy={calchemy} expectedValue="multiple">
-  <Calchemy.Calendar>
-    <Calchemy.CalendarWeekdays />
-    <Calchemy.CalendarGrid dragSelection />
-  </Calchemy.Calendar>
-</Calchemy.Root>
-```
-
-### Calendar constraints
-
-Use `bounds` to cap calendar operation. Navigation, scrolling, preloading, generated periods, and date selection stay inside the range.
-
-```tsx
-function BookingCalendar() {
-  const state = useCalchemyContext();
-  const today =
-    state.parseContext?.referenceDate ??
-    state.calchemy.Temporal.Now.plainDateISO(state.parseContext?.timeZone);
-
-  return (
-    <Calchemy.Calendar
-      period={{ months: 3 }}
-      bounds={{
-        start: today,
-        end: today.add({ months: 6 }),
-      }}
-    >
-      <Calchemy.CalendarHeader>
-        <Calchemy.CalendarPrevious pageSize={{ months: 1 }} />
-        <Calchemy.CalendarHeading />
-        <Calchemy.CalendarNext pageSize={{ months: 1 }} />
-      </Calchemy.CalendarHeader>
-      <Calchemy.CalendarGrid />
-    </Calchemy.Calendar>
-  );
-}
-```
-
-Use `isDateDisabled` for dates that should remain visible but cannot be selected. The callback receives the date and calendar state.
+### Bounds and disabled dates
 
 ```tsx
 <Calchemy.Calendar
+  bounds={{ start: today, end: today.add({ months: 6 }) }}
   isDateDisabled={(date) => date.dayOfWeek === 6 || date.dayOfWeek === 7}
 >
   <Calchemy.CalendarGrid />
 </Calchemy.Calendar>
 ```
 
-Disabled days render with `disabled` and `data-disabled`. Days outside `bounds` also receive `data-out-of-bounds`.
-
-Named-date styling uses the same `NamedDatesVocabularyEntry` records passed to `createCalchemy()`.
+### Named dates on the calendar
 
 ```tsx
-const calchemy = await createCalchemy({
-  namedDatesVocabulary: [
-    {
-      value: "company holiday",
-      isHoliday: true,
-      resolveDate({ year, context }) {
-        return context.referenceDate.with({ year, month: 12, day: 25 });
-      },
-    },
-  ],
-});
-
-<Calchemy.Root calchemy={calchemy} expectedValue="single">
-  <Calchemy.Calendar namedDates="holidays">
-    <Calchemy.CalendarGrid />
-  </Calchemy.Calendar>
-</Calchemy.Root>;
-```
-
-Use `namedDates="all"` to expose all configured named dates or `namedDates="holidays"` to expose entries with `isHoliday: true`. Matching days receive `data-named-date` and `data-named-date-labels`; holiday matches also receive `data-holiday`.
-
-### Scrollable calendars
-
-Wrap `CalendarPeriodList` in `CalendarScroll` to preload periods as the user scrolls. Import scroll from the subpath; it requires `react-dom`. The scroll direction defaults to vertical.
-
-```tsx
-import { Calchemy } from "@calchemy/date-react";
-import { CalendarScroll } from "@calchemy/date-react/calendar-scroll";
-
-<Calchemy.Calendar period={{ months: 3 }}>
-  <Calchemy.CalendarHeader>
-    <Calchemy.CalendarHeading />
-  </Calchemy.CalendarHeader>
-
-  <CalendarScroll direction="horizontal">
-    <Calchemy.CalendarPeriodList>
-      <Calchemy.CalendarPeriod>
-        <Calchemy.CalendarPeriodHeading />
-        <Calchemy.CalendarWeekdays />
-        <Calchemy.CalendarGrid />
-      </Calchemy.CalendarPeriod>
-    </Calchemy.CalendarPeriodList>
-  </CalendarScroll>
+<Calchemy.Calendar namedDates="holidays">
+  <Calchemy.CalendarGrid />
 </Calchemy.Calendar>
-```
-
-For vertical scrolling, give the scroll element a block-size or max-block-size. Without a height constraint, the page scrolls because the calendar grows to fit its content.
-
-```css
-[data-calchemy-scroll][data-direction="vertical"] {
-  max-block-size: 32rem;
-  overflow-y: auto;
-}
-
-[data-calchemy-scroll][data-direction="horizontal"] [data-calchemy-period-list] {
-  display: grid;
-  grid-auto-columns: calc((100% - 2rem) / 3);
-  grid-auto-flow: column;
-  gap: 1rem;
-}
-```
-
-`CalendarHeading`, `CalendarPrevious`, `CalendarNext`, `CalendarMonthSelect`, and `CalendarYearSelect` follow the current visible period while scrolling.
-
-### Custom calendar controls
-
-Use `useCalchemyCalendar()` inside `Calchemy.Calendar` when you want custom controls, including Radix UI selects or your own dropdown.
-
-```tsx
-import * as Select from "@radix-ui/react-select";
-import { useCalchemyCalendar } from "@calchemy/date-react";
-
-function MonthDropdown() {
-  const calendar = useCalchemyCalendar();
-  const current = calendar.visiblePeriodAnchor;
-
-  return (
-    <Select.Root
-      value={String(current.month)}
-      onValueChange={(value) => {
-        calendar.setPeriodAnchor(
-          current.with({ month: Number(value), day: 1 }),
-        );
-      }}
-    >
-      <Select.Trigger aria-label="Month">
-        <Select.Value />
-      </Select.Trigger>
-      <Select.Portal>
-        <Select.Content position="popper">
-          <Select.Viewport>
-            {Array.from({ length: 12 }, (_, index) => {
-              const month = index + 1;
-              const date = current.with({ month, day: 1 });
-
-              return (
-                <Select.Item key={month} value={String(month)}>
-                  <Select.ItemText>
-                    {date.toLocaleString(calendar.locale, { month: "long" })}
-                  </Select.ItemText>
-                </Select.Item>
-              );
-            })}
-          </Select.Viewport>
-        </Select.Content>
-      </Select.Portal>
-    </Select.Root>
-  );
-}
-```
-
-Use `calendar.visiblePeriodAnchor` for controls that should follow scrolling. Use `calendar.setPeriodAnchor()` to jump to a new month or year.
-
-## Styling
-
-Style the headless primitives with plain CSS, recipes, utility classes, CSS Modules, or your own system. Components expose `className` and `data-*` hooks.
-
-### Data attributes
-
-Field: `data-calchemy-field`, `data-calchemy-inline-completion`. Input props from `getInputProps()`: `data-status` (`valid`, `ambiguous`, `invalid`, `kind-mismatch`), `data-expected-value`, `data-value-kind`.
-
-Candidates: `data-calchemy-candidates`, `data-calchemy-candidate`.
-
-Calendar shell: `data-calchemy-calendar`, `data-calchemy-header`, `data-calchemy-heading`, `data-calchemy-previous`, `data-calchemy-next`, `data-calchemy-month-select`, `data-calchemy-year-select`.
-
-Grid: `data-calchemy-weekdays`, `data-calchemy-weekday`, `data-weekend`, `data-calchemy-grid`, `data-calchemy-week`, `data-calchemy-cell`, `data-blank`, `data-calchemy-day`, `data-selected`, `data-today`, `data-outside`, `data-first-of-period`, `data-last-of-period`, `data-disabled`, `data-out-of-bounds`, `data-named-date`, `data-holiday`, `data-named-date-labels`.
-
-Multiple drag: `data-multiple-drag`, `data-dragging`, `data-drag-preview`, `data-drag-preview-selected`, `data-drag-preview-deselected`, `data-calchemy-drag-rect`.
-
-Periods and scroll: `data-calchemy-period`, `data-period-id`, `data-period-index`, `data-calchemy-period-heading`, `data-calchemy-period-list`, `data-calchemy-scroll`, `data-direction`, `data-calchemy-scroll-spacer`.
-
-### Vanilla CSS
-
-```tsx
-<Calchemy.Root calchemy={calchemy} expectedValue="range">
-  <Calchemy.Field className="date-field" />
-  <div className="date-popover">
-    <Calchemy.Candidates />
-    <Calchemy.Calendar />
-  </div>
-</Calchemy.Root>
-```
-
-```css
-.date-field {
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  padding: 8px 10px;
-}
-
-[data-calchemy-candidate],
-[data-calchemy-day] {
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-[data-calchemy-day][data-selected] {
-  background: #111;
-  color: white;
-}
-
-[data-calchemy-day][data-today] {
-  outline: 1px solid currentColor;
-}
-```
-
-### Panda CSS
-
-```tsx
-<Calchemy.Root calchemy={calchemy} expectedValue="range">
-  <Calchemy.Field className={dateInputRecipe()} />
-  <Calchemy.Candidates className={candidateListRecipe()} />
-  <Calchemy.Calendar className={calendarRecipe()} />
-</Calchemy.Root>
-```
-
-### Tailwind
-
-```tsx
-<Calchemy.Root calchemy={calchemy} expectedValue="range">
-  <Calchemy.Field className="rounded-md border px-3 py-2" />
-  <Calchemy.Candidates className="mt-2 grid gap-1" />
-  <Calchemy.Calendar className="mt-2" />
-</Calchemy.Root>
 ```
 
 ## Form and JSON values
 
-Calchemy uses Temporal objects at runtime and plain values at boundaries.
+Runtime values are Temporal objects. Boundaries use plain strings.
 
 ```ts
-const formValue = calchemy.toFormValue(result.value);
+const formValue = calchemy.toFormValue(result.value); // 2026-12-25, 2026-12-25/2027-07-01, or comma-separated
 const jsonValue = calchemy.toJSON(result.value);
 ```
-
-Canonical form values:
-
-```txt
-single:   2026-12-25
-range:    2026-12-25/2027-07-01
-multiple: 2026-12-25,2026-12-28,2027-01-01
-```
-
-Canonical JSON values:
 
 ```ts
 type DateValueJSON =
@@ -504,40 +284,16 @@ type DateValueJSON =
   | { kind: "multiple"; dates: string[] };
 ```
 
-## Bring your own schema validator
+## How it works
 
-Use Zod, Valibot, or your app's schema library for product rules.
+Calchemy keeps parsing and UI separate. `@calchemy/date-core` owns parser semantics, Temporal values, ambiguity, JSON, and form serialization. `@calchemy/date-react` renders parsed results through `useCalchemy` and the `Calchemy` primitives.
 
-The package validates its own wire format with lightweight guards:
+Here's how the parser interprets natural-language dates:
 
-```ts
-import { isDateValueJSON } from "@calchemy/date-core";
-
-if (isDateValueJSON(value, calchemy.Temporal)) {
-  const dateValue = calchemy.fromJSON(value);
-}
-```
-
-Validate product rules in your app:
-
-- Required fields.
-- Maximum range length.
-- Past-date rules.
-- Weekend rules.
-- Allowed value kinds.
-
-## Development
-
-```bash
-pnpm install
-pnpm build
-pnpm test
-pnpm typecheck
-```
-
-Use package filters while working:
-
-```bash
-pnpm --filter @calchemy/date-core test
-pnpm --filter @calchemy/date-react test
-```
+1. Normalize and tokenize: Cleans the input and splits it into typed tokens
+2. Standardize chunks: Classifies the tokens into typed semantic chunks
+3. Resolve context: Applies reference date, locale, and preferences
+4. Resolve ambiguity: Surfaces competing numeric date interpretations
+5. Slice and group: Identifies boundaries, relations, samplers, and exclusions
+6. Resolve values: Computes concrete Temporal values over qualifier boundaries
+7. Return result: Returns status, Temporal value, candidates, and corrections

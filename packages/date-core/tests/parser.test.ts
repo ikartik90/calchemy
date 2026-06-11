@@ -2,29 +2,37 @@ import { Temporal } from "@js-temporal/polyfill";
 import { describe, expect, test } from "vitest";
 import { parseAmount, parseOrdinal } from "../src/parser/primitives/numbers";
 import { createCalchemyWithTemporal, isDateValueJSON, resolveExpectedDateValue } from "../src";
-import type { CompletionSource, DateValueJSON, HolidayProvider, NamedDatesVocabularyEntry, ParseDateContext } from "../src";
+import type { CompletionSource, DateValueJSON, NamedDatesVocabularyEntry, ParseDateContext } from "../src";
 
 const referenceDate = Temporal.PlainDate.from("2026-05-27");
-const holidays: HolidayProvider = {
-  id: "test",
-  label: "Test holidays",
-  includes(date) {
-    return date.toString() === "2026-05-18" || date.toString() === "2026-06-06" || date.toString() === "2026-12-25";
-  },
-};
 const namedDatesVocabulary = [
   {
     value: "christmas",
-    shortcuts: ["xmas"],
+    aliases: ["xmas"],
+    isHoliday: true,
     resolveDate({ year, context }) {
       return context.referenceDate.with({ year, month: 12, day: 25 });
     },
   },
   {
     value: "easter",
-    shortcuts: [],
+    aliases: [],
     resolveDate({ year }) {
       return getEasterDate(year);
+    },
+  },
+  {
+    value: "may holiday",
+    isHoliday: true,
+    resolveDate({ year, context }) {
+      return context.referenceDate.with({ year, month: 5, day: 18 });
+    },
+  },
+  {
+    value: "june holiday",
+    isHoliday: true,
+    resolveDate({ year, context }) {
+      return context.referenceDate.with({ year, month: 6, day: 6 });
     },
   },
 ] satisfies readonly NamedDatesVocabularyEntry[];
@@ -34,7 +42,6 @@ const context: ParseDateContext = {
   locale: "en-US",
   weekStartsOn: 0,
   dateOrderPreference: ["DMY", "MDY", "YMD"],
-  holidays,
 };
 
 describe("parseDate", () => {
@@ -74,6 +81,11 @@ describe("parseDate", () => {
     ["last day of next month", { kind: "single", date: "2026-06-30" }],
     ["third sunday of the next month", { kind: "single", date: "2026-06-21" }],
     ["third monday next quarter", { kind: "single", date: "2026-07-20" }],
+    ["first monday from this monday", { kind: "single", date: "2026-06-01" }],
+    ["third monday from this monday", { kind: "single", date: "2026-06-15" }],
+    ["3rd monday from tomorrow", { kind: "single", date: "2026-06-15" }],
+    ["three mondays from last monday until jun 25", { kind: "range", start: "2026-06-08", end: "2026-06-25" }],
+    ["three mondays before last friday until jun 25", { kind: "range", start: "2026-05-04", end: "2026-06-25" }],
     ["tomorrow next month", { kind: "single", date: "2026-06-28" }],
     ["tomorrow next week", { kind: "single", date: "2026-06-04" }],
     ["tomorrow next quarter", { kind: "single", date: "2026-07-28" }],
@@ -84,6 +96,7 @@ describe("parseDate", () => {
     ["next 10 days", { kind: "range", start: "2026-05-27", end: "2026-06-05" }],
     ["future 2 weeks", { kind: "range", start: "2026-05-27", end: "2026-06-09" }],
     ["25 days from tomorrow", { kind: "range", start: "2026-05-28", end: "2026-06-22" }],
+    ["three weeks from today until aug 15", { kind: "range", start: "2026-06-17", end: "2026-08-15" }],
     ["25 days from tomorrow until the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
     ["25 days from tomorrow till the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
     ["25 days from tomorrow up to the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
@@ -91,6 +104,19 @@ describe("parseDate", () => {
     ["25 days from tomorrow to the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
     ["tomorrow until end of next month", { kind: "range", start: "2026-05-28", end: "2026-06-30" }],
     ["3rd quarter until the end of the year.", { kind: "range", start: "2026-07-01", end: "2026-12-31" }],
+    ["ninth week from today", { kind: "range", start: "2026-07-26", end: "2026-08-01" }],
+    ["9th week from today", { kind: "range", start: "2026-07-26", end: "2026-08-01" }],
+    ["ninth week from tomorrow", { kind: "range", start: "2026-07-26", end: "2026-08-01" }],
+    ["ninth week from christmas", { kind: "range", start: "2027-02-21", end: "2027-02-27" }],
+    ["ninth week from easter", { kind: "range", start: "2026-06-07", end: "2026-06-13" }],
+    ["ninth week from end of next month", { kind: "range", start: "2026-08-30", end: "2026-09-05" }],
+    ["ninth week from 6 mar, 27", { kind: "range", start: "2027-05-02", end: "2027-05-08" }],
+    ["twelfth month from today", { kind: "range", start: "2027-05-01", end: "2027-05-31" }],
+    ["twelfth month from easter next year", { kind: "range", start: "2028-03-01", end: "2028-03-31" }],
+    ["third quarter from today", { kind: "range", start: "2027-01-01", end: "2027-03-31" }],
+    ["third quarter from christmas this year", { kind: "range", start: "2027-07-01", end: "2027-09-30" }],
+    ["second year from today", { kind: "range", start: "2028-01-01", end: "2028-12-31" }],
+    ["second year from jul 1, 27", { kind: "range", start: "2029-01-01", end: "2029-12-31" }],
     ["12 weeks from 6 mar, 27", { kind: "range", start: "2027-03-06", end: "2027-05-29" }],
     ["12 weeks from 6 mar, 27 until end of q3 27", { kind: "range", start: "2027-05-29", end: "2027-09-30" }],
     ["first 10 days of next month", { kind: "range", start: "2026-06-01", end: "2026-06-10" }],
@@ -156,21 +182,26 @@ describe("parseDate", () => {
     ["the tuesday after next month's second weekend", { kind: "single", date: "2026-06-16" }],
     ["the tuesday after second weekend of next month", { kind: "single", date: "2026-06-16" }],
     ["day after tomorrow", { kind: "single", date: "2026-05-29" }],
+    ["today and tomorrow", { kind: "multiple", dates: ["2026-05-27", "2026-05-28"] }],
+    ["today & tomorrow", { kind: "multiple", dates: ["2026-05-27", "2026-05-28"] }],
+    ["tomorrow and day after tomorrow", { kind: "multiple", dates: ["2026-05-28", "2026-05-29"] }],
     ["day before yesterday", { kind: "single", date: "2026-05-25" }],
     ["3 days before christmas this year", { kind: "single", date: "2026-12-22" }],
     ["two weeks after tomorrow", { kind: "single", date: "2026-06-11" }],
     ["2 days after next weekend", { kind: "single", date: "2026-06-09" }],
     ["2 days before next weekend", { kind: "single", date: "2026-06-04" }],
+    ["the weekend before christmas", { kind: "range", start: "2026-12-19", end: "2026-12-20" }],
+    ["The weekend before Christmas.", { kind: "range", start: "2026-12-19", end: "2026-12-20" }],
+    ["the weekend after christmas", { kind: "range", start: "2026-12-26", end: "2026-12-27" }],
     ["jul 1", { kind: "single", date: "2026-07-01" }],
     ["jan 5", { kind: "single", date: "2026-01-05" }],
-    ["mar. 6, 27", { kind: "single", date: "2027-03-06" }],
+    ["aug 10-14", { kind: "range", start: "2026-08-10", end: "2026-08-14" }],
+    ["week of aug 10", { kind: "range", start: "2026-08-09", end: "2026-08-15" }],
     ["6 mar, 27", { kind: "single", date: "2027-03-06" }],
     ["06 mar, 2027", { kind: "single", date: "2027-03-06" }],
     ["6 mar 27", { kind: "single", date: "2027-03-06" }],
     ["06 mar 2027", { kind: "single", date: "2027-03-06" }],
-    ["mar 6, 27", { kind: "single", date: "2027-03-06" }],
     ["mar 06, 2027", { kind: "single", date: "2027-03-06" }],
-    ["mar 6 27", { kind: "single", date: "2027-03-06" }],
     ["mar 06 2027", { kind: "single", date: "2027-03-06" }],
     ["christmas this year", { kind: "single", date: "2026-12-25" }],
     ["easter next year", { kind: "single", date: "2027-03-28" }],
@@ -427,6 +458,70 @@ describe("parseDate", () => {
     }
   });
 
+  test.each([
+    ["all weekdays in q4"],
+    ["all weekdays from q4"],
+    ["every weekday in q4"],
+    ["weekdays in q4"],
+    ["weekdays from q4"],
+  ])("selects day-group weekdays in a quarter range: %s", (input) => {
+    const result = calchemy.parseDate(input, context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      const dates = calchemy.toJSON(result.value);
+      expect(dates.kind).toBe("multiple");
+      if (dates.kind === "multiple") {
+        expect(dates.dates[0]).toBe("2026-10-01");
+        expect(dates.dates.at(-1)).toBe("2026-12-31");
+        expect(dates.dates).toHaveLength(66);
+        expect(dates.dates.every((date) => {
+          const day = Temporal.PlainDate.from(date).dayOfWeek;
+          return day >= 1 && day <= 5;
+        })).toBe(true);
+      }
+    }
+  });
+
+  test.each([
+    ["all weekends in q4"],
+    ["all weekends from q4"],
+    ["every weekend in q4"],
+    ["weekends in q4"],
+  ])("selects day-group weekends in a quarter range: %s", (input) => {
+    const result = calchemy.parseDate(input, context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      const dates = calchemy.toJSON(result.value);
+      expect(dates.kind).toBe("multiple");
+      if (dates.kind === "multiple") {
+        expect(dates.dates[0]).toBe("2026-10-03");
+        expect(dates.dates.at(-1)).toBe("2026-12-27");
+        expect(dates.dates).toHaveLength(26);
+        expect(dates.dates.every((date) => {
+          const day = Temporal.PlainDate.from(date).dayOfWeek;
+          return day === 6 || day === 7;
+        })).toBe(true);
+      }
+    }
+  });
+
+  test("selects day-group weekdays between named month anchors", () => {
+    const result = calchemy.parseDate("all weekdays between jan and mar", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      const dates = calchemy.toJSON(result.value);
+      expect(dates.kind).toBe("multiple");
+      if (dates.kind === "multiple") {
+        expect(dates.dates[0]).toBe("2026-01-01");
+        expect(dates.dates.at(-1)).toBe("2026-03-31");
+        expect(dates.dates).toHaveLength(64);
+      }
+    }
+  });
+
   test("selects weekdays in a relative quarter range", () => {
     const result = calchemy.parseDate("all tuesdays in next quarter", context);
 
@@ -449,6 +544,82 @@ describe("parseDate", () => {
           "2026-09-22",
           "2026-09-29",
         ],
+      });
+    }
+  });
+
+  test("selects day-group weekdays in a relative month range", () => {
+    const result = calchemy.parseDate("all weekday in next month", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      const dates = calchemy.toJSON(result.value);
+      expect(dates.kind).toBe("multiple");
+      if (dates.kind === "multiple") {
+        expect(dates.dates[0]).toBe("2026-06-01");
+        expect(dates.dates.at(-1)).toBe("2026-06-30");
+        expect(dates.dates).toHaveLength(22);
+      }
+    }
+  });
+
+  test.each([
+    "monday and wednesday next month",
+    "monday and wednesday in next month",
+  ])("selects weekdays in a relative month range with or without an explicit preposition: %s", (input) => {
+    const result = calchemy.parseDate(input, context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: ["2026-06-01", "2026-06-03", "2026-06-08", "2026-06-10", "2026-06-15", "2026-06-17", "2026-06-22", "2026-06-24", "2026-06-29"],
+      });
+    }
+  });
+
+  test.each([
+    "all weekdays in q4 excluding holidays",
+    "all weekdays in q4 excl holidays",
+  ])("selects day-group weekdays in a quarter range excluding holidays: %s", (input) => {
+    const result = calchemy.parseDate(input, context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      const dates = calchemy.toJSON(result.value);
+      expect(dates.kind).toBe("multiple");
+      if (dates.kind === "multiple") {
+        expect(dates.dates).not.toContain("2026-12-25");
+        expect(dates.dates).toHaveLength(65);
+      }
+    }
+  });
+
+  test("derives holiday exclusions from isHoliday named dates", () => {
+    const holidayCalchemy = createCalchemyWithTemporal(Temporal, {
+      namedDatesVocabulary: [
+        {
+          value: "christmas",
+          aliases: ["xmas"],
+          isHoliday: true,
+          resolveDate({ year, context }) {
+            return context.referenceDate.with({ year, month: 12, day: 25 });
+          },
+        },
+      ],
+    });
+    const result = holidayCalchemy.parseDate("all weekdays in q4 excl holidays", {
+      referenceDate,
+      locale: "en-US",
+      weekStartsOn: 0,
+      dateOrderPreference: ["DMY", "MDY", "YMD"],
+    });
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(holidayCalchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: expect.not.arrayContaining(["2026-12-25"]),
       });
     }
   });
@@ -592,6 +763,239 @@ describe("parseDate", () => {
     }
   });
 
+  test.each([
+    ["every alternate week in the next quarter"],
+    ["every other week in the next quarter"],
+  ])("selects alternate weeks for a relative quarter range: %s", (input) => {
+    const result = calchemy.parseDate(input, {
+      ...context,
+      referenceDate: Temporal.PlainDate.from("2026-06-09"),
+    });
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: [
+          "2026-07-01",
+          "2026-07-02",
+          "2026-07-03",
+          "2026-07-04",
+          "2026-07-12",
+          "2026-07-13",
+          "2026-07-14",
+          "2026-07-15",
+          "2026-07-16",
+          "2026-07-17",
+          "2026-07-18",
+          "2026-07-26",
+          "2026-07-27",
+          "2026-07-28",
+          "2026-07-29",
+          "2026-07-30",
+          "2026-07-31",
+          "2026-08-01",
+          "2026-08-09",
+          "2026-08-10",
+          "2026-08-11",
+          "2026-08-12",
+          "2026-08-13",
+          "2026-08-14",
+          "2026-08-15",
+          "2026-08-23",
+          "2026-08-24",
+          "2026-08-25",
+          "2026-08-26",
+          "2026-08-27",
+          "2026-08-28",
+          "2026-08-29",
+          "2026-09-06",
+          "2026-09-07",
+          "2026-09-08",
+          "2026-09-09",
+          "2026-09-10",
+          "2026-09-11",
+          "2026-09-12",
+          "2026-09-20",
+          "2026-09-21",
+          "2026-09-22",
+          "2026-09-23",
+          "2026-09-24",
+          "2026-09-25",
+          "2026-09-26",
+        ],
+      });
+    }
+  });
+
+  test("excludes an ordinal week range from alternate week sampling", () => {
+    const result = calchemy.parseDate(
+      "Every alternate week in the next quarter, except the third week of August.",
+      {
+        ...context,
+        referenceDate: Temporal.PlainDate.from("2026-06-09"),
+      },
+    );
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: [
+          "2026-07-01",
+          "2026-07-02",
+          "2026-07-03",
+          "2026-07-04",
+          "2026-07-12",
+          "2026-07-13",
+          "2026-07-14",
+          "2026-07-15",
+          "2026-07-16",
+          "2026-07-17",
+          "2026-07-18",
+          "2026-07-26",
+          "2026-07-27",
+          "2026-07-28",
+          "2026-07-29",
+          "2026-07-30",
+          "2026-07-31",
+          "2026-08-01",
+          "2026-08-23",
+          "2026-08-24",
+          "2026-08-25",
+          "2026-08-26",
+          "2026-08-27",
+          "2026-08-28",
+          "2026-08-29",
+          "2026-09-06",
+          "2026-09-07",
+          "2026-09-08",
+          "2026-09-09",
+          "2026-09-10",
+          "2026-09-11",
+          "2026-09-12",
+          "2026-09-20",
+          "2026-09-21",
+          "2026-09-22",
+          "2026-09-23",
+          "2026-09-24",
+          "2026-09-25",
+          "2026-09-26",
+        ],
+      });
+    }
+  });
+
+  test("excludes overlapping calendar weeks from odd week sampling", () => {
+    const result = calchemy.parseDate("Every odd week in the next quarter except the third week of August.", {
+      ...context,
+      referenceDate: Temporal.PlainDate.from("2026-06-09"),
+    });
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: [
+          "2026-07-01",
+          "2026-07-02",
+          "2026-07-03",
+          "2026-07-04",
+          "2026-07-12",
+          "2026-07-13",
+          "2026-07-14",
+          "2026-07-15",
+          "2026-07-16",
+          "2026-07-17",
+          "2026-07-18",
+          "2026-07-26",
+          "2026-07-27",
+          "2026-07-28",
+          "2026-07-29",
+          "2026-07-30",
+          "2026-07-31",
+          "2026-08-01",
+          "2026-08-23",
+          "2026-08-24",
+          "2026-08-25",
+          "2026-08-26",
+          "2026-08-27",
+          "2026-08-28",
+          "2026-08-29",
+          "2026-09-06",
+          "2026-09-07",
+          "2026-09-08",
+          "2026-09-09",
+          "2026-09-10",
+          "2026-09-11",
+          "2026-09-12",
+          "2026-09-20",
+          "2026-09-21",
+          "2026-09-22",
+          "2026-09-23",
+          "2026-09-24",
+          "2026-09-25",
+          "2026-09-26",
+        ],
+      });
+    }
+  });
+
+  test("accepts parity-prefixed week sampling without an every command", () => {
+    const result = calchemy.parseDate("Odd weeks in the next quarter except the third week of August.", {
+      ...context,
+      referenceDate: Temporal.PlainDate.from("2026-06-09"),
+    });
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: [
+          "2026-07-01",
+          "2026-07-02",
+          "2026-07-03",
+          "2026-07-04",
+          "2026-07-12",
+          "2026-07-13",
+          "2026-07-14",
+          "2026-07-15",
+          "2026-07-16",
+          "2026-07-17",
+          "2026-07-18",
+          "2026-07-26",
+          "2026-07-27",
+          "2026-07-28",
+          "2026-07-29",
+          "2026-07-30",
+          "2026-07-31",
+          "2026-08-01",
+          "2026-08-23",
+          "2026-08-24",
+          "2026-08-25",
+          "2026-08-26",
+          "2026-08-27",
+          "2026-08-28",
+          "2026-08-29",
+          "2026-09-06",
+          "2026-09-07",
+          "2026-09-08",
+          "2026-09-09",
+          "2026-09-10",
+          "2026-09-11",
+          "2026-09-12",
+          "2026-09-20",
+          "2026-09-21",
+          "2026-09-22",
+          "2026-09-23",
+          "2026-09-24",
+          "2026-09-25",
+          "2026-09-26",
+        ],
+      });
+    }
+  });
+
   test("selects alternate days for multiple ordinal week ranges", () => {
     const result = calchemy.parseDate("every other day of 51st and 52nd week this year", context);
 
@@ -704,8 +1108,11 @@ describe("parseDate", () => {
     }
   });
 
-  test("parses recurring weekdays until the end of next month", () => {
-    const result = calchemy.parseDate("all mon and sat until end of next month", context);
+  test.each([
+    "all mon and sat until end of next month",
+    "all mon & sat until end of next month",
+  ])("parses recurring weekdays until the end of next month: %s", (input) => {
+    const result = calchemy.parseDate(input, context);
 
     expect(result.status).toBe("valid");
     if (result.status === "valid") {
@@ -913,8 +1320,11 @@ describe("parseDate", () => {
     }
   });
 
-  test("returns discrete dates for range subsets excluding holidays", () => {
-    const result = calchemy.parseDate("first 10 days of the next month excluding holidays", context);
+  test.each([
+    "first 10 days of the next month excluding holidays",
+    "first 10 days of the next month excl holidays",
+  ])("returns discrete dates for range subsets excluding holidays: %s", (input) => {
+    const result = calchemy.parseDate(input, context);
 
     expect(result.status).toBe("valid");
     if (result.status === "valid") {
@@ -949,6 +1359,18 @@ describe("parseDate", () => {
 
   test("returns weekdays for week ranges excluding weekends", () => {
     const result = calchemy.parseDate("52nd week next year excluding weekends", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: ["2027-12-24", "2027-12-27", "2027-12-28", "2027-12-29", "2027-12-30"],
+      });
+    }
+  });
+
+  test("returns weekdays for week ranges other than weekends", () => {
+    const result = calchemy.parseDate("52nd week next year other than weekends", context);
 
     expect(result.status).toBe("valid");
     if (result.status === "valid") {
@@ -1131,6 +1553,293 @@ describe("parseDate", () => {
           "2026-07-06",
         ],
       });
+    }
+  });
+
+  test("returns configured holidays for the reference year", () => {
+    const result = calchemy.parseDate("holidays", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: ["2026-05-18", "2026-06-06", "2026-12-25"],
+      });
+    }
+  });
+
+  test("derives standalone holidays from isHoliday named dates", () => {
+    const holidayCalchemy = createCalchemyWithTemporal(Temporal, {
+      namedDatesVocabulary: [
+        {
+          value: "christmas",
+          aliases: ["xmas"],
+          isHoliday: true,
+          resolveDate({ year, context }) {
+            return context.referenceDate.with({ year, month: 12, day: 25 });
+          },
+        },
+      ],
+    });
+    const result = holidayCalchemy.parseDate("holidays", {
+      referenceDate,
+      locale: "en-US",
+      weekStartsOn: 0,
+      dateOrderPreference: ["DMY", "MDY", "YMD"],
+    });
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(holidayCalchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: ["2026-12-25"],
+      });
+    }
+  });
+
+  test("excludes a specific month-day date with an ordinal suffix from sampled weekday groups", () => {
+    const result = calchemy.parseDate("all mondays in the next quarter except aug 10th", {
+      ...context,
+      referenceDate: Temporal.PlainDate.from("2026-06-09"),
+    });
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: [
+          "2026-07-06",
+          "2026-07-13",
+          "2026-07-20",
+          "2026-07-27",
+          "2026-08-03",
+          "2026-08-17",
+          "2026-08-24",
+          "2026-08-31",
+          "2026-09-07",
+          "2026-09-14",
+          "2026-09-21",
+          "2026-09-28",
+        ],
+      });
+    }
+  });
+
+  test("excludes a specific month-day date from sampled weekday groups", () => {
+    const result = calchemy.parseDate("all mondays in the next quarter except august 10", {
+      ...context,
+      referenceDate: Temporal.PlainDate.from("2026-06-09"),
+    });
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: [
+          "2026-07-06",
+          "2026-07-13",
+          "2026-07-20",
+          "2026-07-27",
+          "2026-08-03",
+          "2026-08-17",
+          "2026-08-24",
+          "2026-08-31",
+          "2026-09-07",
+          "2026-09-14",
+          "2026-09-21",
+          "2026-09-28",
+        ],
+      });
+    }
+  });
+
+  test("excludes multiple month-day dates from sampled weekday groups", () => {
+    const result = calchemy.parseDate("all mondays and fridays in q3 except aug 10, 14, and 17", {
+      ...context,
+      referenceDate: Temporal.PlainDate.from("2026-06-09"),
+    });
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: [
+          "2026-07-03",
+          "2026-07-06",
+          "2026-07-10",
+          "2026-07-13",
+          "2026-07-17",
+          "2026-07-20",
+          "2026-07-24",
+          "2026-07-27",
+          "2026-07-31",
+          "2026-08-03",
+          "2026-08-07",
+          "2026-08-21",
+          "2026-08-24",
+          "2026-08-28",
+          "2026-08-31",
+          "2026-09-04",
+          "2026-09-07",
+          "2026-09-11",
+          "2026-09-14",
+          "2026-09-18",
+          "2026-09-21",
+          "2026-09-25",
+          "2026-09-28",
+        ],
+      });
+    }
+  });
+
+  test("excludes sampled weekday groups parsed through the selection pipeline", () => {
+    const result = calchemy.parseDate("all mondays and fridays in the next quarter excluding mondays in August", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: [
+          "2026-07-03",
+          "2026-07-06",
+          "2026-07-10",
+          "2026-07-13",
+          "2026-07-17",
+          "2026-07-20",
+          "2026-07-24",
+          "2026-07-27",
+          "2026-07-31",
+          "2026-08-07",
+          "2026-08-14",
+          "2026-08-21",
+          "2026-08-28",
+          "2026-09-04",
+          "2026-09-07",
+          "2026-09-11",
+          "2026-09-14",
+          "2026-09-18",
+          "2026-09-21",
+          "2026-09-25",
+          "2026-09-28",
+        ],
+      });
+    }
+  });
+
+  test("excludes ordinal week ranges from sampled weekday groups", () => {
+    const result = calchemy.parseDate("All mondays in Q3 except the second and third week of august", {
+      ...context,
+      referenceDate: Temporal.PlainDate.from("2026-06-09"),
+    });
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: [
+          "2026-07-06",
+          "2026-07-13",
+          "2026-07-20",
+          "2026-07-27",
+          "2026-08-03",
+          "2026-08-24",
+          "2026-08-31",
+          "2026-09-07",
+          "2026-09-14",
+          "2026-09-21",
+          "2026-09-28",
+        ],
+      });
+    }
+  });
+
+  test("uses weekStartsOn when resolving week of date phrases", () => {
+    const result = calchemy.parseDate("week of aug 10", {
+      ...context,
+      referenceDate: Temporal.PlainDate.from("2026-06-09"),
+      weekStartsOn: 1,
+    });
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "range",
+        start: "2026-08-10",
+        end: "2026-08-16",
+      });
+    }
+  });
+
+  test("returns multiple dates for month day lists", () => {
+    const result = calchemy.parseDate("aug 10, 14, and 17", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: ["2026-08-10", "2026-08-14", "2026-08-17"],
+      });
+    }
+  });
+
+  test("returns ambiguity for month day shorthands that could be a past two-digit year", () => {
+    const result = calchemy.parseDate("apr 15", context);
+
+    expect(result.status).toBe("ambiguous");
+    if (result.status === "ambiguous") {
+      expect(result.ambiguityGroups[0]?.kind).toBe("month-day-year");
+      expect(result.candidates.map((candidate) => calchemy.toJSON(candidate.value))).toEqual([
+        { kind: "single", date: "2026-04-15" },
+        { kind: "range", start: "2015-04-01", end: "2015-04-30" },
+      ]);
+    }
+  });
+
+  test("returns ambiguity for scoped sampler ranges with a past two-digit year shorthand", () => {
+    const result = calchemy.parseDate("second tuesday from apr 15 until end of june", context);
+
+    expect(result.status).toBe("ambiguous");
+    if (result.status === "ambiguous") {
+      expect(result.ambiguityGroups[0]?.kind).toBe("month-day-year");
+      expect(result.candidates[0]?.id).toBe("nested-month-day");
+      expect(calchemy.toJSON(result.candidates[0]?.value)).toEqual({
+        kind: "range",
+        start: "2026-04-28",
+        end: "2026-06-30",
+      });
+      expect(result.candidates[1]?.id).toBe("nested-month-year");
+      expect(calchemy.toJSON(result.candidates[1]?.value)).toEqual({
+        kind: "range",
+        start: "2015-04-14",
+        end: "2026-06-30",
+      });
+    }
+  });
+
+  test("returns ambiguity for month day lists that could include a two-digit year", () => {
+    const result = calchemy.parseDate("aug 10, 14", context);
+
+    expect(result.status).toBe("ambiguous");
+    if (result.status === "ambiguous") {
+      expect(result.ambiguityGroups[0]?.kind).toBe("month-day-list");
+      expect(result.candidates.map((candidate) => calchemy.toJSON(candidate.value))).toEqual([
+        { kind: "single", date: "2014-08-10" },
+        { kind: "multiple", dates: ["2026-08-10", "2026-08-14"] },
+      ]);
+    }
+  });
+
+  test.each([
+    ["mar. 6, 27", { kind: "single", date: "2027-03-06" }, { kind: "multiple", dates: ["2026-03-06", "2026-03-27"] }],
+    ["mar 6, 27", { kind: "single", date: "2027-03-06" }, { kind: "multiple", dates: ["2026-03-06", "2026-03-27"] }],
+    ["mar 6 27", { kind: "single", date: "2027-03-06" }, { kind: "multiple", dates: ["2026-03-06", "2026-03-27"] }],
+  ])("returns ambiguity for month-first day lists with a two-digit year: %s", (input, yearValue, listValue) => {
+    const result = calchemy.parseDate(input, context);
+
+    expect(result.status).toBe("ambiguous");
+    if (result.status === "ambiguous") {
+      expect(result.ambiguityGroups[0]?.kind).toBe("month-day-list");
+      expect(result.candidates.map((candidate) => calchemy.toJSON(candidate.value))).toEqual([yearValue, listValue]);
     }
   });
 
@@ -1389,6 +2098,59 @@ describe("parseDate", () => {
       expect(calchemy.toJSON(configuredResult.value)).toEqual({ kind: "single", date: "2026-12-25" });
     }
   });
+
+  test("reports the unsupported token span for unknown words", () => {
+    const result = calchemy.parseDate("Foobar tomorrow", context);
+
+    expect(result.status).toBe("invalid");
+    if (result.status === "invalid") {
+      expect(result.errors).toEqual([
+        {
+          code: "unsupported-expression",
+          message: 'Calchemy does not understand "Foobar".',
+          token: {
+            kind: "word",
+            raw: "Foobar",
+            normalized: "foobar",
+            start: 0,
+            end: 6,
+          },
+        },
+      ]);
+    }
+  });
+
+  test("reports the unsupported token span when only part of the phrase is unknown", () => {
+    const result = calchemy.parseDate("next qzxwv", context);
+
+    expect(result.status).toBe("invalid");
+    if (result.status === "invalid") {
+      expect(result.errors[0]?.code).toBe("unsupported-expression");
+      expect(result.errors[0]?.token).toEqual({
+        kind: "word",
+        raw: "qzxwv",
+        normalized: "qzxwv",
+        start: 5,
+        end: 10,
+      });
+    }
+  });
+
+  test("reports the unsupported token span for unrecognized named dates", () => {
+    const defaultCalchemy = createCalchemyWithTemporal(Temporal);
+    const result = defaultCalchemy.parseDate("christmas", context);
+
+    expect(result.status).toBe("invalid");
+    if (result.status === "invalid") {
+      expect(result.errors[0]?.token).toEqual({
+        kind: "word",
+        raw: "christmas",
+        normalized: "christmas",
+        start: 0,
+        end: 9,
+      });
+    }
+  });
 });
 
 describe("ordinals", () => {
@@ -1489,6 +2251,11 @@ describe("inline completions", () => {
       sourceId: "user",
     });
     expect(completionCalchemy.getInlineCompletion("previous 90 days")).toBeNull();
+    expect(completionCalchemy.getInlineCompletion("previous ")).toEqual({
+      value: "previous 90 days",
+      suffix: "90 days",
+      sourceId: "user",
+    });
   });
 
   test("uses source order to pick completion matches", () => {

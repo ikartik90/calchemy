@@ -13,7 +13,6 @@ export const PeriodRecords = [
   {
     value: "day",
     aliases: ["date", "dates"],
-    shortcuts: [],
     duration: true,
     calendarRange: false,
     calendarList: false,
@@ -21,8 +20,7 @@ export const PeriodRecords = [
   },
   {
     value: "week",
-    aliases: [],
-    shortcuts: ["wk", "wks"],
+    aliases: ["wk", "wks"],
     duration: true,
     calendarRange: true,
     calendarList: true,
@@ -31,7 +29,6 @@ export const PeriodRecords = [
   {
     value: "weekdays",
     aliases: ["weekday"],
-    shortcuts: [],
     duration: true,
     calendarRange: false,
     calendarList: false,
@@ -40,7 +37,6 @@ export const PeriodRecords = [
   {
     value: "weekend",
     aliases: ["weekends"],
-    shortcuts: [],
     duration: true,
     calendarRange: false,
     calendarList: false,
@@ -49,7 +45,6 @@ export const PeriodRecords = [
   {
     value: "month",
     aliases: [],
-    shortcuts: [],
     duration: true,
     calendarRange: true,
     calendarList: true,
@@ -58,7 +53,6 @@ export const PeriodRecords = [
   {
     value: "quarter",
     aliases: [],
-    shortcuts: [],
     duration: true,
     calendarRange: true,
     calendarList: false,
@@ -66,8 +60,7 @@ export const PeriodRecords = [
   },
   {
     value: "year",
-    aliases: [],
-    shortcuts: ["yr", "yrs"],
+    aliases: ["yr", "yrs"],
     duration: true,
     calendarRange: true,
     calendarList: false,
@@ -128,37 +121,37 @@ export const CalendarListPeriodSet = new Set<Period>(CalendarListPeriodValues);
 export const DayGroupPeriodSet = new Set<Period>(DayGroupPeriodValues);
 
 export const MonthVocabularyValues: readonly MonthVocabularyEntry[] = [
-  { value: "january", shortcuts: ["jan"], month: 1 },
-  { value: "february", shortcuts: ["feb"], month: 2 },
-  { value: "march", shortcuts: ["mar"], month: 3 },
-  { value: "april", shortcuts: ["apr"], month: 4 },
-  { value: "may", shortcuts: [], month: 5 },
-  { value: "june", shortcuts: ["jun"], month: 6 },
-  { value: "july", shortcuts: ["jul"], month: 7 },
-  { value: "august", shortcuts: ["aug"], month: 8 },
-  { value: "september", shortcuts: ["sep", "sept"], month: 9 },
-  { value: "october", shortcuts: ["oct"], month: 10 },
-  { value: "november", shortcuts: ["nov"], month: 11 },
-  { value: "december", shortcuts: ["dec"], month: 12 },
+  { value: "january", aliases: ["jan"], month: 1 },
+  { value: "february", aliases: ["feb"], month: 2 },
+  { value: "march", aliases: ["mar"], month: 3 },
+  { value: "april", aliases: ["apr"], month: 4 },
+  { value: "may", aliases: [], month: 5 },
+  { value: "june", aliases: ["jun"], month: 6 },
+  { value: "july", aliases: ["jul"], month: 7 },
+  { value: "august", aliases: ["aug"], month: 8 },
+  { value: "september", aliases: ["sep", "sept"], month: 9 },
+  { value: "october", aliases: ["oct"], month: 10 },
+  { value: "november", aliases: ["nov"], month: 11 },
+  { value: "december", aliases: ["dec"], month: 12 },
 ];
 
 export const WeekdayVocabularyValues: readonly WeekdayVocabularyEntry[] = [
-  { value: "monday", shortcuts: ["mon", "mondays"], weekday: 1 },
-  { value: "tuesday", shortcuts: ["tue", "tues", "tuesdays"], weekday: 2 },
-  { value: "wednesday", shortcuts: ["wed", "wednesdays"], weekday: 3 },
+  { value: "monday", aliases: ["mon", "mondays"], weekday: 1 },
+  { value: "tuesday", aliases: ["tue", "tues", "tuesdays"], weekday: 2 },
+  { value: "wednesday", aliases: ["wed", "wednesdays"], weekday: 3 },
   {
     value: "thursday",
-    shortcuts: ["thu", "thur", "thurs", "thursdays"],
+    aliases: ["thu", "thur", "thurs", "thursdays"],
     weekday: 4,
   },
-  { value: "friday", shortcuts: ["fri", "fridays"], weekday: 5 },
-  { value: "saturday", shortcuts: ["sat", "saturdays"], weekday: 6 },
-  { value: "sunday", shortcuts: ["sun", "sundays"], weekday: 7 },
+  { value: "friday", aliases: ["fri", "fridays"], weekday: 5 },
+  { value: "saturday", aliases: ["sat", "saturdays"], weekday: 6 },
+  { value: "sunday", aliases: ["sun", "sundays"], weekday: 7 },
 ];
 
 export const RelativeVocabularyValues = [
   { value: "today" },
-  { value: "tomorrow", shortcuts: ["tmr", "tmrw"] },
+  { value: "tomorrow", aliases: ["tmr", "tmrw"] },
   { value: "yesterday" },
   { value: "now" },
 ] as const satisfies readonly RelativeVocabularyEntry[];
@@ -172,9 +165,7 @@ export const DurationUnitVocabularyValues: readonly DurationUnitVocabularyEntry[
     const plural = period.value.endsWith("s") ? period.value : `${period.value}s`;
     return [
       { value: period.value, unit: period.value },
-      ...(plural === period.value
-        ? []
-        : [{ value: plural, unit: period.value, shortcuts: period.shortcuts }]),
+      ...(plural === period.value ? [] : [{ value: plural, unit: period.value }]),
       ...period.aliases.map((alias) => ({ value: alias, unit: period.value })),
     ];
   });
@@ -381,9 +372,25 @@ export const RelativeDateValues = RelativeVocabularyValues.map(
 );
 export const RelativeDateSet = new Set<RelativeDateValue>(RelativeDateValues);
 
-export const ExclusionMarkerValues = ["except", "excluding", "skip"] as const;
+export const ExclusionMarkerRecords = [
+  { value: "except", multiToken: false },
+  { value: "excluding", multiToken: false },
+  { value: "skip", multiToken: false },
+  { value: "other than", multiToken: true },
+] as const;
+export const ExclusionMarkerValues = ExclusionMarkerRecords.map((marker) => marker.value);
 export type ExclusionMarker = (typeof ExclusionMarkerValues)[number];
-export const ExclusionWords = [...ExclusionMarkerValues, "holidays"] as const;
+export const ExclusionMarkerAliasEntries = [["excl", "excluding"]] as const;
+export const ExclusionMarkerAliasValues = ExclusionMarkerAliasEntries.map(([alias]) => alias);
+export const MultiTokenExclusionMarkerValues = ExclusionMarkerRecords.filter((marker) => marker.multiToken).map(
+  (marker) => marker.value,
+);
+export const ExclusionWords = [
+  ...ExclusionMarkerValues,
+  ...ExclusionMarkerAliasValues,
+  ...MultiTokenExclusionMarkerValues.flatMap((marker) => marker.split(" ")),
+  "holidays",
+] as const;
 
 export const SamplerCommandRecords = [
   { value: "all", chunk: true },

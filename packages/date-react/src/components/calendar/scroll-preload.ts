@@ -30,7 +30,7 @@ export function getScrollAnchorPeriod(
   direction: CalendarScrollDirection,
 ): HTMLElement | null {
   const scrollRect = scrollElement.getBoundingClientRect();
-  const periods = Array.from(scrollElement.querySelectorAll<HTMLElement>("[data-calchemy-period]"));
+  const periods = Array.from(scrollElement.querySelectorAll<HTMLElement>("[calchemy-period]"));
   let fallback: HTMLElement | null = null;
 
   for (const period of periods) {
@@ -61,7 +61,7 @@ export function getCalendarPeriodWindowSize(
   direction: CalendarScrollDirection,
   periodCount: number,
 ): number {
-  const periods = Array.from(scrollElement.querySelectorAll<HTMLElement>("[data-calchemy-period]"));
+  const periods = Array.from(scrollElement.querySelectorAll<HTMLElement>("[calchemy-period]"));
   const firstPeriod = periods[0];
   const nextPeriod = periods[1];
   const fallback = direction === "horizontal" ? scrollElement.clientWidth : scrollElement.clientHeight;
@@ -89,7 +89,9 @@ export function getLoadedPeriodRunway(
   anchor: HTMLElement | null,
   direction: "before" | "after",
 ): number | null {
-  const anchorIndex = anchor?.dataset.periodIndex ? Number(anchor.dataset.periodIndex) : NaN;
+  const anchorIndex = anchor?.getAttribute("calchemy-period-index")
+    ? Number(anchor.getAttribute("calchemy-period-index"))
+    : NaN;
   const firstIndex = calendar.periods[0]?.index;
   const lastIndex = calendar.periods.at(-1)?.index;
 

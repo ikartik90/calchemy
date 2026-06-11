@@ -1,10 +1,17 @@
+import { findUnsupportedExpressionToken } from "./diagnostics";
 import { normalizeInput } from "./normalize";
 import { resolveDateSlice } from "./resolve";
-import { sliceDateExpression } from "./slice";
+import { sliceDateExpression, type DateSlice } from "./slice";
 import { standardizeChunks, type StandardChunk } from "./chunks";
+import {
+  findNestedPastMonthDayYear,
+  parseMonthDayListResult,
+  parseMonthDayYearResult,
+} from "./primitives/month-day-list";
 import { parseNumericCandidates } from "./primitives/numeric-date";
 import { createCandidate, labelDateValue } from "./primitives/shared";
 import { createDateVocabulary, createDateVocabularyLookups, type DateVocabularyLookups } from "./vocabulary";
+import { resolveHolidayProvider } from "../holidays";
 import type { PlainDate, TemporalApi } from "../temporal/types";
 import type {
   AmbiguousParseDateResult,
@@ -50,7 +57,7 @@ export function parseDateWithTemporal(
     };
   }
 
-  const resolved = resolveContext(context, Temporal);
+  const resolved = resolveContext(context, Temporal, vocabulary.namedDates ?? []);
   const anchorDate = resolved.referenceDate;
   const numericCandidates = parseNumericCandidates(normalized.normalized, resolved, Temporal, source);
 
@@ -87,6 +94,32 @@ export function parseDateWithTemporal(
     };
   }
 
+  const monthDayListResult = parseMonthDayListResult(
+    input,
+    chunks,
+    resolved,
+    Temporal,
+    lookups,
+    source,
+    normalized.corrections,
+  );
+  if (monthDayListResult) {
+    return monthDayListResult;
+  }
+
+  const monthDayYearResult = parseMonthDayYearResult(
+    input,
+    chunks,
+    resolved,
+    Temporal,
+    lookups,
+    source,
+    normalized.corrections,
+  );
+  if (monthDayYearResult) {
+    return monthDayYearResult;
+  }
+
   const ambiguousKnownExpression = parseKnownExpressionAmbiguity(
     input,
     normalized.normalized,
@@ -100,24 +133,42 @@ export function parseDateWithTemporal(
     return ambiguousKnownExpression;
   }
 
-  const value = parseKnownExpression(normalized.normalized, anchorDate, resolved, Temporal, lookups, chunks);
+  const parsed = parseKnownExpression(normalized.normalized, anchorDate, resolved, Temporal, lookups, chunks);
 
-  if (!value) {
+  if (!parsed.value) {
+    const token = findUnsupportedExpressionToken(
+      chunks,
+      parsed.slice,
+      input,
+      anchorDate,
+      Temporal,
+      resolved,
+      lookups,
+    );
+
     return {
       status: "invalid",
       input,
-      errors: [{ code: "unsupported-expression", message: "Calchemy does not understand this date phrase yet." }],
+      errors: [
+        {
+          code: "unsupported-expression",
+          message: token
+            ? `Calchemy does not understand "${token.raw}".`
+            : "Calchemy does not understand this date phrase yet.",
+          ...(token ? { token } : {}),
+        },
+      ],
       corrections: normalized.corrections,
       warnings: [],
     };
   }
 
-  const candidate = createCandidate("best", value, 1, labelDateValue(value), source);
+  const candidate = createCandidate("best", parsed.value, 1, labelDateValue(parsed.value), source);
 
   return {
     status: "valid",
     input,
-    value,
+    value: parsed.value,
     candidates: [candidate],
     corrections: normalized.corrections,
     warnings: [],
@@ -125,18 +176,24 @@ export function parseDateWithTemporal(
 }
 
 // Example: `resolveContext({}, Temporal)` fills parser defaults around the current reference date.
-function resolveContext(context: ParseDateContext, Temporal: TemporalApi): ResolvedParseDateContext {
+function resolveContext(
+  context: ParseDateContext,
+  Temporal: TemporalApi,
+  namedDates: readonly NamedDatesVocabularyEntry[] = [],
+): ResolvedParseDateContext {
   const referenceDate =
     context.referenceDate ?? Temporal.Now.plainDateISO(context.timeZone);
 
-  return {
+  const baseContext = {
     referenceDate,
     locale: context.locale ?? "en-US",
     weekStartsOn: context.weekStartsOn ?? 0,
     dateOrderPreference: normalizeDateOrderPreference(context.dateOrderPreference),
     lastNDaysIncludesToday: context.lastNDaysIncludesToday ?? true,
-    ...(context.holidays ? { holidays: context.holidays } : {}),
   };
+  const holidays = resolveHolidayProvider(namedDates, baseContext);
+
+  return holidays ? { ...baseContext, holidays } : baseContext;
 }
 
 // Example: `normalizeDateOrderPreference(["MDY", "MDY"])` returns a de-duplicated preference list.
@@ -156,13 +213,32 @@ function parseKnownExpression(
   Temporal: TemporalApi,
   lookups: DateVocabularyLookups,
   chunks: readonly StandardChunk[] = [],
-): DateValue | null {
+): { value: DateValue | null; slice: DateSlice } {
   const slice = sliceDateExpression(input, chunks, lookups);
-  return resolveDateSlice(slice, anchorDate, Temporal, context, lookups);
+  return {
+    slice,
+    value: resolveDateSlice(slice, anchorDate, Temporal, context, lookups),
+  };
 }
 
 // Example: `parseKnownExpressionAmbiguity("every monday until 3/4/27", ...)` returns date-order candidates for the whole phrase.
 function parseKnownExpressionAmbiguity(
+  input: string,
+  normalizedInput: string,
+  anchorDate: PlainDate,
+  context: ResolvedParseDateContext,
+  Temporal: TemporalApi,
+  lookups: DateVocabularyLookups,
+  source: Candidate["source"],
+): AmbiguousParseDateResult | null {
+  return (
+    parseNestedNumericAmbiguity(input, normalizedInput, anchorDate, context, Temporal, lookups, source) ??
+    parseNestedMonthDayYearAmbiguity(input, normalizedInput, anchorDate, context, Temporal, lookups, source)
+  );
+}
+
+// Example: `parseNestedNumericAmbiguity("every monday until 3/4/27", ...)` returns date-order candidates.
+function parseNestedNumericAmbiguity(
   input: string,
   normalizedInput: string,
   anchorDate: PlainDate,
@@ -194,15 +270,15 @@ function parseKnownExpressionAmbiguity(
     );
     const normalized = normalizeInput(interpretedInput, lookups);
     const chunks = standardizeChunks(normalized.tokens, lookups);
-    const value = parseKnownExpression(normalized.normalized, anchorDate, context, Temporal, lookups, chunks);
+    const parsed = parseKnownExpression(normalized.normalized, anchorDate, context, Temporal, lookups, chunks);
 
-    return value
+    return parsed.value
       ? [
           createCandidate(
             `nested-${numericCandidate.id}`,
-            value,
+            parsed.value,
             numericCandidate.confidence,
-            labelDateValue(value),
+            labelDateValue(parsed.value),
             source,
             numericCandidate.explanation,
           ),
@@ -226,6 +302,78 @@ function parseKnownExpressionAmbiguity(
         options: candidates.map((candidate) => ({
           id: candidate.id,
           label: candidate.explanation ?? candidate.label,
+          candidateIds: [candidate.id],
+        })),
+      },
+    ],
+    corrections: source.corrections,
+    warnings: [],
+  };
+}
+
+// Example: `parseNestedMonthDayYearAmbiguity("second tuesday from april 15 until june", ...)` returns day-vs-year candidates.
+function parseNestedMonthDayYearAmbiguity(
+  input: string,
+  normalizedInput: string,
+  anchorDate: PlainDate,
+  context: ResolvedParseDateContext,
+  Temporal: TemporalApi,
+  lookups: DateVocabularyLookups,
+  source: Candidate["source"],
+): AmbiguousParseDateResult | null {
+  const nested = findNestedPastMonthDayYear(normalizedInput, lookups, anchorDate.year);
+  if (!nested) {
+    return null;
+  }
+
+  const interpretations = [
+    {
+      id: "nested-month-day",
+      replacement: `${nested.monthName} ${nested.day} ${anchorDate.year}`,
+      confidence: 0.95,
+    },
+    {
+      id: "nested-month-year",
+      replacement: `${nested.monthName} ${nested.expandedYear}`,
+      confidence: 0.85,
+    },
+  ];
+
+  const candidates = interpretations.flatMap((interpretation) => {
+    const interpretedInput = replaceRange(normalizedInput, nested.start, nested.end, interpretation.replacement);
+    const normalized = normalizeInput(interpretedInput, lookups);
+    const chunks = standardizeChunks(normalized.tokens, lookups);
+    const parsed = parseKnownExpression(normalized.normalized, anchorDate, context, Temporal, lookups, chunks);
+
+    return parsed.value
+      ? [
+          createCandidate(
+            interpretation.id,
+            parsed.value,
+            interpretation.confidence,
+            labelDateValue(parsed.value),
+            source,
+          ),
+        ]
+      : [];
+  });
+
+  if (candidates.length <= 1) {
+    return null;
+  }
+
+  return {
+    status: "ambiguous",
+    input,
+    candidates,
+    ambiguityGroups: [
+      {
+        id: "month-day-year",
+        kind: "month-day-year",
+        message: "Did you mean a calendar day or a month and year?",
+        options: candidates.map((candidate) => ({
+          id: candidate.id,
+          label: candidate.label,
           candidateIds: [candidate.id],
         })),
       },

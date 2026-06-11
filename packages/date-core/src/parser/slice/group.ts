@@ -3,14 +3,16 @@ import {
   parseBoundary,
   parseBoundaryEndpoint as parseTypedBoundaryEndpoint,
   parseBoundaryRelationReference,
+  parseOrdinalUnitFromAnchorBoundary,
+  parseOrdinalWeekdayFromAnchorBoundary,
   rangeBoundary,
   relativeMonthBoundary,
 } from "./boundary";
 import { sliceSampler } from "./sampler";
+import { parseDayGroup } from "../primitives/periods";
 import { parseAmount, parseOrdinal } from "../primitives/numbers";
-import { parsePeriod } from "../primitives/periods";
 import {
-  DayGroupPeriodSet,
+  AlternatingSamplerCommandSet,
   BackwardRelativeModifierSet,
   MultiTokenSamplerCommandValues,
   RelativeModifierSet,
@@ -29,6 +31,7 @@ import type {
   RelationSlice,
   TransformSlice,
 } from "./types";
+import { parseMonthDayListExpression, parseMonthDayRangeExpression } from "../primitives/month-day-list";
 import type { StandardChunk } from "../chunks";
 import type { DateVocabularyLookups } from "../vocabulary";
 
@@ -49,6 +52,16 @@ export function sliceDateExpression(
   const relation = sliceWeekdayRelation(expressionChunks, exclusions, transforms, lookups);
   if (relation) {
     return relation;
+  }
+
+  const dayGroupRelation = sliceDayGroupRelation(expressionChunks, exclusions, transforms, lookups);
+  if (dayGroupRelation) {
+    return dayGroupRelation;
+  }
+
+  const ordinalUnitFromAnchor = sliceOrdinalUnitFromAnchor(expressionChunks, exclusions, transforms, lookups);
+  if (ordinalUnitFromAnchor) {
+    return ordinalUnitFromAnchor;
   }
 
   const until = sliceUntilSampler(expressionChunks, exclusions, transforms, lookups);
@@ -114,6 +127,37 @@ function sliceWeekdayBetween(
   );
 }
 
+// Example: `sliceOrdinalUnitFromAnchor(chunksFor("ninth week from christmas"), [], [], lookups)` offsets an ordinal calendar unit from any anchor.
+function sliceOrdinalUnitFromAnchor(
+  chunks: readonly StandardChunk[],
+  exclusions: readonly ExclusionSlice[],
+  transforms: readonly TransformSlice[],
+  lookups: DateVocabularyLookups,
+): DateSlice | null {
+  if (findUpperBoundConnector(chunks)) {
+    return null;
+  }
+
+  const fromIndex = findConnectorIndex(chunks, "from");
+  if (fromIndex <= 0 || fromIndex >= chunks.length - 1) {
+    return null;
+  }
+
+  const leftText = chunkText(trimLeadingArticle(chunks.slice(0, fromIndex)));
+  const anchorText = chunkText(chunks.slice(fromIndex + 1));
+  if (!leftText || !anchorText) {
+    return null;
+  }
+
+  const combined = `${leftText} from ${anchorText}`;
+  const boundary =
+    parseOrdinalUnitFromAnchorBoundary(combined, lookups) ??
+    parseOrdinalWeekdayFromAnchorBoundary(combined, lookups);
+  return boundary?.kind === "ordinal-unit-from-anchor" || boundary?.kind === "ordinal-weekday-from-anchor"
+    ? createSlice(boundary, exclusions, null, null, transforms)
+    : null;
+}
+
 // Example: `sliceScopedSampler(chunksFor("tuesdays of next month"), [], [], lookups)` scopes a sampler to a boundary.
 function sliceScopedSampler(
   chunks: readonly StandardChunk[],
@@ -121,21 +165,79 @@ function sliceScopedSampler(
   transforms: readonly TransformSlice[],
   lookups: DateVocabularyLookups,
 ): DateSlice | null {
-  const connectorIndex = chunks.findIndex(
-    (chunk) =>
-      chunk.kind === "connector" &&
-      (chunk.value === "for" || chunk.value === "during" || chunk.value === "in" || chunk.value === "from" || chunk.value === "of"),
-  );
-  if (connectorIndex <= 0 || connectorIndex >= chunks.length - 1) {
-    return null;
+  const connectorIndex = findScopedSamplerConnectorIndex(chunks);
+  if (connectorIndex > 0 && connectorIndex < chunks.length - 1) {
+    const sampler = parseSamplerFromChunks(chunks.slice(0, connectorIndex), lookups);
+    if (sampler) {
+      const connector = chunks[connectorIndex];
+      if (
+        !(
+          connector?.kind === "connector" &&
+          connector.value === "of" &&
+          connectorIndex === 1 &&
+          chunks[0] &&
+          (chunks[0].kind === "duration-unit" || chunks[0].kind === "period") &&
+          chunks[0].value === "week"
+        )
+      ) {
+        return createSlice(
+          parseBoundary(chunkText(trimLeadingArticle(chunks.slice(connectorIndex + 1))), lookups),
+          exclusions,
+          sampler,
+          null,
+          transforms,
+        );
+      }
+    }
   }
 
-  const sampler = parseSamplerFromChunks(chunks.slice(0, connectorIndex), lookups);
-  if (!sampler) {
-    return null;
+  return sliceImplicitScopedSampler(chunks, exclusions, transforms, lookups);
+}
+
+// Example: `sliceImplicitScopedSampler(chunksFor("monday and wednesday next month"), [], [], lookups)` scopes weekdays without an explicit preposition.
+function sliceImplicitScopedSampler(
+  chunks: readonly StandardChunk[],
+  exclusions: readonly ExclusionSlice[],
+  transforms: readonly TransformSlice[],
+  lookups: DateVocabularyLookups,
+): DateSlice | null {
+  for (let split = chunks.length - 1; split >= 1; split -= 1) {
+    const sampler = parseSamplerFromChunks(chunks.slice(0, split), lookups);
+    if (!sampler) {
+      continue;
+    }
+
+    const boundaryChunks = trimLeadingArticle(chunks.slice(split));
+    if (boundaryChunks.length === 0) {
+      continue;
+    }
+
+    const boundary = parseBoundary(chunkText(boundaryChunks), lookups);
+    if (!isImplicitScopedSamplerBoundary(boundary)) {
+      continue;
+    }
+
+    return createSlice(boundary, exclusions, sampler, null, transforms);
   }
 
-  return createSlice(parseBoundary(chunkText(trimLeadingArticle(chunks.slice(connectorIndex + 1))), lookups), exclusions, sampler, null, transforms);
+  return null;
+}
+
+// Example: `isImplicitScopedSamplerBoundary({ kind: "relative", ... })` accepts calendar scopes such as `next month`.
+function isImplicitScopedSamplerBoundary(boundary: BoundarySlice): boolean {
+  switch (boundary.kind) {
+    case "atom":
+    case "shifted-anchor":
+    case "duration-from-anchor":
+    case "duration-near-boundary":
+    case "ordinal-unit-from-anchor":
+    case "ordinal-weekday-from-anchor":
+    case "date-list":
+    case "boundary-side":
+      return false;
+    default:
+      return true;
+  }
 }
 
 // Example: `sliceUntilSampler(chunksFor("all mon until end of next month"), [], [], lookups)` builds an anchor-until range.
@@ -172,7 +274,9 @@ function sliceUpperBoundRange(
   }
 
   const startChunks = trimCommandAndArticle(chunks.slice(0, upperBound.index));
-  const start = parseTypedBoundaryEndpoint(chunkText(startChunks), lookups, boundarySideFromChunks(startChunks) ?? "end");
+  const start = parseTypedBoundaryEndpoint(chunkText(startChunks), lookups, boundarySideFromChunks(startChunks) ?? "end", {
+    preferDay: true,
+  });
   const end = parseBoundaryEndpoint(chunks.slice(upperBound.index + upperBound.width), lookups);
   return start && end ? createSlice({ kind: "range", start, end }, exclusions, null, null, transforms) : null;
 }
@@ -200,7 +304,12 @@ function sliceScopedSamplerUpperBound(
     return null;
   }
 
-  const start = parseTypedBoundaryEndpoint(chunkText(trimLeadingArticle(leftChunks.slice(scopeIndex + 1))), lookups, "start");
+  const start = parseTypedBoundaryEndpoint(
+    chunkText(trimLeadingArticle(leftChunks.slice(scopeIndex + 1))),
+    lookups,
+    "start",
+    { preferDay: true },
+  );
   const end = parseBoundaryEndpoint(chunks.slice(upperBound.index + upperBound.width), lookups);
   return start && end ? createSlice({ kind: "range", start, end }, exclusions, sampler, null, transforms) : null;
 }
@@ -212,7 +321,26 @@ function sliceWeekdayRelation(
   transforms: readonly TransformSlice[],
   lookups: DateVocabularyLookups,
 ): DateSlice | null {
+  if (findUpperBoundConnector(chunks)) {
+    return null;
+  }
+
   const parsed = parseWeekdayRelation(chunks, lookups);
+  return parsed ? createSlice(parsed.boundary, exclusions, null, parsed.relation, transforms) : null;
+}
+
+// Example: `sliceDayGroupRelation(chunksFor("weekend before christmas"), [], [], lookups)` builds day-group relation intent.
+function sliceDayGroupRelation(
+  chunks: readonly StandardChunk[],
+  exclusions: readonly ExclusionSlice[],
+  transforms: readonly TransformSlice[],
+  lookups: DateVocabularyLookups,
+): DateSlice | null {
+  if (findUpperBoundConnector(chunks)) {
+    return null;
+  }
+
+  const parsed = parseDayGroupRelation(chunks, lookups);
   return parsed ? createSlice(parsed.boundary, exclusions, null, parsed.relation, transforms) : null;
 }
 
@@ -257,12 +385,21 @@ function parseBoundaryEndpoint(chunks: readonly StandardChunk[], lookups: DateVo
     return { kind: "relation", boundary: relation.boundary, relation: relation.relation };
   }
 
+  const dayGroupRelation = parseDayGroupRelation(chunks, lookups);
+  if (dayGroupRelation) {
+    return {
+      kind: "relation",
+      boundary: dayGroupRelation.boundary,
+      relation: dayGroupRelation.relation,
+    };
+  }
+
   const endOf = parseEndOfBoundary(chunks);
   if (endOf) {
     return parseTypedBoundaryEndpoint(chunkText(endOf), lookups, "end");
   }
 
-  return parseTypedBoundaryEndpoint(chunkText(trimLeadingArticle(chunks)), lookups, "end");
+  return parseTypedBoundaryEndpoint(chunkText(trimLeadingArticle(chunks)), lookups, "end", { preferDay: true });
 }
 
 // Example: `boundarySideFromChunks(chunksFor("q3"))` returns `start`.
@@ -313,6 +450,60 @@ function parseWeekdayRelation(chunks: readonly StandardChunk[], lookups: DateVoc
   };
 }
 
+// Example: `parseDayGroupRelation(chunksFor("weekend before christmas"), lookups)` returns boundary plus day-group relation.
+function parseDayGroupRelation(
+  chunks: readonly StandardChunk[],
+  lookups: DateVocabularyLookups,
+): { boundary: BoundarySlice; relation: RelationSlice } | null {
+  const relationIndex = chunks.findIndex(
+    (chunk) =>
+      chunk.kind === "connector" &&
+      (chunk.value === "after" || chunk.value === "before" || chunk.value === "following" || chunk.value === "preceding"),
+  );
+  if (relationIndex <= 0 || relationIndex >= chunks.length - 1) {
+    return null;
+  }
+
+  const selectorChunks = trimCommandAndArticle(chunks.slice(0, relationIndex));
+  const groupIndex = findLastChunkIndex(
+    selectorChunks,
+    (chunk) =>
+      (chunk.kind === "duration-unit" || chunk.kind === "period") &&
+      parseDayGroup(chunk.token.normalized) !== null,
+  );
+  if (groupIndex < 0) {
+    return null;
+  }
+
+  const groupChunk = selectorChunks[groupIndex];
+  const group =
+    groupChunk && (groupChunk.kind === "duration-unit" || groupChunk.kind === "period")
+      ? parseDayGroup(groupChunk.token.normalized)
+      : null;
+  if (!group) {
+    return null;
+  }
+
+  const ordinalInput = chunkText(selectorChunks.slice(0, groupIndex));
+  const ordinal = ordinalInput ? parseOrdinal(ordinalInput) : 1;
+  if (!ordinal) {
+    return null;
+  }
+
+  const referenceChunks = trimLeadingArticle(chunks.slice(relationIndex + 1));
+  const reference = parseEndOfBoundary(referenceChunks) ?? referenceChunks;
+
+  return {
+    boundary: parseBoundary(chunkText(reference), lookups),
+    relation: {
+      kind: "day-group-near-boundary",
+      direction: (chunks[relationIndex] as Extract<StandardChunk, { kind: "connector" }>).value as RelationDirection,
+      ordinal,
+      group,
+    },
+  };
+}
+
 // Example: `splitExclusionsFromChunks(chunksFor("next month excluding weekends"), lookups)` separates exclusions.
 function splitExclusionsFromChunks(chunks: readonly StandardChunk[], lookups: DateVocabularyLookups): {
   baseChunks: readonly StandardChunk[];
@@ -329,35 +520,28 @@ function splitExclusionsFromChunks(chunks: readonly StandardChunk[], lookups: Da
   };
 }
 
-// Example: `parseExclusionsFromChunks(chunksFor("weekends and holidays"), lookups)` returns typed exclusions.
+// Example: `parseExclusionsFromChunks(chunksFor("weekends and holidays"), lookups)` slices each exclusion through the main expression pipeline.
 function parseExclusionsFromChunks(chunks: readonly StandardChunk[], lookups: DateVocabularyLookups): ExclusionSlice[] {
+  if (parseMonthDayListExpression(chunks, lookups) || parseMonthDayRangeExpression(chunks, lookups)) {
+    return [sliceDateExpression(chunkText(chunks), chunks, lookups)];
+  }
+
+  const whole = sliceDateExpression(chunkText(chunks), chunks, lookups);
+  if (shouldKeepExclusionWhole(whole)) {
+    return [whole];
+  }
+
   const parts = splitListChunks(chunks);
-  return parts.map((part) => parseExclusionFromChunks(part, lookups));
+  if (parts.length <= 1) {
+    return [whole];
+  }
+
+  return parts.map((part) => sliceDateExpression(chunkText(part), part, lookups));
 }
 
-// Example: `parseExclusionFromChunks(chunksFor("2027"), lookups)` returns a year exclusion.
-function parseExclusionFromChunks(chunks: readonly StandardChunk[], lookups: DateVocabularyLookups): ExclusionSlice {
-  const input = chunkText(chunks);
-  if (input === "holidays") {
-    return { kind: "holidays" };
-  }
-
-  const dayGroup = parsePeriod(input);
-  if (dayGroup && DayGroupPeriodSet.has(dayGroup)) {
-    return { kind: dayGroup === "weekend" ? "weekends" : "weekdays" };
-  }
-
-  const monthValues = chunks.map((chunk) => (chunk.kind === "month" ? chunk.value : undefined));
-  if (monthValues.length > 0 && monthValues.every((value) => value !== undefined)) {
-    return { kind: "months", months: Array.from(new Set(monthValues as number[])) };
-  }
-
-  const yearValues = chunks.map((chunk) => (/^\d{4}$/.test(chunk.token.normalized) ? Number(chunk.token.normalized) : undefined));
-  if (yearValues.length > 0 && yearValues.every((value) => value !== undefined)) {
-    return { kind: "years", years: Array.from(new Set(yearValues as number[])) };
-  }
-
-  return { kind: "boundary", boundary: parseBoundary(input, lookups) };
+// Example: `shouldKeepExclusionWhole({ boundary: { kind: "ordinal-calendar-unit" } })` keeps ordinal week spans intact.
+function shouldKeepExclusionWhole(slice: DateSlice): boolean {
+  return slice.boundary.kind !== "atom" || slice.sampler !== null || slice.relation !== null;
 }
 
 // Example: `splitListChunks(chunksFor("weekends and holidays"))` splits list items around connectors.
@@ -433,17 +617,29 @@ function splitSamplerCommand(chunks: readonly StandardChunk[]): {
   command: SamplerCommand;
   samplerChunks: readonly StandardChunk[];
 } {
-  const first = chunks[0];
+  let trimmed = trimLeadingArticle(chunks);
+  if (
+    trimmed[0]?.kind === "command" &&
+    trimmed[0].value === "every" &&
+    trimmed[1]?.kind === "command" &&
+    AlternatingSamplerCommandSet.has(trimmed[1].value)
+  ) {
+    trimmed = trimmed.slice(1);
+  }
+
+  const first = trimmed[0];
   if (first?.kind !== "command") {
-    return { command: undefined, samplerChunks: chunks };
+    return { command: undefined, samplerChunks: trimmed };
   }
 
-  const multiTokenCommand = MultiTokenSamplerCommandValues.find((command) => command === `${first.value} ${chunks[1]?.token.normalized}`);
+  const multiTokenCommand = MultiTokenSamplerCommandValues.find(
+    (command) => command === `${first.value} ${trimmed[1]?.token.normalized}`,
+  );
   if (multiTokenCommand) {
-    return { command: multiTokenCommand, samplerChunks: trimCommandAndArticle(chunks.slice(2)) };
+    return { command: multiTokenCommand, samplerChunks: trimCommandAndArticle(trimmed.slice(2)) };
   }
 
-  return { command: first.value, samplerChunks: trimCommandAndArticle(chunks.slice(1)) };
+  return { command: first.value, samplerChunks: trimCommandAndArticle(trimmed.slice(1)) };
 }
 
 // Example: `parseEndOfBoundary(chunksFor("end of next month"))` returns chunks for `next month`.

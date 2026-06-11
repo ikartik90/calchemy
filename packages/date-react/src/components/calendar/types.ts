@@ -9,6 +9,7 @@ import type { CalchemyState } from "../../hooks/useCalchemy";
 export type CalendarPeriodUnit = "month" | "week";
 export type CalendarScrollDirection = "horizontal" | "vertical";
 export type CalendarDuration = { months: number } | { weeks: number };
+export type CalendarWeekdayFormat = "long" | "short" | "narrow";
 export type CalendarBounds = {
   start?: PlainDate;
   end?: PlainDate;
@@ -42,6 +43,7 @@ export type CalendarState = {
   locale: string;
   bounds: CalendarBounds | undefined;
   namedDates: CalendarNamedDates | undefined;
+  editable: boolean;
   isDateDisabled: ((date: PlainDate, calendar: CalendarState) => boolean) | undefined;
   setPeriodAnchor(date: PlainDate): void;
   setVisiblePeriodIndex(index: number): void;

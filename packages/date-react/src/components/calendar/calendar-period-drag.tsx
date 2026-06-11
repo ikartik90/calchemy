@@ -30,6 +30,7 @@ type DragState = {
   baseDates: PlainDate[];
   previewKeys: string[];
   hasMoved: boolean;
+  startDayCell: DayCell | null;
   cellBounds: ReadonlyMap<string, CellBounds>;
 };
 
@@ -162,7 +163,7 @@ export function useCalendarPeriodDragSurface(
       return null;
     }
 
-    const button = target.closest("[data-calchemy-day]");
+    const button = target.closest("[calchemy-day]");
     if (!(button instanceof HTMLButtonElement)) {
       return null;
     }
@@ -249,6 +250,7 @@ export function useCalendarPeriodDragSurface(
         baseDates,
         previewKeys: baseDates.map((selectedDate) => selectedDate.toString()),
         hasMoved: false,
+        startDayCell: getDayCellFromTarget(event.target),
         cellBounds: snapshotCellBounds(dayCells.current),
       };
       dragStateRef.current = nextDragState;
@@ -258,7 +260,7 @@ export function useCalendarPeriodDragSurface(
         current: nextDragState.current,
       });
     },
-    [acquireDragGestureLock, calendar.selected, multipleSelection],
+    [acquireDragGestureLock, calendar.selected, getDayCellFromTarget, multipleSelection],
   );
 
   const handlePointerUp = useCallback(
@@ -276,14 +278,15 @@ export function useCalendarPeriodDragSurface(
 
       event.preventDefault();
 
+      suppressClickRef.current = true;
+      setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 0);
+
       if (activeDrag.hasMoved) {
-        suppressClickRef.current = true;
-        setTimeout(() => {
-          suppressClickRef.current = false;
-        }, 0);
         commitMultipleSelection(activeDrag.previewKeys, activeDrag.baseDates);
       } else {
-        const dayCell = getDayCellFromTarget(event.target);
+        const dayCell = activeDrag.startDayCell;
         if (dayCell && !dayCell.disabled) {
           const selectedDates = getMultipleDates(calendar.selected);
           const nextKeys = toggleDateKeys(
@@ -378,7 +381,7 @@ export function CalendarDragRectangleOverlay({
   return (
     <div
       aria-hidden="true"
-      data-calchemy-drag-rect=""
+      calchemy-drag-rect=""
       style={{
         position: "absolute",
         left,

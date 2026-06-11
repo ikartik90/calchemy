@@ -1,6 +1,6 @@
 import { useContext } from "react";
 import type { ComponentPropsWithoutRef } from "react";
-import { CalendarPeriodContext } from "./context";
+import { CalendarPeriodContext, useCalchemyCalendar } from "./context";
 import {
   CalendarDragRectangleOverlay,
   CalendarPeriodDragProvider,
@@ -24,7 +24,8 @@ export function CalendarPeriod({
   ...props
 }: CalchemyCalendarPeriodProps) {
   const period = useContext(CalendarPeriodContext);
-  const drag = useCalendarPeriodDragSurface(dragSelection);
+  const calendar = useCalchemyCalendar();
+  const drag = useCalendarPeriodDragSurface(calendar.editable && dragSelection);
 
   const content = drag ? (
     <CalendarPeriodDragProvider value={drag}>
@@ -38,11 +39,11 @@ export function CalendarPeriod({
   return (
     <section
       {...props}
-      data-calchemy-period=""
-      data-period-id={period?.id}
-      data-period-index={period?.index}
-      data-multiple-drag={drag ? "" : undefined}
-      data-dragging={drag?.dragState ? "" : undefined}
+      calchemy-period=""
+      calchemy-period-id={period?.id}
+      calchemy-period-index={period?.index}
+      calchemy-multiple-drag={drag ? "" : undefined}
+      calchemy-dragging={drag?.dragState ? "" : undefined}
       style={drag ? { ...multipleDragSurfaceStyle, ...style } : style}
       onPointerDownCapture={
         drag
