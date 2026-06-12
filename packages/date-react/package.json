@@ -1,6 +1,6 @@
 {
   "name": "@calchemy/date-react",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "description": "Headless React primitives for Calchemy date input.",
   "license": "MIT",
