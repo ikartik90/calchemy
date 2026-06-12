@@ -18,16 +18,18 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     },
     "./calendar-scroll": {
       "types": "./dist/calendar-scroll.d.ts",
-      "import": "./dist/calendar-scroll.js"
+      "import": "./dist/calendar-scroll.js",
+      "require": "./dist/calendar-scroll.cjs"
     }
   },
   "files": ["dist"],
   "scripts": {
-    "build": "tsup src/index.ts src/calendar-scroll.ts --format esm --sourcemap --tsconfig tsconfig.build.json --external react --external react-dom --external react/jsx-runtime --external @calchemy/date-core && tsc -p tsconfig.build.json --emitDeclarationOnly",
+    "build": "tsup src/index.ts src/calendar-scroll.ts --format esm,cjs --sourcemap --tsconfig tsconfig.build.json --external react --external react-dom --external react/jsx-runtime --external @calchemy/date-core && tsc -p tsconfig.build.json --emitDeclarationOnly",
     "test": "pnpm run build && vitest run --root ../.. --config vitest.config.ts packages/date-react/tests --environment jsdom",
     "typecheck": "tsc -b && tsc -p tsconfig.test.json --noEmit",
     "clean": "rm -rf dist tsconfig.tsbuildinfo"
