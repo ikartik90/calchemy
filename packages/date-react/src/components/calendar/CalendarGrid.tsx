@@ -5,6 +5,7 @@ import {
   CalendarDragRectangleOverlay,
   getMultipleDates,
   getSelectedDateKeys,
+  mergeCalendarDragPointerProps,
   multipleDragSurfaceStyle,
   toggleDateKeys,
   useCalendarPeriodDragSurface,
@@ -75,6 +76,13 @@ export function CalendarGrid({
   const committedSelectedKeys = useMemo(() => new Set(getSelectedDateKeys(calendar.selected)), [calendar.selected]);
   const previewSelectedKeys = drag?.previewSelectedKeys ?? new Set<string>();
   const dragState = drag?.dragState ?? null;
+  const dragPointerProps = mergeCalendarDragPointerProps(useLocalDragHandlers, drag, {
+    onPointerDownCapture,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel,
+    onDragStart,
+  });
 
   return (
     <div
@@ -83,46 +91,7 @@ export function CalendarGrid({
       calchemy-multiple-drag={useLocalDragHandlers ? "" : undefined}
       calchemy-dragging={useLocalDragHandlers && dragState ? "" : undefined}
       style={useLocalDragHandlers ? { ...multipleDragSurfaceStyle, ...style } : style}
-      onPointerDownCapture={
-        useLocalDragHandlers
-          ? (event) => {
-              drag?.handlePointerDownCapture(event);
-              onPointerDownCapture?.(event);
-            }
-          : onPointerDownCapture
-      }
-      onPointerMove={
-        useLocalDragHandlers
-          ? (event) => {
-              drag?.handlePointerMove(event);
-              onPointerMove?.(event);
-            }
-          : onPointerMove
-      }
-      onPointerUp={
-        useLocalDragHandlers
-          ? (event) => {
-              drag?.handlePointerUp(event);
-              onPointerUp?.(event);
-            }
-          : onPointerUp
-      }
-      onPointerCancel={
-        useLocalDragHandlers
-          ? (event) => {
-              drag?.handlePointerCancel(event);
-              onPointerCancel?.(event);
-            }
-          : onPointerCancel
-      }
-      onDragStart={
-        useLocalDragHandlers
-          ? (event) => {
-              event.preventDefault();
-              onDragStart?.(event);
-            }
-          : onDragStart
-      }
+      {...dragPointerProps}
     >
       {useLocalDragHandlers && drag?.dragRectangle ? (
         <CalendarDragRectangleOverlay dragRectangle={drag.dragRectangle} surfaceRef={drag.surfaceRef} />

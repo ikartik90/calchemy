@@ -1,6 +1,11 @@
 import type { Correction, Token } from "../types";
 import { ArticleWords, GrammarWordSet } from "./types";
-import { createDateVocabulary, createDateVocabularyLookups, type DateVocabularyLookups } from "./vocabulary";
+import {
+  createDateVocabulary,
+  createDateVocabularyLookups,
+  hasVocabularyLookupValue,
+  type DateVocabularyLookups,
+} from "./vocabulary";
 
 const DefaultLookups = createDateVocabularyLookups(createDateVocabulary());
 const ArticleWordSet = new Set(ArticleWords);
@@ -132,15 +137,7 @@ function getPossessiveBase(value: string): string | null {
 
 // Example: `isKnownWord("february", lookups)` returns true for month vocabulary.
 function isKnownWord(value: string, lookups: DateVocabularyLookups): boolean {
-  return (
-    GrammarWordSet.has(value) ||
-    lookups.aliases.has(value) ||
-    lookups.months.has(value) ||
-    lookups.weekdays.has(value) ||
-    lookups.durationUnits.has(value) ||
-    lookups.relatives.has(value as never) ||
-    lookups.fuzzyValues.includes(value)
-  );
+  return GrammarWordSet.has(value) || hasVocabularyLookupValue(value, lookups) || lookups.fuzzyValues.includes(value);
 }
 
 // Example: `findFuzzyMatch("febuary", ["february"])` returns `february`.

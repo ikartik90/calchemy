@@ -97,7 +97,7 @@ function parseDateListBoundary(input: string, lookups: DateVocabularyLookups): B
 }
 
 // Example: `atomBoundary("christmas this year")` defers named-date atom parsing to primitives.
-export function atomBoundary(input: string): BoundarySlice {
+function atomBoundary(input: string): BoundarySlice {
   return { kind: "atom", input: input.trim() };
 }
 
@@ -111,7 +111,7 @@ export function rangeBoundary(start: BoundarySlice, end: BoundarySlice): Boundar
 }
 
 // Example: `boundaryEndpoint(monthBoundary, "end")` selects the last day of a resolved range.
-export function boundaryEndpoint(boundary: BoundarySlice, side: BoundaryEndpointSide): BoundaryEndpointSlice {
+function boundaryEndpoint(boundary: BoundarySlice, side: BoundaryEndpointSide): BoundaryEndpointSlice {
   return { kind: "boundary", boundary, side };
 }
 
@@ -235,7 +235,7 @@ function parseWeekOfDateBoundary(input: string, lookups: DateVocabularyLookups):
 }
 
 // Example: `parseMonthDayBoundary("august 10", lookups)` returns a named month-day atom boundary.
-export function parseMonthDayBoundary(
+function parseMonthDayBoundary(
   input: string,
   lookups: DateVocabularyLookups,
   options?: ParseBoundaryOptions,
@@ -257,13 +257,13 @@ export function parseMonthDayBoundary(
 }
 
 // Example: `parseMonthDayListBoundary("august 10 14 and 17", lookups)` returns multiple August day intent.
-export function parseMonthDayListBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
+function parseMonthDayListBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
   const parsed = parseMonthDayListFromInput(input, lookups);
   return parsed ? { kind: "month-day-list", month: parsed.month, days: parsed.days } : null;
 }
 
 // Example: `parseMonthDayRangeBoundary("august 10-14", lookups)` returns August 10 through 14 in the anchor year.
-export function parseMonthDayRangeBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
+function parseMonthDayRangeBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
   const parsed = parseMonthDayRangeFromInput(input, lookups);
   return parsed
     ? { kind: "month-day-range", month: parsed.month, startDay: parsed.startDay, endDay: parsed.endDay }

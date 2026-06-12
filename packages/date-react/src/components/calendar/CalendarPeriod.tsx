@@ -4,6 +4,7 @@ import { CalendarPeriodContext, useCalchemyCalendar } from "./context";
 import {
   CalendarDragRectangleOverlay,
   CalendarPeriodDragProvider,
+  mergeCalendarDragPointerProps,
   multipleDragSurfaceStyle,
   useCalendarPeriodDragSurface,
   useOptionalCalendarPeriodDrag,
@@ -39,6 +40,13 @@ export function CalendarPeriod({
   ) : (
     children
   );
+  const dragPointerProps = mergeCalendarDragPointerProps(Boolean(drag), drag, {
+    onPointerDownCapture,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel,
+    onDragStart,
+  });
 
   return (
     <section
@@ -55,46 +63,7 @@ export function CalendarPeriod({
             ? { touchAction: "none", ...style }
             : style
       }
-      onPointerDownCapture={
-        drag
-          ? (event) => {
-              drag.handlePointerDownCapture(event);
-              onPointerDownCapture?.(event);
-            }
-          : onPointerDownCapture
-      }
-      onPointerMove={
-        drag
-          ? (event) => {
-              drag.handlePointerMove(event);
-              onPointerMove?.(event);
-            }
-          : onPointerMove
-      }
-      onPointerUp={
-        drag
-          ? (event) => {
-              drag.handlePointerUp(event);
-              onPointerUp?.(event);
-            }
-          : onPointerUp
-      }
-      onPointerCancel={
-        drag
-          ? (event) => {
-              drag.handlePointerCancel(event);
-              onPointerCancel?.(event);
-            }
-          : onPointerCancel
-      }
-      onDragStart={
-        drag
-          ? (event) => {
-              event.preventDefault();
-              onDragStart?.(event);
-            }
-          : onDragStart
-      }
+      {...dragPointerProps}
     >
       {content}
     </section>

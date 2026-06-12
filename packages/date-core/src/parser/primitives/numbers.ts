@@ -7,7 +7,7 @@ import {
 } from "../types";
 
 // Example: `parseCardinalWords("one hundred twenty three")` returns `123`.
-export function parseCardinalWords(value: string): number | null {
+function parseCardinalWords(value: string): number | null {
   const words = value.split(" ");
   let total = 0;
   let current = 0;

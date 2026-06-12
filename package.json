@@ -20,6 +20,7 @@
     "@types/node": "^22.15.21",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
+    "fallow": "^2.93.0",
     "jsdom": "^29.1.1",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

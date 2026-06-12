@@ -7,7 +7,7 @@ import {
 import { resolveMonthDayList, resolveMonthDayRange } from "../primitives/month-day-list";
 import { parseNamedDate } from "../primitives/named-date";
 import { parseNumericCandidates } from "../primitives/numeric-date";
-import { comparePlainDate, toDuration } from "../primitives/shared";
+import { comparePlainDate, expandDatesBetween, toDuration } from "../primitives/shared";
 import { applyRelations } from "./relations";
 import {
   BackwardRelativeModifierSet,
@@ -789,40 +789,10 @@ function resolveCalendarUnitContainingDate(
   Temporal: TemporalApi,
   context: ResolvedParseDateContext,
 ): DateValue | null {
-  if (unit === "day") {
-    return { kind: "single", date };
-  }
-
-  if (unit === "week") {
-    return {
-      kind: "range",
-      start: startOfCalendarWeek(date, context.weekStartsOn),
-      end: endOfCalendarWeek(date, context.weekStartsOn),
-    };
-  }
-
-  if (unit === "month") {
-    return {
-      kind: "range",
-      start: startOfCalendarMonth(date),
-      end: endOfCalendarMonth(date),
-    };
-  }
-
-  if (unit === "quarter") {
-    const quarter = Math.floor((date.month - 1) / 3) + 1;
-    return resolveQuarterRange(quarter, date.year, Temporal);
-  }
-
-  if (unit === "year") {
-    return {
-      kind: "range",
-      start: startOfCalendarYear(date),
-      end: endOfCalendarYear(date),
-    };
-  }
-
-  return null;
+  return resolveCalendarUnitValue(date, unit, context, (resolvedDate) => {
+    const quarter = Math.floor((resolvedDate.month - 1) / 3) + 1;
+    return resolveQuarterRange(quarter, resolvedDate.year, Temporal);
+  });
 }
 
 // Example: `resolveCalendarUnitRange("this", "week", anchor, context)` returns the current configured week.
@@ -835,36 +805,17 @@ function resolveCalendarUnitRange(
 ): DateValue | null {
   const offset = modifier === "this" ? 0 : isForwardModifier(modifier) ? 1 : -1;
   const date = anchorDate.add(toDuration(offset, unit));
+  const resolved = resolveCalendarUnitValue(date, unit, context, () =>
+    resolveRelativeQuarterRange(modifier, anchorDate, Temporal),
+  );
 
-  if (unit === "day") {
-    return { kind: "single", date };
-  }
-
-  if (unit === "week") {
-    return {
+  return (
+    resolved ?? {
       kind: "range",
-      start: startOfCalendarWeek(date, context.weekStartsOn),
-      end: endOfCalendarWeek(date, context.weekStartsOn),
-    };
-  }
-
-  if (unit === "month") {
-    return {
-      kind: "range",
-      start: startOfCalendarMonth(date),
-      end: endOfCalendarMonth(date),
-    };
-  }
-
-  if (unit === "quarter") {
-    return resolveRelativeQuarterRange(modifier, anchorDate, Temporal);
-  }
-
-  return {
-    kind: "range",
-    start: startOfCalendarYear(date),
-    end: endOfCalendarYear(date),
-  };
+      start: startOfCalendarYear(date),
+      end: endOfCalendarYear(date),
+    }
+  );
 }
 
 // Example: `resolveRelativeWeekday("next", 5, anchor)` returns next Friday.
@@ -1136,23 +1087,10 @@ function resolveOrdinalWeekdayBoundary(
   context: ResolvedParseDateContext,
   lookups: DateVocabularyLookups,
 ): DateValue | null {
-  const range = resolveBoundary(
-    boundary.range,
-    anchorDate,
-    Temporal,
-    context,
-    lookups,
-  );
-  if (range?.kind !== "range") {
-    return null;
-  }
-
-  const date = firstWeekdayOnOrAfter(range.start, boundary.weekday).add({
-    weeks: boundary.ordinal - 1,
+  return resolveWeekdayBoundaryInRange(boundary, anchorDate, Temporal, context, lookups, ({ range, date: firstWeekday }) => {
+    const date = firstWeekday.add({ weeks: boundary.ordinal - 1 });
+    return comparePlainDate(date, range.end) <= 0 ? { kind: "single", date } : null;
   });
-  return comparePlainDate(date, range.end) <= 0
-    ? { kind: "single", date }
-    : null;
 }
 
 // Example: `resolveUniqueWeekdayBoundary(sundayOfNextWeekBoundary, anchor, Temporal, context, lookups)` resolves a single weekday only when unique.
@@ -1163,26 +1101,16 @@ function resolveUniqueWeekdayBoundary(
   context: ResolvedParseDateContext,
   lookups: DateVocabularyLookups,
 ): DateValue | null {
-  const range = resolveBoundary(
-    boundary.range,
-    anchorDate,
-    Temporal,
-    context,
-    lookups,
-  );
-  if (range?.kind !== "range") {
-    return null;
-  }
+  return resolveWeekdayBoundaryInRange(boundary, anchorDate, Temporal, context, lookups, ({ range, date }) => {
+    if (
+      comparePlainDate(date, range.end) > 0 ||
+      comparePlainDate(date.add({ days: 7 }), range.end) <= 0
+    ) {
+      return null;
+    }
 
-  const date = firstWeekdayOnOrAfter(range.start, boundary.weekday);
-  if (
-    comparePlainDate(date, range.end) > 0 ||
-    comparePlainDate(date.add({ days: 7 }), range.end) <= 0
-  ) {
-    return null;
-  }
-
-  return { kind: "single", date };
+    return { kind: "single", date };
+  });
 }
 
 // Example: `resolveOrdinalDayGroupBoundary(secondWeekendBoundary, anchor, Temporal, context, lookups)` resolves the selected weekend.
@@ -1320,6 +1248,90 @@ function applyHolidayExclusion(
     : value;
 }
 
+// Example: `resolveCalendarUnitValue(date, "week", context, resolveQuarter)` returns that calendar week.
+function resolveCalendarUnitValue(
+  date: PlainDate,
+  unit: DurationUnit,
+  context: ResolvedParseDateContext,
+  resolveQuarter: (date: PlainDate) => DateValue | null,
+): DateValue | null {
+  if (unit === "day") {
+    return { kind: "single", date };
+  }
+
+  if (unit === "week") {
+    return {
+      kind: "range",
+      start: startOfCalendarWeek(date, context.weekStartsOn),
+      end: endOfCalendarWeek(date, context.weekStartsOn),
+    };
+  }
+
+  if (unit === "month") {
+    return {
+      kind: "range",
+      start: startOfCalendarMonth(date),
+      end: endOfCalendarMonth(date),
+    };
+  }
+
+  if (unit === "quarter") {
+    return resolveQuarter(date);
+  }
+
+  if (unit === "year") {
+    return {
+      kind: "range",
+      start: startOfCalendarYear(date),
+      end: endOfCalendarYear(date),
+    };
+  }
+
+  return null;
+}
+
+// Example: `resolveInnerRangeBoundary(monthRange, anchor, Temporal, context, lookups)` resolves a nested range boundary.
+function resolveInnerRangeBoundary(
+  rangeBoundary: BoundarySlice,
+  anchorDate: PlainDate,
+  Temporal: TemporalApi,
+  context: ResolvedParseDateContext,
+  lookups: DateVocabularyLookups,
+): Extract<DateValue, { kind: "range" }> | null {
+  const range = resolveBoundary(rangeBoundary, anchorDate, Temporal, context, lookups);
+  return range?.kind === "range" ? range : null;
+}
+
+// Example: `resolveWeekdayBoundaryInRange(boundary, anchor, Temporal, context, lookups, project)` resolves a weekday inside a nested range.
+function resolveWeekdayBoundaryInRange<T extends { range: BoundarySlice; weekday: number }>(
+  boundary: T,
+  anchorDate: PlainDate,
+  Temporal: TemporalApi,
+  context: ResolvedParseDateContext,
+  lookups: DateVocabularyLookups,
+  project: (resolved: { range: Extract<DateValue, { kind: "range" }>; date: PlainDate }) => DateValue | null,
+): DateValue | null {
+  const resolved = resolveWeekdayInInnerRange(boundary.range, boundary.weekday, anchorDate, Temporal, context, lookups);
+  return resolved ? project(resolved) : null;
+}
+
+// Example: `resolveWeekdayInInnerRange(monthRange, 0, anchor, Temporal, context, lookups)` returns the first Sunday in range.
+function resolveWeekdayInInnerRange(
+  rangeBoundary: BoundarySlice,
+  weekday: number,
+  anchorDate: PlainDate,
+  Temporal: TemporalApi,
+  context: ResolvedParseDateContext,
+  lookups: DateVocabularyLookups,
+): { range: Extract<DateValue, { kind: "range" }>; date: PlainDate } | null {
+  const range = resolveInnerRangeBoundary(rangeBoundary, anchorDate, Temporal, context, lookups);
+  if (!range) {
+    return null;
+  }
+
+  return { range, date: firstWeekdayOnOrAfter(range.start, weekday) };
+}
+
 // Example: `areContiguousRanges([week51, week52])` returns true for adjacent ranges.
 function areContiguousRanges(
   ranges: readonly Extract<DateValue, { kind: "range" }>[],
@@ -1330,17 +1342,6 @@ function areContiguousRanges(
       !previousRange || range.start.equals(previousRange.end.add({ days: 1 }))
     );
   });
-}
-
-// Example: `expandDatesBetween(start, end)` returns every date in an inclusive range.
-function expandDatesBetween(start: PlainDate, end: PlainDate): PlainDate[] {
-  const dates: PlainDate[] = [];
-  let cursor = start;
-  while (comparePlainDate(cursor, end) <= 0) {
-    dates.push(cursor);
-    cursor = cursor.add({ days: 1 });
-  }
-  return dates;
 }
 
 // Example: `expandWeekdaysBetween(start, end, [1, 5])` returns Mondays and Fridays in a range.

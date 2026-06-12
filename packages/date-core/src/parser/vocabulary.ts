@@ -105,3 +105,14 @@ function addFuzzyEntries(values: Set<string>, value: string, aliasEntries: reado
 export function normalizeVocabularyValue(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
+
+// Example: `hasVocabularyLookupValue("february", lookups)` returns true for month vocabulary.
+export function hasVocabularyLookupValue(value: string, lookups: DateVocabularyLookups): boolean {
+  return (
+    lookups.aliases.has(value) ||
+    lookups.months.has(value) ||
+    lookups.weekdays.has(value) ||
+    lookups.durationUnits.has(value) ||
+    lookups.relatives.has(value as RelativeVocabularyEntry["value"])
+  );
+}

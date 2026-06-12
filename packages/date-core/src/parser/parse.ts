@@ -268,17 +268,15 @@ function parseNestedNumericAmbiguity(
       nestedNumeric.end,
       numericCandidate.value.date.toString(),
     );
-    const normalized = normalizeInput(interpretedInput, lookups);
-    const chunks = standardizeChunks(normalized.tokens, lookups);
-    const parsed = parseKnownExpression(normalized.normalized, anchorDate, context, Temporal, lookups, chunks);
+    const value = parseInterpretedExpressionValue(interpretedInput, anchorDate, context, Temporal, lookups);
 
-    return parsed.value
+    return value
       ? [
           createCandidate(
             `nested-${numericCandidate.id}`,
-            parsed.value,
+            value,
             numericCandidate.confidence,
-            labelDateValue(parsed.value),
+            labelDateValue(value),
             source,
             numericCandidate.explanation,
           ),
@@ -341,17 +339,15 @@ function parseNestedMonthDayYearAmbiguity(
 
   const candidates = interpretations.flatMap((interpretation) => {
     const interpretedInput = replaceRange(normalizedInput, nested.start, nested.end, interpretation.replacement);
-    const normalized = normalizeInput(interpretedInput, lookups);
-    const chunks = standardizeChunks(normalized.tokens, lookups);
-    const parsed = parseKnownExpression(normalized.normalized, anchorDate, context, Temporal, lookups, chunks);
+    const value = parseInterpretedExpressionValue(interpretedInput, anchorDate, context, Temporal, lookups);
 
-    return parsed.value
+    return value
       ? [
           createCandidate(
             interpretation.id,
-            parsed.value,
+            value,
             interpretation.confidence,
-            labelDateValue(parsed.value),
+            labelDateValue(value),
             source,
           ),
         ]
@@ -381,6 +377,19 @@ function parseNestedMonthDayYearAmbiguity(
     corrections: source.corrections,
     warnings: [],
   };
+}
+
+// Example: `parseInterpretedExpressionValue("next month", anchor, context, Temporal, lookups)` re-parses a substituted phrase.
+function parseInterpretedExpressionValue(
+  interpretedInput: string,
+  anchorDate: PlainDate,
+  context: ResolvedParseDateContext,
+  Temporal: TemporalApi,
+  lookups: DateVocabularyLookups,
+): DateValue | null {
+  const normalized = normalizeInput(interpretedInput, lookups);
+  const chunks = standardizeChunks(normalized.tokens, lookups);
+  return parseKnownExpression(normalized.normalized, anchorDate, context, Temporal, lookups, chunks).value;
 }
 
 // Example: `findNestedNumericDate("every monday until 3/4/27")` finds `3/4/27`.

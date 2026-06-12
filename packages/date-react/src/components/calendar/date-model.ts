@@ -87,7 +87,7 @@ export function clampDateToBounds(date: PlainDate, bounds: CalendarBounds | unde
   return date;
 }
 
-export function isDateWithinBounds(date: PlainDate, bounds: CalendarBounds | undefined): boolean {
+function isDateWithinBounds(date: PlainDate, bounds: CalendarBounds | undefined): boolean {
   return (!bounds?.start || !isBefore(date, bounds.start)) && (!bounds?.end || !isAfter(date, bounds.end));
 }
 

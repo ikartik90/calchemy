@@ -7,6 +7,7 @@ import { CalendarPeriod } from "./CalendarPeriod";
 import {
   CalendarDragRectangleOverlay,
   CalendarPeriodDragProvider,
+  mergeCalendarDragPointerProps,
   multiplePeriodListDragSurfaceStyle,
   useCalendarPeriodDragSurface,
   useOptionalCalendarPeriodDrag,
@@ -133,6 +134,13 @@ export function CalendarPeriodList({
   ) : (
     periodContent
   );
+  const dragPointerProps = mergeCalendarDragPointerProps(Boolean(drag), drag, {
+    onPointerDownCapture,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel,
+    onDragStart,
+  });
 
   return (
     <div
@@ -142,46 +150,7 @@ export function CalendarPeriodList({
       calchemy-multiple-drag={drag ? "" : undefined}
       calchemy-dragging={drag?.dragState ? "" : undefined}
       style={drag ? { ...multiplePeriodListDragSurfaceStyle, ...style } : style}
-      onPointerDownCapture={
-        drag
-          ? (event) => {
-              drag.handlePointerDownCapture(event);
-              onPointerDownCapture?.(event);
-            }
-          : onPointerDownCapture
-      }
-      onPointerMove={
-        drag
-          ? (event) => {
-              drag.handlePointerMove(event);
-              onPointerMove?.(event);
-            }
-          : onPointerMove
-      }
-      onPointerUp={
-        drag
-          ? (event) => {
-              drag.handlePointerUp(event);
-              onPointerUp?.(event);
-            }
-          : onPointerUp
-      }
-      onPointerCancel={
-        drag
-          ? (event) => {
-              drag.handlePointerCancel(event);
-              onPointerCancel?.(event);
-            }
-          : onPointerCancel
-      }
-      onDragStart={
-        drag
-          ? (event) => {
-              event.preventDefault();
-              onDragStart?.(event);
-            }
-          : onDragStart
-      }
+      {...dragPointerProps}
     >
       {content}
     </div>

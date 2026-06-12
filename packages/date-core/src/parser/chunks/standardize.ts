@@ -135,24 +135,20 @@ function standardizeCalendarRangeChunks(chunks: readonly StandardChunk[]): Stand
       chunk.value >= 1 &&
       chunk.value <= 4
     ) {
-      const afterQuarter = chunks[index + 2];
-      if (afterQuarter?.kind === "connector" && afterQuarter.value === "from") {
+      if (shouldDeferQuarterShorthand(chunks[index + 2])) {
         standardized.push(chunk);
         continue;
       }
 
-      standardized.push({
-        kind: "shorthand",
-        value: { kind: "quarter", ordinal: chunk.value },
-        boundarySide: "start",
-        token: {
+      standardized.push(
+        createQuarterShorthandChunk(chunk.value, {
           kind: "word",
           raw: `${chunk.token.raw} ${next.token.raw}`,
           normalized: `q${chunk.value}`,
           start: chunk.token.start,
           end: next.token.end,
-        },
-      });
+        }),
+      );
       index += 1;
       continue;
     }
@@ -167,24 +163,20 @@ function standardizeCalendarRangeChunks(chunks: readonly StandardChunk[]): Stand
       chunk.value >= 1 &&
       chunk.value <= 4
     ) {
-      const afterQuarter = chunks[index + 3];
-      if (afterQuarter?.kind === "connector" && afterQuarter.value === "from") {
+      if (shouldDeferQuarterShorthand(chunks[index + 3])) {
         standardized.push(chunk);
         continue;
       }
 
-      standardized.push({
-        kind: "shorthand",
-        value: { kind: "quarter", ordinal: chunk.value },
-        boundarySide: "start",
-        token: {
+      standardized.push(
+        createQuarterShorthandChunk(chunk.value, {
           kind: "word",
           raw: `${chunk.token.raw}${next.token.raw} ${afterNext.token.raw}`,
           normalized: `q${chunk.value}`,
           start: chunk.token.start,
           end: afterNext.token.end,
-        },
-      });
+        }),
+      );
       index += 2;
       continue;
     }
@@ -200,4 +192,22 @@ function standardizeCalendarRangeChunks(chunks: readonly StandardChunk[]): Stand
 // Example: `isOrdinalSuffix("rd")` returns true.
 function isOrdinalSuffix(value: string): boolean {
   return value === "st" || value === "nd" || value === "rd" || value === "th";
+}
+
+// Example: `shouldDeferQuarterShorthand(fromConnector)` returns true for `3rd quarter from july`.
+function shouldDeferQuarterShorthand(afterQuarter: StandardChunk | undefined): boolean {
+  return afterQuarter?.kind === "connector" && afterQuarter.value === "from";
+}
+
+// Example: `createQuarterShorthandChunk(3, token)` emits a structural Q3 shorthand chunk.
+function createQuarterShorthandChunk(
+  ordinal: number,
+  token: Extract<StandardChunk, { kind: "word" }>["token"],
+): Extract<StandardChunk, { kind: "shorthand" }> {
+  return {
+    kind: "shorthand",
+    value: { kind: "quarter", ordinal },
+    boundarySide: "start",
+    token,
+  };
 }

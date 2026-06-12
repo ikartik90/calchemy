@@ -9,7 +9,7 @@ import type {
 
 export const ArticleWords = ["a", "an", "the"] as const;
 
-export const PeriodRecords = [
+const PeriodRecords = [
   {
     value: "day",
     aliases: ["date", "dates"],
@@ -72,10 +72,10 @@ type PeriodRecord = (typeof PeriodRecords)[number];
 export type Period = (typeof PeriodRecords)[number]["value"];
 export type DurationUnit = Period;
 
-export const PeriodAliasEntries = PeriodRecords.flatMap((period) =>
+const PeriodAliasEntries = PeriodRecords.flatMap((period) =>
   period.aliases.map((alias) => [alias, period.value] as const),
 );
-export const PeriodIdentityEntries = PeriodRecords.map(
+const PeriodIdentityEntries = PeriodRecords.map(
   (period) => [period.value, period.value] as const,
 );
 export type PeriodWord = Period | (typeof PeriodAliasEntries)[number][0];
@@ -83,7 +83,7 @@ export const PeriodAliasMap: ReadonlyMap<PeriodWord, Period> = new Map([
   ...PeriodIdentityEntries,
   ...PeriodAliasEntries,
 ]);
-export const PeriodWords: readonly PeriodWord[] = Array.from(
+const PeriodWords: readonly PeriodWord[] = Array.from(
   PeriodAliasMap.keys(),
 );
 
@@ -92,7 +92,7 @@ export type CalendarRangePeriod = Extract<
   { calendarRange: true }
 >["value"];
 
-export const CalendarRangePeriodValues = PeriodRecords.filter(
+const CalendarRangePeriodValues = PeriodRecords.filter(
   (period): period is Extract<PeriodRecord, { calendarRange: true }> =>
     period.calendarRange,
 ).map((period) => period.value);
@@ -102,14 +102,14 @@ export type CalendarListPeriod = Extract<
   { calendarList: true }
 >["value"];
 
-export const CalendarListPeriodValues = PeriodRecords.filter(
+const CalendarListPeriodValues = PeriodRecords.filter(
   (period): period is Extract<PeriodRecord, { calendarList: true }> =>
     period.calendarList,
 ).map((period) => period.value);
 
 export type DayGroupPeriod = Extract<PeriodRecord, { dayGroup: true }>["value"];
 
-export const DayGroupPeriodValues = PeriodRecords.filter(
+const DayGroupPeriodValues = PeriodRecords.filter(
   (period): period is Extract<PeriodRecord, { dayGroup: true }> =>
     period.dayGroup,
 ).map((period) => period.value);
@@ -120,7 +120,7 @@ export const CalendarRangePeriodSet = new Set<Period>(
 export const CalendarListPeriodSet = new Set<Period>(CalendarListPeriodValues);
 export const DayGroupPeriodSet = new Set<Period>(DayGroupPeriodValues);
 
-export const MonthVocabularyValues: readonly MonthVocabularyEntry[] = [
+const MonthVocabularyValues: readonly MonthVocabularyEntry[] = [
   { value: "january", aliases: ["jan"], month: 1 },
   { value: "february", aliases: ["feb"], month: 2 },
   { value: "march", aliases: ["mar"], month: 3 },
@@ -135,7 +135,7 @@ export const MonthVocabularyValues: readonly MonthVocabularyEntry[] = [
   { value: "december", aliases: ["dec"], month: 12 },
 ];
 
-export const WeekdayVocabularyValues: readonly WeekdayVocabularyEntry[] = [
+const WeekdayVocabularyValues: readonly WeekdayVocabularyEntry[] = [
   { value: "monday", aliases: ["mon", "mondays"], weekday: 1 },
   { value: "tuesday", aliases: ["tue", "tues", "tuesdays"], weekday: 2 },
   { value: "wednesday", aliases: ["wed", "wednesdays"], weekday: 3 },
@@ -149,14 +149,14 @@ export const WeekdayVocabularyValues: readonly WeekdayVocabularyEntry[] = [
   { value: "sunday", aliases: ["sun", "sundays"], weekday: 7 },
 ];
 
-export const RelativeVocabularyValues = [
+const RelativeVocabularyValues = [
   { value: "today" },
   { value: "tomorrow", aliases: ["tmr", "tmrw"] },
   { value: "yesterday" },
   { value: "now" },
 ] as const satisfies readonly RelativeVocabularyEntry[];
 
-export const DurationUnitVocabularyValues: readonly DurationUnitVocabularyEntry[] =
+const DurationUnitVocabularyValues: readonly DurationUnitVocabularyEntry[] =
   PeriodRecords.flatMap((period) => {
     if (!period.duration) {
       return [];
@@ -170,7 +170,7 @@ export const DurationUnitVocabularyValues: readonly DurationUnitVocabularyEntry[
     ];
   });
 
-export const RecurrenceFrequencyVocabularyValues: readonly RecurrenceFrequencyVocabularyEntry[] =
+const RecurrenceFrequencyVocabularyValues: readonly RecurrenceFrequencyVocabularyEntry[] =
   [
     {
       value: "daily",
@@ -231,7 +231,7 @@ export const ConnectorAliasEntries = [
   ["till", "until"],
   ["upto", "until"],
 ] as const satisfies readonly (readonly [string, Connector])[];
-export const ConnectorAliasValues = ConnectorAliasEntries.map(([alias]) => alias);
+const ConnectorAliasValues = ConnectorAliasEntries.map(([alias]) => alias);
 
 export const SmallCardinals: ReadonlyMap<string, number> = new Map([
   ["one", 1],
@@ -271,11 +271,11 @@ export const Scales: ReadonlyMap<string, number> = new Map([
   ["thousand", 1000],
 ]);
 
-export const TeenOrdinals = Array.from(SmallCardinals)
+const TeenOrdinals = Array.from(SmallCardinals)
   .filter(([, value]) => value >= 13)
   .map(([word, value]) => [`${word}th`, value] as const);
 
-export const TensOrdinals = Array.from(
+const TensOrdinals = Array.from(
   Tens,
   ([word, value]) => [`${word.slice(0, -1)}ieth`, value] as const,
 );
@@ -300,7 +300,7 @@ export const SmallOrdinals: ReadonlyMap<string, number> = new Map([
   ...TensOrdinals,
 ]);
 
-export const NumberWords = [
+const NumberWords = [
   ...SmallCardinals.keys(),
   ...Tens.keys(),
   ...Scales.keys(),
@@ -308,10 +308,10 @@ export const NumberWords = [
   ...ScaleOrdinals.map(([ordinal]) => ordinal),
 ] as const;
 
-export const BoundarySideValues = ["end", "start"] as const;
+const BoundarySideValues = ["end", "start"] as const;
 export type BoundaryEndpointSide = (typeof BoundarySideValues)[number];
 
-export const RelativeModifierRecords = [
+const RelativeModifierRecords = [
   { value: "this", yearReference: true },
   { value: "next", yearReference: true, forward: true },
   { value: "upcoming", forward: true },
@@ -322,7 +322,7 @@ export const RelativeModifierRecords = [
 ] as const;
 type RelativeModifierRecord = (typeof RelativeModifierRecords)[number];
 export type RelativeModifier = RelativeModifierRecord["value"];
-export const RelativeModifierValues = RelativeModifierRecords.map(
+const RelativeModifierValues = RelativeModifierRecords.map(
   (modifier) => modifier.value,
 );
 export const RelativeModifierSet = new Set<RelativeModifier>(
@@ -332,7 +332,7 @@ export type YearReferenceModifier = Extract<
   RelativeModifierRecord,
   { yearReference: true }
 >["value"];
-export const YearReferenceModifierValues = RelativeModifierRecords.filter(
+const YearReferenceModifierValues = RelativeModifierRecords.filter(
   (
     modifier,
   ): modifier is Extract<RelativeModifierRecord, { yearReference: true }> =>
@@ -341,21 +341,21 @@ export const YearReferenceModifierValues = RelativeModifierRecords.filter(
 export const YearReferenceModifierSet = new Set<RelativeModifier>(
   YearReferenceModifierValues,
 );
-export const ForwardRelativeModifierValues = RelativeModifierRecords.filter(
+const ForwardRelativeModifierValues = RelativeModifierRecords.filter(
   (modifier): modifier is Extract<RelativeModifierRecord, { forward: true }> =>
     "forward" in modifier,
 ).map((modifier) => modifier.value);
 export const ForwardRelativeModifierSet = new Set<RelativeModifier>(
   ForwardRelativeModifierValues,
 );
-export const BackwardRelativeModifierValues = RelativeModifierRecords.filter(
+const BackwardRelativeModifierValues = RelativeModifierRecords.filter(
   (modifier): modifier is Extract<RelativeModifierRecord, { backward: true }> =>
     "backward" in modifier,
 ).map((modifier) => modifier.value);
 export const BackwardRelativeModifierSet = new Set<RelativeModifier>(
   BackwardRelativeModifierValues,
 );
-export const BoundaryPlacementValues = [
+const BoundaryPlacementValues = [
   "first",
   ...RelativeModifierRecords.filter(
     (
@@ -367,12 +367,12 @@ export const BoundaryPlacementValues = [
 export type BoundaryPlacement = (typeof BoundaryPlacementValues)[number];
 export type RelativeDateValue =
   (typeof RelativeVocabularyValues)[number]["value"];
-export const RelativeDateValues = RelativeVocabularyValues.map(
+const RelativeDateValues = RelativeVocabularyValues.map(
   (relative) => relative.value,
 );
 export const RelativeDateSet = new Set<RelativeDateValue>(RelativeDateValues);
 
-export const ExclusionMarkerRecords = [
+const ExclusionMarkerRecords = [
   { value: "except", multiToken: false },
   { value: "excluding", multiToken: false },
   { value: "skip", multiToken: false },
@@ -381,18 +381,18 @@ export const ExclusionMarkerRecords = [
 export const ExclusionMarkerValues = ExclusionMarkerRecords.map((marker) => marker.value);
 export type ExclusionMarker = (typeof ExclusionMarkerValues)[number];
 export const ExclusionMarkerAliasEntries = [["excl", "excluding"]] as const;
-export const ExclusionMarkerAliasValues = ExclusionMarkerAliasEntries.map(([alias]) => alias);
+const ExclusionMarkerAliasValues = ExclusionMarkerAliasEntries.map(([alias]) => alias);
 export const MultiTokenExclusionMarkerValues = ExclusionMarkerRecords.filter((marker) => marker.multiToken).map(
   (marker) => marker.value,
 );
-export const ExclusionWords = [
+const ExclusionWords = [
   ...ExclusionMarkerValues,
   ...ExclusionMarkerAliasValues,
   ...MultiTokenExclusionMarkerValues.flatMap((marker) => marker.split(" ")),
   "holidays",
 ] as const;
 
-export const SamplerCommandRecords = [
+const SamplerCommandRecords = [
   { value: "all", chunk: true },
   { value: "alternate", chunk: true, interval: 2 },
   { value: "every", chunk: true },
@@ -400,7 +400,7 @@ export const SamplerCommandRecords = [
   { value: "select", chunk: true },
 ] as const;
 type SamplerCommandRecord = (typeof SamplerCommandRecords)[number];
-export const SamplerCommandValues = SamplerCommandRecords.map(
+const SamplerCommandValues = SamplerCommandRecords.map(
   (command) => command.value,
 );
 export type SamplerCommand = (typeof SamplerCommandValues)[number] | undefined;
@@ -411,7 +411,7 @@ export type SamplerChunkCommand = (typeof SamplerChunkCommandValues)[number];
 export const MultiTokenSamplerCommandValues = SamplerCommandRecords.filter(
   (command) => !command.chunk,
 ).map((command) => command.value);
-export const AlternatingSamplerCommandValues = SamplerCommandRecords.filter(
+const AlternatingSamplerCommandValues = SamplerCommandRecords.filter(
   (command): command is Extract<SamplerCommandRecord, { interval: 2 }> =>
     "interval" in command,
 ).map((command) => command.value);
@@ -419,11 +419,11 @@ export const AlternatingSamplerCommandSet = new Set<SamplerCommand>(
   AlternatingSamplerCommandValues,
 );
 
-export const SamplerParityRecords = [
+const SamplerParityRecords = [
   { value: "even", startIndex: 1, dayRemainder: 0 },
   { value: "odd", startIndex: 0, dayRemainder: 1 },
 ] as const;
-export const SamplerParityValues = SamplerParityRecords.map(
+const SamplerParityValues = SamplerParityRecords.map(
   (parity) => parity.value,
 );
 export type SamplerParity = (typeof SamplerParityValues)[number];
@@ -439,18 +439,18 @@ export const SamplerParityDayRemainderMap = new Map(
   ),
 );
 
-export const SamplerModifierWords = [
+const SamplerModifierWords = [
   ...SamplerParityValues,
   "numbered",
 ] as const;
-export const SamplerWords = Array.from(
+const SamplerWords = Array.from(
   new Set([
     ...SamplerCommandValues.flatMap((command) => command.split(" ")),
     ...SamplerModifierWords,
   ]),
 );
 
-export const RelationDirectionValues = ConnectorValues.filter(
+const RelationDirectionValues = ConnectorValues.filter(
   (
     connector,
   ): connector is Extract<
@@ -463,8 +463,8 @@ export const RelationDirectionValues = ConnectorValues.filter(
     connector === "preceding",
 );
 export type RelationDirection = (typeof RelationDirectionValues)[number];
-export const RelationDirectionSet = new Set<Connector>(RelationDirectionValues);
-export const TransformOperatorValues = ConnectorValues.filter(
+const RelationDirectionSet = new Set<Connector>(RelationDirectionValues);
+const TransformOperatorValues = ConnectorValues.filter(
   (connector): connector is Extract<Connector, "minus" | "plus"> =>
     connector === "minus" || connector === "plus",
 );

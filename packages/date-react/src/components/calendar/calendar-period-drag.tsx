@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ComponentPropsWithoutRef,
   type PointerEvent,
   type RefObject,
 } from "react";
@@ -73,6 +74,47 @@ export const multiplePeriodListDragSurfaceStyle = {
   position: "relative",
   background: "transparent",
 } as const;
+
+export type CalendarDragPointerHandlerProps = Pick<
+  ComponentPropsWithoutRef<"div">,
+  "onPointerDownCapture" | "onPointerMove" | "onPointerUp" | "onPointerCancel" | "onDragStart"
+>;
+
+// Example: `mergeCalendarDragPointerProps(true, drag, handlers)` chains drag surface handlers with caller props.
+export function mergeCalendarDragPointerProps(
+  enabled: boolean,
+  drag: CalendarPeriodDragContextValue | null | undefined,
+  handlers: CalendarDragPointerHandlerProps,
+): CalendarDragPointerHandlerProps {
+  if (!enabled || !drag) {
+    return handlers;
+  }
+
+  const { onPointerDownCapture, onPointerMove, onPointerUp, onPointerCancel, onDragStart } = handlers;
+
+  return {
+    onPointerDownCapture: (event) => {
+      drag.handlePointerDownCapture(event);
+      onPointerDownCapture?.(event);
+    },
+    onPointerMove: (event) => {
+      drag.handlePointerMove(event);
+      onPointerMove?.(event);
+    },
+    onPointerUp: (event) => {
+      drag.handlePointerUp(event);
+      onPointerUp?.(event);
+    },
+    onPointerCancel: (event) => {
+      drag.handlePointerCancel(event);
+      onPointerCancel?.(event);
+    },
+    onDragStart: (event) => {
+      event.preventDefault();
+      onDragStart?.(event);
+    },
+  };
+}
 
 export function useOptionalCalendarPeriodDrag(): CalendarPeriodDragContextValue | null {
   return useContext(CalendarPeriodDragContext);

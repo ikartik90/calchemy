@@ -7,6 +7,17 @@ export function comparePlainDate(left: PlainDate, right: PlainDate): number {
   return left.toString().localeCompare(right.toString());
 }
 
+// Example: `expandDatesBetween(start, end)` returns every date in an inclusive range.
+export function expandDatesBetween(start: PlainDate, end: PlainDate): PlainDate[] {
+  const dates: PlainDate[] = [];
+  let cursor = start;
+  while (comparePlainDate(cursor, end) <= 0) {
+    dates.push(cursor);
+    cursor = cursor.add({ days: 1 });
+  }
+  return dates;
+}
+
 // Example: `createCandidate("best", value, 1, "2026-01-01", source)` creates a ranked parse candidate.
 export function createCandidate(
   id: string,

@@ -13,7 +13,7 @@ export function resolveHolidayProvider(
 }
 
 // Example: `createNamedDatesHolidayProvider([christmasEntry], context)` checks configured holiday named dates.
-export function createNamedDatesHolidayProvider(
+function createNamedDatesHolidayProvider(
   entries: readonly NamedDatesVocabularyEntry[],
   context: Omit<ResolvedParseDateContext, "holidays">,
 ): HolidayProvider {

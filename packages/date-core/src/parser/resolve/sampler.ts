@@ -1,5 +1,5 @@
 import { endOfCalendarWeek, startOfCalendarWeek } from "../primitives/date-math";
-import { comparePlainDate } from "../primitives/shared";
+import { comparePlainDate, expandDatesBetween } from "../primitives/shared";
 import { SamplerParityDayRemainderMap } from "../types";
 import type { SamplerSlice } from "../slice";
 import type { PlainDate } from "../../temporal/types";
@@ -114,15 +114,3 @@ function selectEveryNthDate(dates: readonly PlainDate[], interval: number, start
   return dates.filter((_, index) => index >= startIndex && (index - startIndex) % interval === 0);
 }
 
-// Example: `expandDatesBetween(start, end)` returns all dates from start through end.
-function expandDatesBetween(start: PlainDate, end: PlainDate): PlainDate[] {
-  const dates: PlainDate[] = [];
-  let cursor = start;
-
-  while (comparePlainDate(cursor, end) <= 0) {
-    dates.push(cursor);
-    cursor = cursor.add({ days: 1 });
-  }
-
-  return dates;
-}

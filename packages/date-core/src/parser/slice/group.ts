@@ -32,7 +32,7 @@ import type {
   TransformSlice,
 } from "./types";
 import { parseMonthDayListExpression, parseMonthDayRangeExpression } from "../primitives/month-day-list";
-import type { StandardChunk } from "../chunks";
+import { trimLeadingSeparators, trimTrailingSeparators, type StandardChunk } from "../chunks";
 import type { DateVocabularyLookups } from "../vocabulary";
 
 // Example: `sliceDateExpression("all mondays in june", chunks, lookups)` returns boundary plus sampler intent.
@@ -247,13 +247,13 @@ function sliceUntilSampler(
   transforms: readonly TransformSlice[],
   lookups: DateVocabularyLookups,
 ): DateSlice | null {
-  const upperBound = findUpperBoundConnector(chunks);
-  if (!upperBound || upperBound.index <= 0 || upperBound.index + upperBound.width >= chunks.length) {
+  const split = requireValidUpperBoundSplit(chunks);
+  if (!split) {
     return null;
   }
 
-  const sampler = parseSamplerFromChunks(chunks.slice(0, upperBound.index), lookups);
-  const end = parseBoundaryEndpoint(chunks.slice(upperBound.index + upperBound.width), lookups);
+  const sampler = parseSamplerFromChunks(split.leftChunks, lookups);
+  const end = parseBoundaryEndpoint(split.rightChunks, lookups);
   return sampler && end ? createSlice(anchorUntilBoundary(end), exclusions, sampler, null, transforms) : null;
 }
 
@@ -264,20 +264,20 @@ function sliceUpperBoundRange(
   transforms: readonly TransformSlice[],
   lookups: DateVocabularyLookups,
 ): DateSlice | null {
-  const upperBound = findUpperBoundConnector(chunks);
-  if (!upperBound || upperBound.index <= 0 || upperBound.index + upperBound.width >= chunks.length) {
+  const split = requireValidUpperBoundSplit(chunks);
+  if (!split) {
     return null;
   }
 
-  if (shouldDeferUpperBoundRange(chunks, upperBound.index, lookups)) {
+  if (shouldDeferUpperBoundRange(chunks, split.upperBound.index, lookups)) {
     return null;
   }
 
-  const startChunks = trimCommandAndArticle(chunks.slice(0, upperBound.index));
+  const startChunks = trimCommandAndArticle(split.leftChunks);
   const start = parseTypedBoundaryEndpoint(chunkText(startChunks), lookups, boundarySideFromChunks(startChunks) ?? "end", {
     preferDay: true,
   });
-  const end = parseBoundaryEndpoint(chunks.slice(upperBound.index + upperBound.width), lookups);
+  const end = parseBoundaryEndpoint(split.rightChunks, lookups);
   return start && end ? createSlice({ kind: "range", start, end }, exclusions, null, null, transforms) : null;
 }
 
@@ -288,29 +288,28 @@ function sliceScopedSamplerUpperBound(
   transforms: readonly TransformSlice[],
   lookups: DateVocabularyLookups,
 ): DateSlice | null {
-  const upperBound = findUpperBoundConnector(chunks);
-  if (!upperBound || upperBound.index <= 0 || upperBound.index + upperBound.width >= chunks.length) {
+  const split = requireValidUpperBoundSplit(chunks);
+  if (!split) {
     return null;
   }
 
-  const leftChunks = chunks.slice(0, upperBound.index);
-  const scopeIndex = findScopedSamplerConnectorIndex(leftChunks);
-  if (scopeIndex <= 0 || scopeIndex >= leftChunks.length - 1) {
+  const scopeIndex = findScopedSamplerConnectorIndex(split.leftChunks);
+  if (scopeIndex <= 0 || scopeIndex >= split.leftChunks.length - 1) {
     return null;
   }
 
-  const sampler = parseSamplerFromChunks(leftChunks.slice(0, scopeIndex), lookups);
+  const sampler = parseSamplerFromChunks(split.leftChunks.slice(0, scopeIndex), lookups);
   if (!sampler) {
     return null;
   }
 
   const start = parseTypedBoundaryEndpoint(
-    chunkText(trimLeadingArticle(leftChunks.slice(scopeIndex + 1))),
+    chunkText(trimLeadingArticle(split.leftChunks.slice(scopeIndex + 1))),
     lookups,
     "start",
     { preferDay: true },
   );
-  const end = parseBoundaryEndpoint(chunks.slice(upperBound.index + upperBound.width), lookups);
+  const end = parseBoundaryEndpoint(split.rightChunks, lookups);
   return start && end ? createSlice({ kind: "range", start, end }, exclusions, sampler, null, transforms) : null;
 }
 
@@ -410,16 +409,12 @@ function boundarySideFromChunks(chunks: readonly StandardChunk[]): BoundaryEndpo
 
 // Example: `parseWeekdayRelation(chunksFor("first monday after christmas"), lookups)` returns boundary plus relation.
 function parseWeekdayRelation(chunks: readonly StandardChunk[], lookups: DateVocabularyLookups): { boundary: BoundarySlice; relation: RelationSlice } | null {
-  const relationIndex = chunks.findIndex(
-    (chunk) =>
-      chunk.kind === "connector" &&
-      (chunk.value === "after" || chunk.value === "before" || chunk.value === "following" || chunk.value === "preceding"),
-  );
-  if (relationIndex <= 0 || relationIndex >= chunks.length - 1) {
+  const split = parseRelationSelectorSplit(chunks);
+  if (!split) {
     return null;
   }
 
-  const selectorChunks = trimCommandAndArticle(chunks.slice(0, relationIndex));
+  const { relationIndex, selectorChunks } = split;
   const weekdayIndex = findLastChunkIndex(selectorChunks, (chunk) => chunk.kind === "weekday");
   if (weekdayIndex < 0) {
     return null;
@@ -430,20 +425,16 @@ function parseWeekdayRelation(chunks: readonly StandardChunk[], lookups: DateVoc
     return null;
   }
 
-  const ordinalInput = chunkText(selectorChunks.slice(0, weekdayIndex));
-  const ordinal = ordinalInput ? parseOrdinal(ordinalInput) : 1;
+  const ordinal = parseRelationOrdinal(selectorChunks, weekdayIndex);
   if (!ordinal) {
     return null;
   }
 
-  const referenceChunks = trimLeadingArticle(chunks.slice(relationIndex + 1));
-  const reference = parseEndOfBoundary(referenceChunks) ?? referenceChunks;
-
   return {
-    boundary: parseBoundary(chunkText(reference), lookups),
+    boundary: parseRelationReferenceBoundary(chunks, relationIndex, lookups),
     relation: {
       kind: "weekday-near-boundary",
-      direction: (chunks[relationIndex] as Extract<StandardChunk, { kind: "connector" }>).value as RelationDirection,
+      direction: relationDirectionAt(chunks, relationIndex),
       ordinal,
       weekday: weekdayChunk.value,
     },
@@ -455,16 +446,12 @@ function parseDayGroupRelation(
   chunks: readonly StandardChunk[],
   lookups: DateVocabularyLookups,
 ): { boundary: BoundarySlice; relation: RelationSlice } | null {
-  const relationIndex = chunks.findIndex(
-    (chunk) =>
-      chunk.kind === "connector" &&
-      (chunk.value === "after" || chunk.value === "before" || chunk.value === "following" || chunk.value === "preceding"),
-  );
-  if (relationIndex <= 0 || relationIndex >= chunks.length - 1) {
+  const split = parseRelationSelectorSplit(chunks);
+  if (!split) {
     return null;
   }
 
-  const selectorChunks = trimCommandAndArticle(chunks.slice(0, relationIndex));
+  const { relationIndex, selectorChunks } = split;
   const groupIndex = findLastChunkIndex(
     selectorChunks,
     (chunk) =>
@@ -484,20 +471,16 @@ function parseDayGroupRelation(
     return null;
   }
 
-  const ordinalInput = chunkText(selectorChunks.slice(0, groupIndex));
-  const ordinal = ordinalInput ? parseOrdinal(ordinalInput) : 1;
+  const ordinal = parseRelationOrdinal(selectorChunks, groupIndex);
   if (!ordinal) {
     return null;
   }
 
-  const referenceChunks = trimLeadingArticle(chunks.slice(relationIndex + 1));
-  const reference = parseEndOfBoundary(referenceChunks) ?? referenceChunks;
-
   return {
-    boundary: parseBoundary(chunkText(reference), lookups),
+    boundary: parseRelationReferenceBoundary(chunks, relationIndex, lookups),
     relation: {
       kind: "day-group-near-boundary",
-      direction: (chunks[relationIndex] as Extract<StandardChunk, { kind: "connector" }>).value as RelationDirection,
+      direction: relationDirectionAt(chunks, relationIndex),
       ordinal,
       group,
     },
@@ -680,6 +663,74 @@ function findConnectorIndex(chunks: readonly StandardChunk[], value: string): nu
   return chunks.findIndex((chunk) => chunk.kind === "connector" && chunk.value === value);
 }
 
+type UpperBoundSplit = {
+  upperBound: { index: number; width: number };
+  leftChunks: readonly StandardChunk[];
+  rightChunks: readonly StandardChunk[];
+};
+
+// Example: `requireValidUpperBoundSplit(chunksFor("today until tomorrow"))` returns left and right phrase chunks.
+function requireValidUpperBoundSplit(chunks: readonly StandardChunk[]): UpperBoundSplit | null {
+  const upperBound = findUpperBoundConnector(chunks);
+  if (!upperBound || upperBound.index <= 0 || upperBound.index + upperBound.width >= chunks.length) {
+    return null;
+  }
+
+  return {
+    upperBound,
+    leftChunks: chunks.slice(0, upperBound.index),
+    rightChunks: chunks.slice(upperBound.index + upperBound.width),
+  };
+}
+
+// Example: `parseRelationSelectorSplit(chunksFor("monday after christmas"))` returns selector and connector chunks.
+function parseRelationSelectorSplit(
+  chunks: readonly StandardChunk[],
+): { relationIndex: number; selectorChunks: readonly StandardChunk[] } | null {
+  const relationIndex = parseRelationConnectorIndex(chunks);
+  if (relationIndex === null) {
+    return null;
+  }
+
+  return {
+    relationIndex,
+    selectorChunks: trimCommandAndArticle(chunks.slice(0, relationIndex)),
+  };
+}
+
+// Example: `parseRelationConnectorIndex(chunksFor("monday after christmas"))` returns the connector index.
+function parseRelationConnectorIndex(chunks: readonly StandardChunk[]): number | null {
+  const relationIndex = chunks.findIndex(
+    (chunk) =>
+      chunk.kind === "connector" &&
+      (chunk.value === "after" || chunk.value === "before" || chunk.value === "following" || chunk.value === "preceding"),
+  );
+  return relationIndex > 0 && relationIndex < chunks.length - 1 ? relationIndex : null;
+}
+
+// Example: `parseRelationOrdinal(selectorChunks, weekdayIndex)` returns `1` for `first monday`.
+function parseRelationOrdinal(selectorChunks: readonly StandardChunk[], selectorEndIndex: number): number | null {
+  const ordinalInput = chunkText(selectorChunks.slice(0, selectorEndIndex));
+  const ordinal = ordinalInput ? parseOrdinal(ordinalInput) : 1;
+  return ordinal || null;
+}
+
+// Example: `parseRelationReferenceBoundary(chunks, relationIndex, lookups)` resolves the reference boundary.
+function parseRelationReferenceBoundary(
+  chunks: readonly StandardChunk[],
+  relationIndex: number,
+  lookups: DateVocabularyLookups,
+): BoundarySlice {
+  const referenceChunks = trimLeadingArticle(chunks.slice(relationIndex + 1));
+  const reference = parseEndOfBoundary(referenceChunks) ?? referenceChunks;
+  return parseBoundary(chunkText(reference), lookups);
+}
+
+// Example: `relationDirectionAt(chunks, relationIndex)` returns `after` for `monday after christmas`.
+function relationDirectionAt(chunks: readonly StandardChunk[], relationIndex: number): RelationDirection {
+  return (chunks[relationIndex] as Extract<StandardChunk, { kind: "connector" }>).value as RelationDirection;
+}
+
 // Example: `findUpperBoundConnector(chunksFor("today up to tomorrow"))` finds the `up to` connector.
 function findUpperBoundConnector(chunks: readonly StandardChunk[]): { index: number; width: number } | null {
   for (let index = 0; index < chunks.length; index += 1) {
@@ -741,24 +792,6 @@ function trimCommandAndArticle(chunks: readonly StandardChunk[]): readonly Stand
 // Example: `trimLeadingArticle(chunksFor("the next month"))` returns chunks for `next month`.
 function trimLeadingArticle(chunks: readonly StandardChunk[]): readonly StandardChunk[] {
   return chunks[0]?.kind === "word" && chunks[0].value === "the" ? chunks.slice(1) : chunks;
-}
-
-// Example: `trimLeadingSeparators(chunksFor(", weekends"))` removes leading separators.
-function trimLeadingSeparators(chunks: readonly StandardChunk[]): readonly StandardChunk[] {
-  let start = 0;
-  while (chunks[start]?.kind === "separator") {
-    start += 1;
-  }
-  return chunks.slice(start);
-}
-
-// Example: `trimTrailingSeparators(chunksFor("next month,"))` removes trailing separators.
-function trimTrailingSeparators(chunks: readonly StandardChunk[]): readonly StandardChunk[] {
-  let end = chunks.length;
-  while (chunks[end - 1]?.kind === "separator") {
-    end -= 1;
-  }
-  return chunks.slice(0, end);
 }
 
 // Example: `chunkText(chunksFor("q 4"))` returns normalized phrase text `q4`.

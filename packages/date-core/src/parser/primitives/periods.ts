@@ -1,4 +1,3 @@
-export type { CalendarRangePeriod, DayGroupPeriod, Period } from "../types";
 import { DayGroupPeriodSet, PeriodAliasMap, type DayGroupPeriod, type Period } from "../types";
 
 // Example: `parsePeriod("weekends")` returns `weekend`.

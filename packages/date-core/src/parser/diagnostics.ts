@@ -2,7 +2,7 @@ import { resolveBoundary } from "./resolve/boundary";
 import type { StandardChunk } from "./chunks";
 import type { BoundaryEndpointSlice, BoundarySlice, DateSlice } from "./slice";
 import { GrammarWordSet, RelativeModifierSet, type RelativeModifier } from "./types";
-import { normalizeVocabularyValue, type DateVocabularyLookups } from "./vocabulary";
+import { hasVocabularyLookupValue, normalizeVocabularyValue, type DateVocabularyLookups } from "./vocabulary";
 import type { PlainDate, TemporalApi } from "../temporal/types";
 import type { ResolvedParseDateContext, Token } from "../types";
 
@@ -66,11 +66,7 @@ function isRecognizedWordChunkValue(value: string, lookups: DateVocabularyLookup
   return (
     RelativeModifierSet.has(value as RelativeModifier) ||
     GrammarWordSet.has(value as never) ||
-    lookups.aliases.has(value) ||
-    lookups.months.has(value) ||
-    lookups.weekdays.has(value) ||
-    lookups.durationUnits.has(value) ||
-    lookups.relatives.has(value as never) ||
+    hasVocabularyLookupValue(value, lookups) ||
     lookups.namedDates.some(
       (entry) =>
         normalizeVocabularyValue(entry.value) === value ||
