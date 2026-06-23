@@ -145,6 +145,10 @@ export function CalendarScroll({
       return;
     }
 
+    if (calendar.navigationRefs.syncRef.current.suppressScrollSync) {
+      return;
+    }
+
     if (
       getScrollSize(element, direction) <= getClientSize(element, direction)
     ) {
@@ -156,6 +160,7 @@ export function CalendarScroll({
       ? Number(anchor.getAttribute("calchemy-period-index"))
       : NaN;
     if (Number.isFinite(anchorIndex)) {
+      calendar.navigationRefs.periodIndexRef.current = anchorIndex;
       calendar.setVisiblePeriodIndex(anchorIndex);
     }
 

@@ -5,6 +5,7 @@ import type {
   WeekdayIndex,
 } from "@calchemy/date-core";
 import type { CalchemyState } from "../../hooks/useCalchemy";
+import type { CalendarNavigationRefs } from "./calendar-navigation";
 
 export type CalendarPeriodUnit = "month" | "week";
 export type CalendarScrollDirection = "horizontal" | "vertical";
@@ -47,6 +48,7 @@ export type CalendarState = {
   isDateDisabled: ((date: PlainDate, calendar: CalendarState) => boolean) | undefined;
   setPeriodAnchor(date: PlainDate): void;
   setVisiblePeriodIndex(index: number): void;
+  navigationRefs: CalendarNavigationRefs;
   canMove(unit: CalendarPeriodUnit, count: number): boolean;
   move(unit: CalendarPeriodUnit, count: number): void;
   canExtendPeriods(direction: "before" | "after", windows?: number): boolean;

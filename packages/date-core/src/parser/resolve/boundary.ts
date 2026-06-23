@@ -968,11 +968,13 @@ function resolveOrdinalCalendarUnitSpanBoundary(
     range,
     boundary.unit,
     boundary.startOrdinal,
+    context.weekStartsOn,
   );
   const endRange = selectOrdinalCalendarUnitRange(
     range,
     boundary.unit,
     boundary.endOrdinal,
+    context.weekStartsOn,
   );
   return startRange?.kind === "range" && endRange?.kind === "range"
     ? { kind: "range", start: startRange.start, end: endRange.end }
@@ -1000,7 +1002,7 @@ function resolveOrdinalCalendarUnitBoundary(
 
   const selectedRanges = boundary.ordinals
     .map((ordinal) =>
-      selectOrdinalCalendarUnitRange(range, boundary.unit, ordinal),
+      selectOrdinalCalendarUnitRange(range, boundary.unit, ordinal, context.weekStartsOn),
     )
     .filter(
       (value): value is Extract<DateValue, { kind: "range" }> =>
@@ -1024,29 +1026,47 @@ function resolveOrdinalCalendarUnitBoundary(
   return dates.length > 0 ? { kind: "multiple", dates } : null;
 }
 
-// Example: `selectOrdinalCalendarUnitRange(yearRange, "week", 52)` selects the 52nd week inside the year.
+// Example: `selectOrdinalCalendarUnitRange(yearRange, "week", 52, 0)` selects the 52nd calendar week inside the year.
 function selectOrdinalCalendarUnitRange(
   range: Extract<DateValue, { kind: "range" }>,
   unit: CalendarListPeriod,
   ordinal: number,
+  weekStartsOn: WeekdayIndex,
 ): DateValue | null {
-  const start =
-    unit === "week"
-      ? range.start.add({ weeks: ordinal - 1 })
-      : range.start.add({ months: ordinal - 1 });
-  const end =
-    unit === "week"
-      ? start.add({ days: 6 })
-      : start.add({ months: 1 }).subtract({ days: 1 });
-  if (comparePlainDate(start, range.end) > 0) {
-    return null;
+  if (unit === "month") {
+    const start = range.start.add({ months: ordinal - 1 });
+    const end = start.add({ months: 1 }).subtract({ days: 1 });
+    if (comparePlainDate(start, range.end) > 0) {
+      return null;
+    }
+
+    return {
+      kind: "range",
+      start,
+      end: comparePlainDate(end, range.end) <= 0 ? end : range.end,
+    };
   }
 
-  return {
-    kind: "range",
-    start,
-    end: comparePlainDate(end, range.end) <= 0 ? end : range.end,
-  };
+  let weekStart = startOfCalendarWeek(range.start, weekStartsOn);
+  let weekIndex = 0;
+
+  while (comparePlainDate(weekStart, range.end) <= 0) {
+    if (weekIndex === ordinal - 1) {
+      const weekEnd = endOfCalendarWeek(weekStart, weekStartsOn);
+      const start = comparePlainDate(weekStart, range.start) < 0 ? range.start : weekStart;
+      const end = comparePlainDate(weekEnd, range.end) > 0 ? range.end : weekEnd;
+      if (comparePlainDate(start, range.end) > 0) {
+        return null;
+      }
+
+      return { kind: "range", start, end };
+    }
+
+    weekIndex += 1;
+    weekStart = weekStart.add({ weeks: 1 });
+  }
+
+  return null;
 }
 
 // Example: `resolveShiftedAnchorBoundary(tomorrowNextMonthBoundary, anchor, Temporal, context, lookups)` projects tomorrow into next month.

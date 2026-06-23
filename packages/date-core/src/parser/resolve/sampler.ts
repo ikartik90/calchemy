@@ -21,7 +21,7 @@ export function applySampler(
   }
 
   if (sampler.kind === "all-days") {
-    return { kind: "multiple", dates: selectEveryNthDate(dates, sampler.interval, sampler.startIndex) };
+    return materializeSampledDates(selectEveryNthDate(dates, sampler.interval, sampler.startIndex));
   }
 
   if (sampler.kind === "day-number-parity") {
@@ -32,14 +32,16 @@ export function applySampler(
     };
   }
 
-  return {
-    kind: "multiple",
-    dates: selectEveryNthDate(
-      dates.filter((date) => sampler.weekdays.includes(date.dayOfWeek)),
-      sampler.interval,
-      sampler.startIndex,
-    ),
-  };
+  const matchingDates = dates.filter((date) => sampler.weekdays.includes(date.dayOfWeek));
+  if (sampler.interval > 1 && sampler.weekdays.length > 1) {
+    return materializeSampledDates(
+      selectAlternateWeekdayDates(value, sampler.weekdays, sampler.interval, sampler.startIndex, weekStartsOn),
+    );
+  }
+
+  return materializeSampledDates(
+    selectEveryNthDate(matchingDates, sampler.interval, sampler.startIndex),
+  );
 }
 
 // Example: `applyWeekSampler(quarterRange, 2, 0, 0)` returns every other week in the quarter.
@@ -75,7 +77,7 @@ function applyWeekSampler(
     weekStart = weekStart.add({ weeks: 1 });
   }
 
-  return dates.length > 0 ? { kind: "multiple", dates } : null;
+  return dates.length > 0 ? materializeSampledDates(dates) : null;
 }
 
 // Example: `expandValueDates(range)` expands every date in the inclusive range.
@@ -112,5 +114,65 @@ function getRangeScope(value: DateValue): { start: PlainDate; end: PlainDate } |
 // Example: `selectEveryNthDate(dates, 2, 0)` returns every other date.
 function selectEveryNthDate(dates: readonly PlainDate[], interval: number, startIndex: number): PlainDate[] {
   return dates.filter((_, index) => index >= startIndex && (index - startIndex) % interval === 0);
+}
+
+// Example: `selectAlternateWeekdayDates(q4Range, [1, 3], 2, 0, 0)` returns Mon and Wed on alternate weeks in Q4.
+function selectAlternateWeekdayDates(
+  value: DateValue,
+  weekdays: readonly number[],
+  interval: number,
+  startIndex: number,
+  weekStartsOn: WeekdayIndex,
+): PlainDate[] {
+  const scope = getRangeScope(value);
+  if (!scope) {
+    return [];
+  }
+
+  const dates: PlainDate[] = [];
+  let weekStart = startOfCalendarWeek(scope.start, weekStartsOn);
+  let weekIndex = 0;
+
+  while (comparePlainDate(weekStart, scope.end) <= 0) {
+    if (weekIndex >= startIndex && (weekIndex - startIndex) % interval === 0) {
+      const weekEnd = endOfCalendarWeek(weekStart, weekStartsOn);
+      const clipStart = comparePlainDate(weekStart, scope.start) < 0 ? scope.start : weekStart;
+      const clipEnd = comparePlainDate(weekEnd, scope.end) > 0 ? scope.end : weekEnd;
+      let cursor = clipStart;
+
+      while (comparePlainDate(cursor, clipEnd) <= 0) {
+        if (weekdays.includes(cursor.dayOfWeek)) {
+          dates.push(cursor);
+        }
+        cursor = cursor.add({ days: 1 });
+      }
+    }
+
+    weekIndex += 1;
+    weekStart = weekStart.add({ weeks: 1 });
+  }
+
+  return dates;
+}
+
+// Example: `materializeSampledDates([mon, tue, wed, thu, fri])` returns a contiguous weekday range.
+function materializeSampledDates(dates: readonly PlainDate[]): DateValue | null {
+  if (dates.length === 0) {
+    return null;
+  }
+
+  if (dates.length === 1) {
+    return { kind: "single", date: dates[0]! };
+  }
+
+  for (let index = 1; index < dates.length; index += 1) {
+    const previous = dates[index - 1];
+    const current = dates[index];
+    if (!previous || !current || comparePlainDate(current.subtract({ days: 1 }), previous) !== 0) {
+      return { kind: "multiple", dates: [...dates] };
+    }
+  }
+
+  return { kind: "range", start: dates[0]!, end: dates[dates.length - 1]! };
 }
 

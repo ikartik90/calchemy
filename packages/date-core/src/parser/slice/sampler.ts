@@ -79,7 +79,7 @@ function parseWeekPeriod(input: string, lookups: DateVocabularyLookups): boolean
 
 // Example: `parseOccurrencePrefix("even mondays")` returns even occurrence metadata for `mondays`.
 function parseOccurrencePrefix(input: string): { parity: SamplerParity; input: string } | null {
-  const match = /^(.+) (.+)$/.exec(input);
+  const match = /^(odd|even) (.+)$/u.exec(input);
   if (!match?.[1] || !SamplerParitySet.has(match[1]) || !match[2] || match[2].startsWith("numbered ")) {
     return null;
   }

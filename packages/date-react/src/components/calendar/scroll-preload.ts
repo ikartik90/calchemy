@@ -25,20 +25,112 @@ export function getClientSize(element: HTMLElement, direction: CalendarScrollDir
   return direction === "horizontal" ? element.clientWidth : element.clientHeight;
 }
 
+export function getScrollOffsetToPeriod(
+  scrollElement: HTMLElement,
+  period: HTMLElement,
+  direction: CalendarScrollDirection,
+): number {
+  const scrollRect = scrollElement.getBoundingClientRect();
+  const periodRect = period.getBoundingClientRect();
+
+  return (
+    getScrollPosition(scrollElement, direction) +
+    (direction === "horizontal"
+      ? periodRect.left - scrollRect.left
+      : periodRect.top - scrollRect.top)
+  );
+}
+
 export function scrollPeriodIntoView(
   scrollElement: HTMLElement,
   period: HTMLElement,
   direction: CalendarScrollDirection,
 ): void {
-  const scrollRect = scrollElement.getBoundingClientRect();
-  const periodRect = period.getBoundingClientRect();
+  setScrollPosition(
+    scrollElement,
+    direction,
+    getScrollOffsetToPeriod(scrollElement, period, direction),
+  );
+}
 
-  if (direction === "horizontal") {
-    scrollElement.scrollLeft += periodRect.left - scrollRect.left;
-    return;
+const defaultNavigationDurationMs = 280;
+
+function easeOutCubic(progress: number): number {
+  return 1 - (1 - progress) ** 3;
+}
+
+function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return false;
   }
 
-  scrollElement.scrollTop += periodRect.top - scrollRect.top;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+export function animateScrollPosition(
+  element: HTMLElement,
+  direction: CalendarScrollDirection,
+  targetPosition: number,
+  options?: { durationMs?: number; onComplete?: () => void },
+): () => void {
+  if (prefersReducedMotion()) {
+    setScrollPosition(element, direction, targetPosition);
+    options?.onComplete?.();
+    return () => {};
+  }
+
+  const startPosition = getScrollPosition(element, direction);
+  const distance = targetPosition - startPosition;
+  if (distance === 0) {
+    options?.onComplete?.();
+    return () => {};
+  }
+
+  const durationMs = options?.durationMs ?? defaultNavigationDurationMs;
+  let startTime: number | null = null;
+  let frame = 0;
+  let cancelled = false;
+
+  const step = (timestamp: number) => {
+    if (cancelled) {
+      return;
+    }
+
+    startTime ??= timestamp;
+    const progress = Math.min((timestamp - startTime) / durationMs, 1);
+    setScrollPosition(
+      element,
+      direction,
+      startPosition + distance * easeOutCubic(progress),
+    );
+
+    if (progress < 1) {
+      frame = requestAnimationFrame(step);
+      return;
+    }
+
+    options?.onComplete?.();
+  };
+
+  frame = requestAnimationFrame(step);
+  return () => {
+    cancelled = true;
+    cancelAnimationFrame(frame);
+  };
+}
+
+export function scrollPeriodIntoViewSmooth(
+  scrollElement: HTMLElement,
+  period: HTMLElement,
+  direction: CalendarScrollDirection,
+  options?: { durationMs?: number; onComplete?: () => void },
+): () => void {
+  return animateScrollPosition(
+    scrollElement,
+    direction,
+    getScrollOffsetToPeriod(scrollElement, period, direction),
+    options,
+  );
 }
 
 export function getScrollAnchorPeriod(

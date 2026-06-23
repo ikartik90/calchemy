@@ -3,6 +3,7 @@ import type { ComponentPropsWithoutRef, CSSProperties, MouseEvent } from "react"
 import type { PlainDate } from "@calchemy/date-core";
 import { CalendarContext, useCalchemyCalendar, useCalchemyContext } from "./context";
 import { CalendarGrid, CalendarWeekdays } from "./CalendarGrid";
+import { navigateCalendarWindow } from "./calendar-navigation";
 import {
   addCalendarPeriod,
   buildCalendarPeriods,
@@ -58,6 +59,10 @@ export function Calendar({
   const prevInputValueRef = useRef(state.inputValue);
   const prevSelectedKeyRef = useRef(getDateValueKey(selected));
   const prevExpectedValueRef = useRef(state.expectedValue);
+  const calendarRef = useRef<HTMLDivElement | null>(null);
+  const periodIndexRef = useRef<number | null>(null);
+  const animationCancelRef = useRef<(() => void) | null>(null);
+  const navigationSyncRef = useRef({ suppressScrollSync: false });
   useEffect(() => {
     if (prevExpectedValueRef.current === state.expectedValue) {
       return;
@@ -93,6 +98,10 @@ export function Calendar({
     [periods, activeVisiblePeriodIndex, parsedPeriod.count],
   );
   const visiblePeriodAnchor = visiblePeriods[0]?.start ?? periodAnchor;
+
+  useLayoutEffect(() => {
+    periodIndexRef.current = visiblePeriods[0]?.index ?? null;
+  }, [visiblePeriods]);
 
   useLayoutEffect(() => {
     const inputChanged = prevInputValueRef.current !== state.inputValue;
@@ -166,6 +175,18 @@ export function Calendar({
     return periodIntersectsBounds(targetPeriod, bounds);
   }
 
+  function commitCalendarMove(unit: "month" | "week", count: number) {
+    const clamped = clampDateToBounds(addCalendarPeriod(visiblePeriodAnchor, unit, count), bounds);
+    setPeriodAnchor(clamped);
+    setNavigationAnchor({
+      date: clamped,
+      inputValue: state.inputValue,
+    });
+    setPeriodExtensions(getInitialPeriodExtensions(parsedPeriod));
+    setScrolledVisiblePeriodIndex(null);
+  }
+
+  const calendarStateRef = useRef<CalendarState | null>(null);
   const calendarState = useMemo(
     () =>
       ({
@@ -197,20 +218,36 @@ export function Calendar({
             return { anchor: periodAnchorKey, inputValue: state.inputValue, index };
           });
         },
+        navigationRefs: {
+          periodIndexRef,
+          animationCancelRef,
+          syncRef: navigationSyncRef,
+        },
         canMove: canMoveCalendar,
         move(unit, count) {
           if (!canMoveCalendar(unit, count)) {
             return;
           }
 
-          const clamped = clampDateToBounds(addCalendarPeriod(visiblePeriodAnchor, unit, count), bounds);
-          setPeriodAnchor(clamped);
-          setNavigationAnchor({
-            date: clamped,
-            inputValue: state.inputValue,
-          });
-          setPeriodExtensions(getInitialPeriodExtensions(parsedPeriod));
-          setScrolledVisiblePeriodIndex(null);
+          if (unit !== parsedPeriod.unit || Math.abs(count) !== parsedPeriod.count) {
+            commitCalendarMove(unit, count);
+            return;
+          }
+
+          const calendarElement = calendarRef.current;
+          const currentState = calendarStateRef.current;
+          if (!calendarElement || !currentState) {
+            commitCalendarMove(unit, count);
+            return;
+          }
+
+          navigateCalendarWindow(
+            currentState,
+            calendarElement,
+            count > 0 ? 1 : -1,
+            currentState.navigationRefs,
+            () => commitCalendarMove(unit, count),
+          );
         },
         canExtendPeriods: canExtendCalendarPeriods,
         extendPeriods(direction, windows = 1) {
@@ -269,6 +306,7 @@ export function Calendar({
       isDateDisabled,
     ],
   );
+  calendarStateRef.current = calendarState;
 
   const content = children ?? (
     <>
@@ -286,6 +324,7 @@ export function Calendar({
     <CalendarContext.Provider value={calendarState}>
       <div
         {...divProps}
+        ref={calendarRef}
         calchemy-calendar=""
         calchemy-editable={editable ? "" : undefined}
         style={
@@ -368,8 +407,9 @@ function CalendarNavigationButton({
   ...props
 }: CalendarNavigationButtonProps) {
   const calendar = useCalchemyCalendar();
+  const moveCount = calendar.period.count * direction;
   const disabled =
-    props.disabled ?? !calendar.canMove(calendar.period.unit, calendar.period.count * direction);
+    props.disabled ?? !calendar.canMove(calendar.period.unit, moveCount);
 
   function handleClick(event: MouseEvent<HTMLButtonElement>) {
     onClick?.(event);
@@ -377,7 +417,7 @@ function CalendarNavigationButton({
       return;
     }
 
-    calendar.move(calendar.period.unit, calendar.period.count * direction);
+    calendar.move(calendar.period.unit, moveCount);
   }
 
   return <button {...props} type={type} disabled={disabled} onClick={handleClick} />;

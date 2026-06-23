@@ -123,10 +123,10 @@ describe("parseDate", () => {
     ["last 20 days of the next month", { kind: "range", start: "2026-06-11", end: "2026-06-30" }],
     ["first ten days in next year", { kind: "range", start: "2027-01-01", end: "2027-01-10" }],
     ["third weekend of the next month", { kind: "range", start: "2026-06-20", end: "2026-06-21" }],
-    ["third week last quarter", { kind: "range", start: "2026-01-15", end: "2026-01-21" }],
-    ["third week of last quarter", { kind: "range", start: "2026-01-15", end: "2026-01-21" }],
-    ["51st and 52nd week this year", { kind: "range", start: "2026-12-17", end: "2026-12-30" }],
-    ["between 50th and 52nd week this year", { kind: "range", start: "2026-12-10", end: "2026-12-30" }],
+    ["third week last quarter", { kind: "range", start: "2026-01-11", end: "2026-01-17" }],
+    ["third week of last quarter", { kind: "range", start: "2026-01-11", end: "2026-01-17" }],
+    ["51st and 52nd week this year", { kind: "range", start: "2026-12-13", end: "2026-12-26" }],
+    ["between 50th and 52nd week this year", { kind: "range", start: "2026-12-06", end: "2026-12-26" }],
     ["Christmas 2026-Jul 1, 27", { kind: "range", start: "2026-12-25", end: "2027-07-01" }],
     ["2026-11-10/2026-11-24", { kind: "range", start: "2026-11-10", end: "2026-11-24" }],
     ["between christmas and jul 1 2027", { kind: "range", start: "2026-12-25", end: "2027-07-01" }],
@@ -662,6 +662,36 @@ describe("parseDate", () => {
     }
   });
 
+  test("selects weekdays in the nth calendar week of a month", () => {
+    const result = calchemy.parseDate("weekdays in the second week of july", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "range",
+        start: "2026-07-06",
+        end: "2026-07-10",
+      });
+    }
+  });
+
+  test("resolves weekday spans in an ordinal week as a range for range inputs", () => {
+    const result = calchemy.parseDate("weekdays in the second week of july", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      const rangeResult = resolveExpectedDateValue(result, "range");
+      expect(rangeResult.status).toBe("valid");
+      if (rangeResult.status === "valid") {
+        expect(calchemy.toJSON(rangeResult.value)).toEqual({
+          kind: "range",
+          start: "2026-07-06",
+          end: "2026-07-10",
+        });
+      }
+    }
+  });
+
   test("samples even weekday occurrences across shorthand month boundaries and excludes holidays", () => {
     const result = calchemy.parseDate("even mondays from m3 to m5 excluding holidays", context);
 
@@ -759,6 +789,74 @@ describe("parseDate", () => {
           "2026-08-10",
           "2026-08-24",
         ],
+      });
+    }
+  });
+
+  test("selects alternate weekdays on alternate weeks for a quarter range", () => {
+    const result = calchemy.parseDate("Alternate mondays and wednesday in Q4", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: [
+          "2026-10-12",
+          "2026-10-14",
+          "2026-10-26",
+          "2026-10-28",
+          "2026-11-09",
+          "2026-11-11",
+          "2026-11-23",
+          "2026-11-25",
+          "2026-12-07",
+          "2026-12-09",
+          "2026-12-21",
+          "2026-12-23",
+        ],
+      });
+    }
+  });
+
+  test.each([
+    ["odd mondays and wednesdays in Q4", [
+      "2026-10-12",
+      "2026-10-14",
+      "2026-10-26",
+      "2026-10-28",
+      "2026-11-09",
+      "2026-11-11",
+      "2026-11-23",
+      "2026-11-25",
+      "2026-12-07",
+      "2026-12-09",
+      "2026-12-21",
+      "2026-12-23",
+    ]],
+    ["even mondays and wednesdays in Q4", [
+      "2026-10-05",
+      "2026-10-07",
+      "2026-10-19",
+      "2026-10-21",
+      "2026-11-02",
+      "2026-11-04",
+      "2026-11-16",
+      "2026-11-18",
+      "2026-11-30",
+      "2026-12-02",
+      "2026-12-14",
+      "2026-12-16",
+      "2026-12-28",
+      "2026-12-30",
+    ]],
+  ])("selects parity weekdays on alternate weeks for a quarter range: %s", (input, dates) => {
+    const result = calchemy.parseDate(input, context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates,
       });
     }
   });
@@ -1004,13 +1102,13 @@ describe("parseDate", () => {
       expect(calchemy.toJSON(result.value)).toEqual({
         kind: "multiple",
         dates: [
+          "2026-12-13",
+          "2026-12-15",
           "2026-12-17",
           "2026-12-19",
           "2026-12-21",
           "2026-12-23",
           "2026-12-25",
-          "2026-12-27",
-          "2026-12-29",
         ],
       });
     }
@@ -1027,7 +1125,7 @@ describe("parseDate", () => {
     if (result.status === "valid") {
       expect(calchemy.toJSON(result.value)).toEqual({
         kind: "multiple",
-        dates: ["2026-12-22", "2026-12-29"],
+        dates: ["2026-12-15", "2026-12-22"],
       });
     }
   });
@@ -1364,7 +1462,7 @@ describe("parseDate", () => {
     if (result.status === "valid") {
       expect(calchemy.toJSON(result.value)).toEqual({
         kind: "multiple",
-        dates: ["2027-12-24", "2027-12-27", "2027-12-28", "2027-12-29", "2027-12-30"],
+        dates: ["2027-12-20", "2027-12-21", "2027-12-22", "2027-12-23", "2027-12-24"],
       });
     }
   });
@@ -1376,7 +1474,7 @@ describe("parseDate", () => {
     if (result.status === "valid") {
       expect(calchemy.toJSON(result.value)).toEqual({
         kind: "multiple",
-        dates: ["2027-12-24", "2027-12-27", "2027-12-28", "2027-12-29", "2027-12-30"],
+        dates: ["2027-12-20", "2027-12-21", "2027-12-22", "2027-12-23", "2027-12-24"],
       });
     }
   });
@@ -1389,16 +1487,16 @@ describe("parseDate", () => {
       expect(calchemy.toJSON(result.value)).toEqual({
         kind: "multiple",
         dates: [
+          "2027-12-13",
+          "2027-12-14",
+          "2027-12-15",
+          "2027-12-16",
           "2027-12-17",
           "2027-12-20",
           "2027-12-21",
           "2027-12-22",
           "2027-12-23",
           "2027-12-24",
-          "2027-12-27",
-          "2027-12-28",
-          "2027-12-29",
-          "2027-12-30",
         ],
       });
     }
@@ -1412,15 +1510,15 @@ describe("parseDate", () => {
       expect(calchemy.toJSON(result.value)).toEqual({
         kind: "multiple",
         dates: [
+          "2026-12-14",
+          "2026-12-15",
+          "2026-12-16",
           "2026-12-17",
           "2026-12-18",
           "2026-12-21",
           "2026-12-22",
           "2026-12-23",
           "2026-12-24",
-          "2026-12-28",
-          "2026-12-29",
-          "2026-12-30",
         ],
       });
     }
@@ -1741,7 +1839,7 @@ describe("parseDate", () => {
           "2026-07-13",
           "2026-07-20",
           "2026-07-27",
-          "2026-08-03",
+          "2026-08-17",
           "2026-08-24",
           "2026-08-31",
           "2026-09-07",
