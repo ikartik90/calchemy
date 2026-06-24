@@ -12,6 +12,14 @@ import {
   scrollPeriodIntoView,
   setScrollPosition,
 } from "./scroll-preload";
+
+function isCurrentPeriodAligned(
+  scrollElement: HTMLElement,
+  direction: CalendarScrollDirection,
+): boolean {
+  const anchor = getScrollAnchorPeriod(scrollElement, direction);
+  return anchor?.getAttribute("calchemy-period-index") === "0";
+}
 import type { CalendarScrollDirection } from "./types";
 
 const preloadWindowCount = 2;
@@ -50,15 +58,68 @@ export function CalendarScroll({
     }
 
     const element = scrollRef.current;
-    const currentPeriod = element?.querySelector<HTMLElement>(
-      "[calchemy-period][calchemy-period-index='0']",
-    );
-    if (!element || !currentPeriod) {
+    if (!element) {
       return;
     }
 
-    positionedPeriodAnchor.current = anchorKey;
-    scrollPeriodIntoView(element, currentPeriod, direction);
+    let cancelled = false;
+
+    const alignToCurrentPeriod = () => {
+      if (cancelled || positionedPeriodAnchor.current === anchorKey) {
+        return;
+      }
+
+      const currentPeriod = element.querySelector<HTMLElement>(
+        "[calchemy-period][calchemy-period-index='0']",
+      );
+      if (!currentPeriod) {
+        return;
+      }
+
+      calendar.navigationSync.suppressScrollSync = true;
+      scrollPeriodIntoView(element, currentPeriod, direction, { instant: true });
+
+      if (isCurrentPeriodAligned(element, direction)) {
+        positionedPeriodAnchor.current = anchorKey;
+        calendar.setVisiblePeriodIndex(0);
+        calendar.navigationSync.suppressScrollSync = false;
+        return;
+      }
+
+      calendar.navigationSync.suppressScrollSync = false;
+    };
+
+    alignToCurrentPeriod();
+
+    if (positionedPeriodAnchor.current === anchorKey) {
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      alignToCurrentPeriod();
+    });
+
+    if (typeof ResizeObserver === "undefined") {
+      return () => {
+        cancelled = true;
+        cancelAnimationFrame(frame);
+      };
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      alignToCurrentPeriod();
+    });
+    resizeObserver.observe(element);
+    const periodList = element.querySelector<HTMLElement>("[calchemy-period-list]");
+    if (periodList) {
+      resizeObserver.observe(periodList);
+    }
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+      resizeObserver.disconnect();
+    };
   }, [direction, calendar.periodAnchor, calendar.periods]);
 
   function startBeforePreloadTransaction(
@@ -140,12 +201,12 @@ export function CalendarScroll({
     }
 
     const element = event.currentTarget;
-    if (suppressPreloadEvaluation.current) {
-      stabilizePrependScrollEvent(element);
+    if (calendar.navigationSync.suppressScrollSync) {
       return;
     }
 
-    if (calendar.navigationRefs.syncRef.current.suppressScrollSync) {
+    if (suppressPreloadEvaluation.current) {
+      stabilizePrependScrollEvent(element);
       return;
     }
 
@@ -160,7 +221,6 @@ export function CalendarScroll({
       ? Number(anchor.getAttribute("calchemy-period-index"))
       : NaN;
     if (Number.isFinite(anchorIndex)) {
-      calendar.navigationRefs.periodIndexRef.current = anchorIndex;
       calendar.setVisiblePeriodIndex(anchorIndex);
     }
 

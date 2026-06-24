@@ -1,4 +1,5 @@
 import type { ComponentPropsWithoutRef, ChangeEvent } from "react";
+import type { PlainDate } from "@calchemy/date-core";
 import { useCalchemyCalendar } from "./context";
 import { formatMonthLabel, isAfter, isBefore } from "./date-model";
 
@@ -6,7 +7,7 @@ export type CalchemyCalendarMonthSelectProps = Omit<ComponentPropsWithoutRef<"se
   onChange?: ComponentPropsWithoutRef<"select">["onChange"];
 };
 
-export function CalendarMonthSelect({ onChange, ...props }: CalchemyCalendarMonthSelectProps) {
+export function CalendarMonthSelect({ onChange, disabled, ...props }: CalchemyCalendarMonthSelectProps) {
   const calendar = useCalchemyCalendar();
   const months = Array.from({ length: 12 }, (_, index) => index + 1).filter((month) =>
     isMonthWithinBounds(calendar.visiblePeriodAnchor.with({ month, day: 1 }), calendar),
@@ -16,11 +17,13 @@ export function CalendarMonthSelect({ onChange, ...props }: CalchemyCalendarMont
     <select
       {...props}
       calchemy-month-select=""
+      disabled={disabled ?? calendar.isNavigating}
       value={String(calendar.visiblePeriodAnchor.month)}
       onChange={(event) =>
-        handleCalendarSelectChange(event, onChange, (value) =>
-          calendar.setPeriodAnchor(calendar.visiblePeriodAnchor.with({ month: value, day: 1 })),
-        )
+        handleCalendarSelectChange(event, onChange, (value) => {
+          const target = calendar.visiblePeriodAnchor.with({ month: value, day: 1 });
+          calendar.navigateTo(target, compareNavigationDirection(target, calendar.visiblePeriodAnchor));
+        })
       }
     >
       {months.map((month) => {
@@ -41,7 +44,13 @@ export type CalchemyCalendarYearSelectProps = Omit<ComponentPropsWithoutRef<"sel
   onChange?: ComponentPropsWithoutRef<"select">["onChange"];
 };
 
-export function CalendarYearSelect({ startYear, endYear, onChange, ...props }: CalchemyCalendarYearSelectProps) {
+export function CalendarYearSelect({
+  startYear,
+  endYear,
+  onChange,
+  disabled,
+  ...props
+}: CalchemyCalendarYearSelectProps) {
   const calendar = useCalchemyCalendar();
   const visibleYear = calendar.visiblePeriodAnchor.year;
   const firstYear = Math.min(calendar.bounds?.start?.year ?? startYear ?? visibleYear - 100, visibleYear);
@@ -51,11 +60,13 @@ export function CalendarYearSelect({ startYear, endYear, onChange, ...props }: C
     <select
       {...props}
       calchemy-year-select=""
+      disabled={disabled ?? calendar.isNavigating}
       value={String(visibleYear)}
       onChange={(event) =>
-        handleCalendarSelectChange(event, onChange, (value) =>
-          calendar.setPeriodAnchor(calendar.visiblePeriodAnchor.with({ year: value, day: 1 })),
-        )
+        handleCalendarSelectChange(event, onChange, (value) => {
+          const target = calendar.visiblePeriodAnchor.with({ year: value, day: 1 });
+          calendar.navigateTo(target, compareNavigationDirection(target, calendar.visiblePeriodAnchor));
+        })
       }
     >
       {Array.from({ length: lastYear - firstYear + 1 }, (_, index) => firstYear + index).map((year) => (
@@ -78,6 +89,14 @@ function handleCalendarSelectChange(
   }
 
   updatePeriodAnchor(Number(event.currentTarget.value));
+}
+
+function compareNavigationDirection(target: PlainDate, anchor: PlainDate): 1 | -1 {
+  if (isBefore(target, anchor)) {
+    return -1;
+  }
+
+  return 1;
 }
 
 function isMonthWithinBounds(

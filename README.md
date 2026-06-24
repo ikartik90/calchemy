@@ -189,6 +189,30 @@ Optional date grid. Skip the children and you get a default header, weekday row,
 
 `bounds` keeps navigation and selection inside a range. `isDateDisabled` greys out specific days. `namedDates="holidays"` marks days from your `namedDatesVocabulary`.
 
+`navigationTransition="auto"` (default) animates header navigation. Static layouts expose `calchemy-nav="out"` and `calchemy-nav="in"` on the slide target (`[calchemy-grid]`, `[calchemy-period]`, or `[calchemy-period-list]`) with `--calchemy-nav-direction` set to `1` or `-1`. Style the transition in CSS:
+
+```css
+[calchemy-grid][calchemy-nav="out"] {
+  transform: translateX(calc(var(--calchemy-nav-direction) * -100%));
+  transition: transform 240ms ease;
+}
+
+[calchemy-grid][calchemy-nav="in"] {
+  transform: translateX(0);
+  transition: transform 240ms ease;
+}
+```
+
+With `CalendarScroll`, Previous and Next scroll one visible window inside the loaded strip. Style scroll motion on `[calchemy-scroll]`:
+
+```css
+[calchemy-scroll] {
+  scroll-behavior: smooth;
+}
+```
+
+Pass `navigationTransition="none"` to skip animation and commit instantly.
+
 ### CalendarGrid `[calchemy-grid]` `[calchemy-date]` `[calchemy-selected?]` `[calchemy-today?]`
 
 The month grid. `showBookends` fills leading and trailing cells with adjacent-month days. In calendar input mode, click or drag to toggle multiple dates.
@@ -202,7 +226,7 @@ The month grid. `showBookends` fills leading and trailing cells with adjacent-mo
 
 ### CalendarScroll `[calchemy-scroll]`
 
-Import from `@calchemy/date-react/calendar-scroll`. Requires `react-dom` 18.3+ or 19+ as a peer dependency. Wrap `CalendarPeriodList` to load more months as the user scrolls.
+Import from `@calchemy/date-react/calendar-scroll`. Requires `react-dom` 18.3+ or 19+ as a peer dependency. Wrap `CalendarPeriodList` to load more months as the user scrolls. You provide overflow, grid, and scroll styling.
 
 ```tsx
 import { CalendarScroll } from "@calchemy/date-react/calendar-scroll";
@@ -225,8 +249,9 @@ Use inside `Calchemy.Calendar` when you want your own month or year controls.
 ```tsx
 const calendar = useCalchemyCalendar();
 
-calendar.setPeriodAnchor(
+calendar.navigateTo(
   calendar.visiblePeriodAnchor.with({ month: 6, day: 1 }),
+  1,
 );
 ```
 

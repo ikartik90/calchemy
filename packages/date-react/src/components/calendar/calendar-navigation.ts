@@ -1,4 +1,6 @@
 import type { RefObject } from "react";
+import type { PlainDate } from "@calchemy/date-core";
+import { isAfter, isBefore } from "./date-model";
 import {
   animateScrollPosition,
   getClientSize,
@@ -12,6 +14,9 @@ import {
 import type { CalendarScrollDirection, CalendarState } from "./types";
 
 const preloadWindowCount = 2;
+const motionProperties = new Set(["transform", "opacity"]);
+
+export type CalendarNavPhase = "out" | "in";
 
 export type CalendarNavigationRefs = {
   periodIndexRef: RefObject<number | null>;
@@ -19,54 +24,202 @@ export type CalendarNavigationRefs = {
   syncRef: RefObject<{ suppressScrollSync: boolean }>;
 };
 
-export function navigateCalendarWindow(
-  calendar: CalendarState,
-  calendarElement: HTMLElement,
-  windowDirection: -1 | 1,
-  refs: CalendarNavigationRefs,
-  onStaticCommit: () => void,
-): void {
-  const scrollElement = calendarElement.querySelector<HTMLElement>("[calchemy-scroll]");
-  const scrollDirection = getScrollDirection(scrollElement);
-
-  if (
-    scrollElement &&
-    getScrollSize(scrollElement, scrollDirection) > getClientSize(scrollElement, scrollDirection) &&
-    navigateViaScroll(calendar, scrollElement, scrollDirection, windowDirection, refs)
-  ) {
-    return;
-  }
-
-  const slideTarget = findSlideTarget(calendarElement);
-  if (slideTarget) {
-    animateStaticWindow(
-      slideTarget,
-      scrollDirection,
-      windowDirection,
-      refs,
-      onStaticCommit,
-    );
-    return;
-  }
-
-  onStaticCommit();
+export function findNavigationSlideTarget(calendarElement: HTMLElement): HTMLElement | null {
+  return (
+    calendarElement.querySelector<HTMLElement>("[calchemy-period-list]") ??
+    calendarElement.querySelector<HTMLElement>("[calchemy-period]") ??
+    calendarElement.querySelector<HTMLElement>("[calchemy-grid]")
+  );
 }
 
-function navigateViaScroll(
+export function getScrollDirection(
+  scrollElement: HTMLElement | null,
+): CalendarScrollDirection {
+  return scrollElement?.getAttribute("calchemy-direction") === "horizontal"
+    ? "horizontal"
+    : "vertical";
+}
+
+export function applySlideTargetNav(
+  slideTarget: HTMLElement,
+  phase: CalendarNavPhase,
+  direction: 1 | -1,
+): void {
+  slideTarget.setAttribute("calchemy-nav", phase);
+  slideTarget.style.setProperty("--calchemy-nav-direction", String(direction));
+}
+
+export function clearSlideTargetNav(slideTarget: HTMLElement): void {
+  slideTarget.removeAttribute("calchemy-nav");
+  slideTarget.style.removeProperty("--calchemy-nav-direction");
+  slideTarget.style.removeProperty("transform");
+  slideTarget.style.removeProperty("transition");
+}
+
+function waitForMotionEnd(element: HTMLElement): Promise<void> {
+  const computed = getComputedStyle(element);
+  const durationMs = Math.max(
+    parseDurationMs(computed.transitionDuration),
+    parseDurationMs(computed.animationDuration),
+  );
+
+  if (durationMs <= 0) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      element.removeEventListener("transitionend", onTransitionEnd);
+      element.removeEventListener("animationend", onAnimationEnd);
+      window.clearTimeout(timeoutId);
+      resolve();
+    };
+
+    const onTransitionEnd = (event: TransitionEvent) => {
+      if (event.target !== element || !motionProperties.has(event.propertyName)) {
+        return;
+      }
+
+      finish();
+    };
+
+    const onAnimationEnd = (event: AnimationEvent) => {
+      if (event.target !== element) {
+        return;
+      }
+
+      finish();
+    };
+
+    element.addEventListener("transitionend", onTransitionEnd);
+    element.addEventListener("animationend", onAnimationEnd);
+    const timeoutId = window.setTimeout(finish, durationMs + 50);
+  });
+}
+
+function parseDurationMs(value: string): number {
+  return value
+    .split(",")
+    .reduce((max, part) => {
+      const trimmed = part.trim();
+      if (!trimmed) {
+        return max;
+      }
+
+      if (trimmed.endsWith("ms")) {
+        return Math.max(max, Number.parseFloat(trimmed));
+      }
+
+      if (trimmed.endsWith("s")) {
+        return Math.max(max, Number.parseFloat(trimmed) * 1000);
+      }
+
+      return max;
+    }, 0);
+}
+
+export async function runStaticNavigation(options: {
+  slideTarget: HTMLElement;
+  direction: 1 | -1;
+  animated: boolean;
+  commit: () => void;
+  onPhaseChange?: (phase: CalendarNavPhase | null) => void;
+}): Promise<void> {
+  const { slideTarget, direction, animated, commit, onPhaseChange } = options;
+
+  if (!animated) {
+    commit();
+    return;
+  }
+
+  onPhaseChange?.("out");
+  applySlideTargetNav(slideTarget, "out", direction);
+
+  if (!hasMotion(slideTarget)) {
+    commit();
+    onPhaseChange?.("in");
+    applySlideTargetNav(slideTarget, "in", direction);
+    clearSlideTargetNav(slideTarget);
+    onPhaseChange?.(null);
+    return;
+  }
+
+  await waitForMotionEnd(slideTarget);
+
+  commit();
+
+  slideTarget.style.transition = "none";
+  slideTarget.style.transform = `translateX(${direction * 100}%)`;
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
+
+  slideTarget.style.removeProperty("transition");
+  slideTarget.style.removeProperty("transform");
+  onPhaseChange?.("in");
+  applySlideTargetNav(slideTarget, "in", direction);
+
+  if (!hasMotion(slideTarget)) {
+    clearSlideTargetNav(slideTarget);
+    onPhaseChange?.(null);
+    return;
+  }
+
+  await waitForMotionEnd(slideTarget);
+
+  clearSlideTargetNav(slideTarget);
+  onPhaseChange?.(null);
+}
+
+function hasMotion(element: HTMLElement): boolean {
+  const computed = getComputedStyle(element);
+  return (
+    parseDurationMs(computed.transitionDuration) > 0 ||
+    parseDurationMs(computed.animationDuration) > 0
+  );
+}
+
+export function resolveScrollTargetIndex(
   calendar: CalendarState,
-  scrollElement: HTMLElement,
-  direction: CalendarScrollDirection,
-  windowDirection: -1 | 1,
+  targetAnchor: PlainDate,
+): number | null {
+  const match = calendar.periods.find(
+    (period) => !isBefore(targetAnchor, period.start) && !isAfter(targetAnchor, period.end),
+  );
+
+  return match?.index ?? null;
+}
+
+export function runScrollNavigation(
+  calendar: CalendarState,
+  calendarElement: HTMLElement,
+  targetIndex: number,
+  animated: boolean,
   refs: CalendarNavigationRefs,
+  onComplete?: () => void,
 ): boolean {
-  const anchorIndex =
-    refs.periodIndexRef.current ?? calendar.visiblePeriods[0]?.index;
-  if (anchorIndex === undefined) {
+  const scrollElement = calendarElement.querySelector<HTMLElement>("[calchemy-scroll]");
+  if (!scrollElement) {
     return false;
   }
 
-  const targetIndex = anchorIndex + windowDirection * calendar.period.count;
-  refs.periodIndexRef.current = targetIndex;
+  const direction = getScrollDirection(scrollElement);
+  if (getScrollSize(scrollElement, direction) <= getClientSize(scrollElement, direction)) {
+    return false;
+  }
+
+  const anchorIndex =
+    refs.periodIndexRef.current ?? calendar.visiblePeriods[0]?.index ?? 0;
+  const windowDirection = targetIndex >= anchorIndex ? 1 : -1;
 
   ensureScrollRunway(calendar, scrollElement, direction, windowDirection);
 
@@ -74,23 +227,32 @@ function navigateViaScroll(
     `[calchemy-period-index='${targetIndex}']`,
   );
   if (!targetPeriod) {
-    refs.periodIndexRef.current = anchorIndex;
     return false;
   }
 
   refs.animationCancelRef.current?.();
   refs.syncRef.current.suppressScrollSync = true;
   calendar.setVisiblePeriodIndex(targetIndex);
+  refs.periodIndexRef.current = targetIndex;
+
+  const targetPosition = getScrollOffsetToPeriod(scrollElement, targetPeriod, direction);
+  const finish = () => {
+    refs.animationCancelRef.current = null;
+    refs.syncRef.current.suppressScrollSync = false;
+    onComplete?.();
+  };
+
+  if (!animated) {
+    setScrollPosition(scrollElement, direction, targetPosition);
+    finish();
+    return true;
+  }
+
   refs.animationCancelRef.current = animateScrollPosition(
     scrollElement,
     direction,
-    getScrollOffsetToPeriod(scrollElement, targetPeriod, direction),
-    {
-      onComplete: () => {
-        refs.animationCancelRef.current = null;
-        refs.syncRef.current.suppressScrollSync = false;
-      },
-    },
+    targetPosition,
+    { onComplete: finish },
   );
 
   return true;
@@ -133,142 +295,4 @@ function ensureScrollRunway(
   ) {
     calendar.extendPeriods("after", preloadWindowCount);
   }
-}
-
-function animateStaticWindow(
-  slideTarget: HTMLElement,
-  direction: CalendarScrollDirection,
-  windowDirection: -1 | 1,
-  refs: CalendarNavigationRefs,
-  onStaticCommit: () => void,
-): void {
-  refs.animationCancelRef.current?.();
-  refs.syncRef.current.suppressScrollSync = true;
-
-  const slideDistance =
-    direction === "horizontal" ? slideTarget.offsetWidth : slideTarget.offsetHeight;
-  if (slideDistance <= 0) {
-    onStaticCommit();
-    refs.syncRef.current.suppressScrollSync = false;
-    return;
-  }
-
-  const offset = -windowDirection * slideDistance;
-  const axisProperty = direction === "horizontal" ? "translateX" : "translateY";
-
-  refs.animationCancelRef.current = animateElementTransform(
-    slideTarget,
-    `${axisProperty}(0px)`,
-    `${axisProperty}(${offset}px)`,
-    () => {
-      onStaticCommit();
-      slideTarget.style.transform = `${axisProperty}(${-offset}px)`;
-      return `${axisProperty}(0px)`;
-    },
-    () => {
-      slideTarget.style.removeProperty("transform");
-      slideTarget.style.removeProperty("transition");
-      refs.animationCancelRef.current = null;
-      refs.syncRef.current.suppressScrollSync = false;
-    },
-  );
-}
-
-function animateElementTransform(
-  element: HTMLElement,
-  fromTransform: string,
-  midTransform: string,
-  onMidpoint: () => string,
-  onComplete: () => void,
-): () => void {
-  if (prefersReducedMotion()) {
-    onMidpoint();
-    onComplete();
-    return () => {};
-  }
-
-  const durationMs = 280;
-  let startTime: number | null = null;
-  let frame = 0;
-  let cancelled = false;
-  let midpointReached = false;
-  let endTransform = midTransform;
-
-  element.style.transform = fromTransform;
-
-  const step = (timestamp: number) => {
-    if (cancelled) {
-      return;
-    }
-
-    startTime ??= timestamp;
-    const progress = Math.min((timestamp - startTime) / durationMs, 1);
-
-    if (!midpointReached && progress >= 0.5) {
-      midpointReached = true;
-      endTransform = onMidpoint();
-    }
-
-    const localProgress = midpointReached
-      ? (progress - 0.5) / 0.5
-      : progress / 0.5;
-    const eased = easeOutCubic(Math.min(Math.max(localProgress, 0), 1));
-    element.style.transform = midpointReached
-      ? interpolateTransform(endTransform, fromTransform, eased)
-      : interpolateTransform(fromTransform, midTransform, eased);
-
-    if (progress < 1) {
-      frame = requestAnimationFrame(step);
-      return;
-    }
-
-    onComplete();
-  };
-
-  frame = requestAnimationFrame(step);
-  return () => {
-    cancelled = true;
-    cancelAnimationFrame(frame);
-  };
-}
-
-function interpolateTransform(from: string, to: string, progress: number): string {
-  const fromValue = parseTransformOffset(from);
-  const toValue = parseTransformOffset(to);
-  const current = fromValue + (toValue - fromValue) * progress;
-  const axis = from.includes("translateX") ? "translateX" : "translateY";
-  return `${axis}(${current}px)`;
-}
-
-function parseTransformOffset(transform: string): number {
-  const match = transform.match(/translate(?:X|Y)\(([-\d.]+)px\)/);
-  return match ? Number(match[1]) : 0;
-}
-
-function easeOutCubic(progress: number): number {
-  return 1 - (1 - progress) ** 3;
-}
-
-function prefersReducedMotion(): boolean {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-    return false;
-  }
-
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
-
-function getScrollDirection(
-  scrollElement: HTMLElement | null,
-): CalendarScrollDirection {
-  return scrollElement?.getAttribute("calchemy-direction") === "horizontal"
-    ? "horizontal"
-    : "vertical";
-}
-
-function findSlideTarget(calendarElement: HTMLElement): HTMLElement | null {
-  return (
-    calendarElement.querySelector<HTMLElement>("[calchemy-period-list]") ??
-    calendarElement.querySelector<HTMLElement>("[calchemy-period]") ??
-    calendarElement.querySelector<HTMLElement>("[calchemy-grid]")
-  );
 }

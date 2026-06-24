@@ -1421,6 +1421,93 @@ describe("Calchemy", () => {
     expect(screen.getByText("July 2026 - August 2026")).toBeTruthy();
   });
 
+  test("sets calchemy-nav out when static transitions are styled", () => {
+    vi.useRealTimers();
+    const originalGetComputedStyle = window.getComputedStyle.bind(window);
+    const styleSpy = vi.spyOn(window, "getComputedStyle").mockImplementation((element) => {
+      const style = originalGetComputedStyle(element);
+      if (element instanceof HTMLElement && element.matches("[calchemy-grid]")) {
+        return {
+          ...style,
+          transitionDuration: "240ms",
+          animationDuration: "0s",
+        } as CSSStyleDeclaration;
+      }
+
+      return style;
+    });
+
+    try {
+      const { container } = render(
+        <Calchemy.Root calchemy={calchemy} expectedValue="single">
+          <Calchemy.Calendar period={{ months: 1 }}>
+            <Calchemy.CalendarHeader>
+              <Calchemy.CalendarNext />
+              <Calchemy.CalendarHeading />
+            </Calchemy.CalendarHeader>
+            <Calchemy.CalendarGrid />
+          </Calchemy.Calendar>
+        </Calchemy.Root>,
+      );
+
+      const grid = container.querySelector<HTMLElement>("[calchemy-grid]");
+      if (!grid) {
+        throw new Error("Expected calendar grid.");
+      }
+
+      fireEvent.click(screen.getByText("Next"));
+      expect(grid.getAttribute("calchemy-nav")).toBe("out");
+      expect(grid.style.getPropertyValue("--calchemy-nav-direction")).toBe("1");
+    } finally {
+      styleSpy.mockRestore();
+      vi.useFakeTimers();
+    }
+  });
+
+  test("navigationTransition none skips calchemy-nav attributes", () => {
+    const { container } = render(
+      <Calchemy.Root calchemy={calchemy} expectedValue="single">
+        <Calchemy.Calendar navigationTransition="none">
+          <Calchemy.CalendarHeader>
+            <Calchemy.CalendarNext />
+            <Calchemy.CalendarHeading />
+          </Calchemy.CalendarHeader>
+          <Calchemy.CalendarGrid />
+        </Calchemy.Calendar>
+      </Calchemy.Root>,
+    );
+
+    fireEvent.click(screen.getByText("Next"));
+
+    expect(container.querySelector("[calchemy-grid][calchemy-nav]")).toBeNull();
+    expect(screen.getByText("June 2026")).toBeTruthy();
+  });
+
+  test("scroll calendar navigation does not set calchemy-nav", () => {
+    const { container } = render(
+      <Calchemy.Root calchemy={calchemy} expectedValue="single">
+        <Calchemy.Calendar period={{ months: 3 }}>
+          <Calchemy.CalendarHeader>
+            <Calchemy.CalendarNext />
+            <Calchemy.CalendarHeading />
+          </Calchemy.CalendarHeader>
+          <CalendarScroll direction="horizontal">
+            <Calchemy.CalendarPeriodList>
+              <Calchemy.CalendarPeriod>
+                <Calchemy.CalendarGrid />
+              </Calchemy.CalendarPeriod>
+            </Calchemy.CalendarPeriodList>
+          </CalendarScroll>
+        </Calchemy.Calendar>
+      </Calchemy.Root>,
+    );
+
+    fireEvent.click(screen.getByText("Next"));
+
+    expect(container.querySelector("[calchemy-nav]")).toBeNull();
+    expect(getCalendarHeadingText()).toBe("August 2026 - October 2026");
+  });
+
   test("query changes update the visible period after manual navigation", () => {
     render(
       <Calchemy.Root calchemy={calchemy} expectedValue="range">

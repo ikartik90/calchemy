@@ -45,12 +45,19 @@ export function scrollPeriodIntoView(
   scrollElement: HTMLElement,
   period: HTMLElement,
   direction: CalendarScrollDirection,
+  options?: { instant?: boolean },
 ): void {
-  setScrollPosition(
-    scrollElement,
-    direction,
-    getScrollOffsetToPeriod(scrollElement, period, direction),
-  );
+  const targetPosition = getScrollOffsetToPeriod(scrollElement, period, direction);
+
+  if (!options?.instant) {
+    setScrollPosition(scrollElement, direction, targetPosition);
+    return;
+  }
+
+  const previousBehavior = scrollElement.style.scrollBehavior;
+  scrollElement.style.scrollBehavior = "auto";
+  setScrollPosition(scrollElement, direction, targetPosition);
+  scrollElement.style.scrollBehavior = previousBehavior;
 }
 
 const defaultNavigationDurationMs = 280;
@@ -59,7 +66,7 @@ function easeOutCubic(progress: number): number {
   return 1 - (1 - progress) ** 3;
 }
 
-function prefersReducedMotion(): boolean {
+export function prefersReducedMotion(): boolean {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
     return false;
   }
@@ -119,20 +126,6 @@ export function animateScrollPosition(
   };
 }
 
-export function scrollPeriodIntoViewSmooth(
-  scrollElement: HTMLElement,
-  period: HTMLElement,
-  direction: CalendarScrollDirection,
-  options?: { durationMs?: number; onComplete?: () => void },
-): () => void {
-  return animateScrollPosition(
-    scrollElement,
-    direction,
-    getScrollOffsetToPeriod(scrollElement, period, direction),
-    options,
-  );
-}
-
 export function getScrollAnchorPeriod(
   scrollElement: HTMLElement,
   direction: CalendarScrollDirection,
@@ -140,6 +133,7 @@ export function getScrollAnchorPeriod(
   const scrollRect = scrollElement.getBoundingClientRect();
   const periods = Array.from(scrollElement.querySelectorAll<HTMLElement>("[calchemy-period]"));
   let fallback: HTMLElement | null = null;
+  const edgeTolerancePx = 1;
 
   for (const period of periods) {
     const periodRect = period.getBoundingClientRect();
@@ -156,7 +150,7 @@ export function getScrollAnchorPeriod(
     }
 
     fallback = period;
-    if (periodStart >= scrollStart) {
+    if (periodStart >= scrollStart - edgeTolerancePx) {
       return period;
     }
   }
