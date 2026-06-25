@@ -203,15 +203,20 @@ Optional date grid. Skip the children and you get a default header, weekday row,
 }
 ```
 
-With `CalendarScroll`, Previous and Next scroll one visible window inside the loaded strip. Style scroll motion on `[calchemy-scroll]`:
+With `CalendarScroll`, Previous and Next call native smooth scrolling on `[calchemy-scroll]`. Style motion with normal CSS — `scroll-behavior`, scroll snap, and your own timing all apply:
 
 ```css
 [calchemy-scroll] {
   scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+}
+
+[calchemy-period] {
+  scroll-snap-align: start;
 }
 ```
 
-Pass `navigationTransition="none"` to skip animation and commit instantly.
+Pass `navigationTransition="none"` to jump instantly with `behavior: auto`.
 
 ### CalendarGrid `[calchemy-grid]` `[calchemy-date]` `[calchemy-selected?]` `[calchemy-today?]`
 

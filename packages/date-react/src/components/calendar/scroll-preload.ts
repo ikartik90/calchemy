@@ -60,11 +60,7 @@ export function scrollPeriodIntoView(
   scrollElement.style.scrollBehavior = previousBehavior;
 }
 
-const defaultNavigationDurationMs = 280;
-
-function easeOutCubic(progress: number): number {
-  return 1 - (1 - progress) ** 3;
-}
+const smoothScrollFallbackMs = 1000;
 
 export function prefersReducedMotion(): boolean {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
@@ -78,51 +74,55 @@ export function animateScrollPosition(
   element: HTMLElement,
   direction: CalendarScrollDirection,
   targetPosition: number,
-  options?: { durationMs?: number; onComplete?: () => void },
+  options?: { onComplete?: () => void },
 ): () => void {
-  if (prefersReducedMotion()) {
-    setScrollPosition(element, direction, targetPosition);
+  const currentPosition = getScrollPosition(element, direction);
+  if (Math.abs(currentPosition - targetPosition) < 1) {
     options?.onComplete?.();
     return () => {};
   }
 
-  const startPosition = getScrollPosition(element, direction);
-  const distance = targetPosition - startPosition;
-  if (distance === 0) {
-    options?.onComplete?.();
-    return () => {};
-  }
+  const behavior: ScrollBehavior = prefersReducedMotion() ? "auto" : "smooth";
+  let settled = false;
 
-  const durationMs = options?.durationMs ?? defaultNavigationDurationMs;
-  let startTime: number | null = null;
-  let frame = 0;
-  let cancelled = false;
-
-  const step = (timestamp: number) => {
-    if (cancelled) {
+  const finish = () => {
+    if (settled) {
       return;
     }
 
-    startTime ??= timestamp;
-    const progress = Math.min((timestamp - startTime) / durationMs, 1);
-    setScrollPosition(
-      element,
-      direction,
-      startPosition + distance * easeOutCubic(progress),
-    );
-
-    if (progress < 1) {
-      frame = requestAnimationFrame(step);
-      return;
-    }
-
+    settled = true;
+    element.removeEventListener("scrollend", onScrollEnd);
+    window.clearTimeout(fallbackTimeoutId);
     options?.onComplete?.();
   };
 
-  frame = requestAnimationFrame(step);
+  const onScrollEnd = () => {
+    finish();
+  };
+
+  element.addEventListener("scrollend", onScrollEnd);
+  const fallbackTimeoutId = window.setTimeout(
+    finish,
+    behavior === "smooth" ? smoothScrollFallbackMs : 0,
+  );
+
+  if (typeof element.scrollTo !== "function") {
+    setScrollPosition(element, direction, targetPosition);
+    finish();
+  } else if (direction === "horizontal") {
+    element.scrollTo({ left: targetPosition, behavior });
+  } else {
+    element.scrollTo({ top: targetPosition, behavior });
+  }
+
+  if (behavior === "auto" && typeof element.scrollTo === "function") {
+    finish();
+  }
+
   return () => {
-    cancelled = true;
-    cancelAnimationFrame(frame);
+    settled = true;
+    element.removeEventListener("scrollend", onScrollEnd);
+    window.clearTimeout(fallbackTimeoutId);
   };
 }
 
