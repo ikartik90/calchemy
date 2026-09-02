@@ -1,8 +1,5 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./packages/date-core" },
-    { "path": "./packages/date-react" },
-    { "path": "./packages/date-react/tsconfig.test.json" }
-  ]
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": { "noEmit": true, "types": ["node"] },
+  "include": ["packages/*/src", "packages/*/tests", "vitest.config.ts"]
 }
