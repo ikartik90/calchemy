@@ -29,7 +29,7 @@ export type ParseDateContext = {
   referenceDate?: PlainDate;
   locale?: string;
   weekStartsOn?: WeekdayIndex;
-  dateOrderPreference?: DateOrder[];
+  dateOrderPreference?: readonly DateOrder[];
   lastNDaysIncludesToday?: boolean;
 };
 
@@ -174,11 +174,18 @@ export type ParseDateError = {
   code:
     | "empty-input"
     | "unsupported-expression"
+    | "impossible-date"
     | "invalid-date"
     | "invalid-context"
     | "unexpected-value-kind";
   message: string;
   token?: Token;
+  /**
+   * ISO `YYYY-MM-DD` dates the caller may offer as corrections. Only set when
+   * the parser understood the phrase but the calendar date it names does not
+   * exist, as in `29 feb 2027`.
+   */
+  suggestions?: string[];
 };
 
 export type ParseDateWarning = {

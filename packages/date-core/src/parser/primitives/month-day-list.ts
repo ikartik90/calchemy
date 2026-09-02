@@ -33,7 +33,16 @@ export function findNestedPastMonthDayYear(
     return null;
   }
 
-  const pattern = new RegExp(`\\b(${monthNames.join("|")}) (\\d{1,2})(?:st|nd|rd|th)?\\b`);
+  const monthDayPattern = `\\b(${monthNames.join("|")}) (\\d{1,2})(?:st|nd|rd|th)?\\b`;
+
+  // A phrase with two or more `<month> <day>` expressions is a concrete date range or list
+  // (e.g. `between aug 15 and sep 30`), so the numbers are calendar days rather than a
+  // possible `<month> <two-digit year>` shorthand and there is no day-vs-year ambiguity.
+  if ((input.match(new RegExp(monthDayPattern, "g")) ?? []).length >= 2) {
+    return null;
+  }
+
+  const pattern = new RegExp(monthDayPattern);
   const match = pattern.exec(input);
   if (!match?.[1] || !match[2]) {
     return null;

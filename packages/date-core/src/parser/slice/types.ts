@@ -13,6 +13,10 @@ import type {
 } from "../types";
 import type { SamplerSlice } from "./sampler";
 
+export type EachUnitPeriod = "week" | "month" | "quarter" | "year";
+
+export type RangeHalf = "first" | "second";
+
 export type BoundarySlice =
   | { kind: "atom"; input: string }
   | {
@@ -65,6 +69,16 @@ export type BoundarySlice =
       range: BoundarySlice;
       unit: CalendarRangePeriod;
     }
+  | {
+      kind: "edge-count-unit-in-range";
+      edge: BoundaryPlacement;
+      count: number;
+      unit: DurationUnit;
+      range: BoundarySlice;
+      skipHolidays: boolean;
+    }
+  | { kind: "ordinal-day-in-range"; day: number; range: BoundarySlice }
+  | { kind: "half-of-range"; half: RangeHalf; range: BoundarySlice }
   | { kind: "unique-weekday-in-range"; weekday: number; range: BoundarySlice }
   | {
       kind: "ordinal-weekday-in-range";
@@ -98,7 +112,28 @@ export type BoundarySlice =
       ordinal: number;
       weekday: number;
       anchor: BoundarySlice;
-    };
+    }
+  | { kind: "each-unit"; unit: EachUnitPeriod; within: BoundarySlice };
+
+/**
+ * Boundary kinds that compose another boundary. The grammar emits them as a
+ * parse tree; the lowering pass unfolds every one into an expression node, so
+ * the boundary resolver only ever evaluates `LeafBoundarySlice`.
+ */
+export type CompositionalBoundaryKind =
+  | "each-unit"
+  | "ordinal-calendar-unit"
+  | "ordinal-calendar-unit-span"
+  | "edge-count-unit-in-range"
+  | "ordinal-day-in-range"
+  | "half-of-range"
+  | "unique-weekday-in-range"
+  | "ordinal-weekday-in-range"
+  | "ordinal-day-group-in-range";
+
+export type CompositionalBoundarySlice = Extract<BoundarySlice, { kind: CompositionalBoundaryKind }>;
+
+export type LeafBoundarySlice = Exclude<BoundarySlice, CompositionalBoundarySlice>;
 
 export type BoundaryEndpointSlice =
   | { kind: "boundary"; boundary: BoundarySlice; side: BoundaryEndpointSide }
@@ -107,13 +142,6 @@ export type BoundaryEndpointSlice =
 export type RelativeExpressionSlice =
   | { kind: "bare"; value: RelativeDateValue }
   | { kind: "from-now"; amount: number; unit: DurationUnit }
-  | {
-      kind: "leading-trailing-days";
-      edge: BoundaryPlacement;
-      count: number;
-      range: BoundarySlice;
-      skipHolidays: boolean;
-    }
   | {
       kind: "modifier";
       modifier: RelativeModifier;
@@ -157,12 +185,4 @@ export type TransformSlice = {
   unit: DurationUnit;
 };
 
-export type ExclusionSlice = DateSlice;
-
-export type DateSlice = {
-  boundary: BoundarySlice;
-  exclusions: ExclusionSlice[];
-  relation: RelationSlice | null;
-  sampler: SamplerSlice | null;
-  transforms: TransformSlice[];
-};
+export type { DateSlice, ExclusionSlice } from "../expression/types";

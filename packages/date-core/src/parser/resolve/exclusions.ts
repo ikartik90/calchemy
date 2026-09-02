@@ -2,11 +2,14 @@ import { startOfCalendarWeek } from "../primitives/date-math";
 import { materializeDateValue } from "./materialize";
 import { resolveDateSliceWithoutExclusions } from "./slice";
 import { expandValueDates } from "./sampler";
+import { findSamplerInExpression } from "../expression/sampler";
 import { comparePlainDate } from "../primitives/shared";
-import type { DateSlice, SamplerSlice } from "../slice";
+import type { DateSlice } from "../expression/types";
 import type { PlainDate, TemporalApi } from "../../temporal/types";
 import type { DateValue, ResolvedParseDateContext } from "../../types";
 import type { DateVocabularyLookups } from "../vocabulary";
+
+import type { SamplerSlice } from "../slice/sampler";
 
 export type ApplyExclusionsOptions = {
   sampler?: SamplerSlice | null;
@@ -71,7 +74,7 @@ function createExclusionPredicate(
     Temporal,
     context,
     lookups,
-    { sampler: exclusion.sampler },
+    { sampler: findSamplerInExpression(exclusion.expression) },
   );
   const value = filtered ? materializeDateValue(filtered) : null;
   return value

@@ -1,7 +1,8 @@
 import { applyExclusions } from "./exclusions";
 import { materializeDateValue } from "./materialize";
 import { resolveDateSliceWithoutExclusions } from "./slice";
-import type { DateSlice } from "../slice";
+import { findSamplerInExpression } from "../expression/sampler";
+import type { DateSlice } from "../expression/types";
 import type { PlainDate, TemporalApi } from "../../temporal/types";
 import type { DateValue, ResolvedParseDateContext } from "../../types";
 import type { DateVocabularyLookups } from "../vocabulary";
@@ -20,7 +21,7 @@ export function resolveDateSlice(
   }
 
   const filtered = applyExclusions(transformed, slice.exclusions, anchorDate, Temporal, context, lookups, {
-    sampler: slice.sampler,
+    sampler: findSamplerInExpression(slice.expression),
   });
   return filtered ? materializeDateValue(filtered) : null;
 }

@@ -2,12 +2,11 @@
 
 ## Product Direction
 
-This project is a natural language date engine with optional headless React components. The core value is reliable parsing, ambiguity handling, Temporal-based date values, serialization, and inline tab completion. The React layer should be a consumer of the engine, not the source of parsing truth.
+This project is a headless natural language date engine. The core value is reliable parsing, ambiguity handling, Temporal-based date values, and serialization. The engine ships as a single package with no UI or framework dependency.
 
 ## Package Boundaries
 
 - `@calchemy/date-core`: parser, candidate ranking, ambiguity modeling, Temporal conversion, JSON/form serialization, and parser context.
-- `@calchemy/date-react`: headless React primitives and hooks built on `date-core`.
 - `@calchemy/date-holidays`: optional holiday and landmark-date providers.
 - `@calchemy/date-fuzzy`: optional typo, shorthand, and token-correction helpers.
 
@@ -19,12 +18,9 @@ Agents MUST consult official documentation before implementing APIs or framework
 
 | Topic                        | Reference                                                                         |
 | ---------------------------- | --------------------------------------------------------------------------------- |
-| React                        | https://react.dev/reference/react                                                 |
 | TypeScript                   | https://www.typescriptlang.org/docs/                                              |
 | Temporal                     | https://tc39.es/proposal-temporal/docs/                                           |
 | `@js-temporal/polyfill`      | https://www.npmjs.com/package/@js-temporal/polyfill                               |
-| Radix UI primitives          | https://www.radix-ui.com/primitives/docs/overview/introduction                    |
-| WAI-ARIA Authoring Practices | https://www.w3.org/WAI/ARIA/apg/                                                  |
 | npm package publishing       | https://docs.npmjs.com/packages-and-modules/contributing-packages-to-the-registry |
 | tsup                         | https://tsup.egoist.dev/                                                          |
 | Vitest                       | https://vitest.dev/                                                               |
@@ -40,26 +36,24 @@ Agents MUST consult official documentation before implementing APIs or framework
 │   │   ├── src/
 │   │   │   ├── parser/
 │   │   │   │   ├── chunks/
+│   │   │   │   ├── diagnostics/
+│   │   │   │   ├── expression/
 │   │   │   │   ├── primitives/
 │   │   │   │   ├── resolve/
 │   │   │   │   └── slice/
 │   │   │   ├── serialize/
 │   │   │   └── temporal/
-│   │   └── tests/
-│   ├── date-react/
-│   │   ├── src/
-│   │   │   ├── components/
-│   │   │   └── hooks/
-│   │   └── tests/
+│   │   ├── tests/
+│   │   └── README.md
 └── scripts/
 ```
 
 ## Ownership Rules
 
 - `packages/date-core` owns parser semantics, candidate ranking, ambiguity modeling, Temporal value creation, expected-value helpers, and JSON/form serialization.
-- Parser behavior belongs in `date-core`, never in React components, demos, or scripts.
-- `packages/date-react` owns headless React primitives and hooks that consume the public `date-core` API. Keep it unstyled, composable, and independent from popover or styling libraries.
+- Parser behavior belongs in `date-core`, never in demos or scripts.
 - `scripts/parse-date.mjs` is for parser CLI checks and developer workflows. Keep reusable parsing behavior in `date-core`.
+- `packages/date-core/README.md` is the README npm publishes; the root `README.md` only points to it.
 - Future optional workspaces such as holiday providers, fuzzy matching, docs, or examples should live under their own package or top-level directory and consume `date-core` through public exports.
 
 # Build and Test Commands
@@ -77,7 +71,6 @@ For package-scoped work, prefer workspace filters:
 
 ```bash
 pnpm --filter @calchemy/date-core test
-pnpm --filter @calchemy/date-react test
 pnpm --filter @calchemy/date-core typecheck
 ```
 
@@ -135,32 +128,14 @@ Prefer a deterministic, inspectable pipeline:
 3. Standardize tokens into typed chunks such as weekdays, months, periods, connectors, ordinals, shorthands, commands, exclusions, and numbers.
 4. Resolve context: apply the reference date plus locale, week-start, date-order preference, holiday provider, and relative-range options.
 5. Parse numeric date candidates first. Return `valid` for one candidate or `ambiguous` with a date-order group for competing candidates.
-6. Slice known language chunks into typed date intent: boundaries, relations, samplers, transforms, and exclusions.
-7. Resolve the slice into concrete Temporal values by resolving boundaries, applying relations, sampling, transforming, excluding dates, and materializing a `DateValue`.
-8. Return `valid` with the best candidate or `invalid` with structured errors and correction metadata.
+6. Slice known language chunks into a parse tree of boundaries plus samplers, relations, transforms, and exclusions.
+7. Lower the parse tree into an expression tree: every compositional boundary (`first week of …`, `each month in …`, `last 2 weeks of …`, `15th of …`, `first half of …`) becomes a `select` or `iterate` node over its inner expression, so `scope` nodes only ever carry leaf boundaries. `boundaryToExpression` is the single lowering pass.
+8. Resolve the expression tree into concrete Temporal values: `resolveExpression` evaluates composition nodes, `resolveBoundary` evaluates leaves only, then relations, sampling, transforms, and exclusions apply, and a `DateValue` is materialized.
+9. Return `valid` with the best candidate, or `invalid` with structured errors — `impossible-date` with suggestions when the phrase names a date that does not exist, `unsupported-expression` with the offending token otherwise — and correction metadata.
 
-Known grammar and phrase support should remain distinct from vocabulary aliases and fuzzy vocabulary correction.
+Known grammar and phrase support should remain distinct from vocabulary aliases and fuzzy vocabulary correction. Three alias tables live in `parser/types.ts` and are applied during normalization, each recording a `shorthand` correction: `GrammarAliasEntries` (one grammar word for another, `beginning` → `start`), `PhraseShorthandEntries` (one token or a few for a whole phrase, `eom` → `end of this month`, `year to date` → `start of this year until today`), and the vocabulary aliases (`tmrw` → `tomorrow`). Prefer adding to a table over adding a grammar rule when the new wording is a pure synonym of one the grammar already accepts.
 
-## React Components
-
-React should provide headless primitives and hooks:
-
-- `Calchemy.Root`
-- `Calchemy.Field`
-- `Calchemy.InputMode`
-- `Calchemy.Candidates`
-- `Calchemy.Calendar`
-- `useCalchemy`
-
-Inline autocomplete belongs in `Calchemy.Field`. Pressing `Tab` should accept the active inline completion. `Candidates` and `Calendar` may be rendered inside popovers, but must not require a specific popover implementation.
-
-## Effect Usage
-
-Do not use `useEffect` to derive parser output, inline completion, candidates, calendar state, or form values from props/state. Calculate those during render or in `useCalchemy`, and use event handlers for typing, `Tab` completion, candidate selection, and calendar clicks. Effects are appropriate only for external synchronization such as DOM focus/measurement, global event listeners, timers, or integrations with non-React popover/positioning code; those Effects must include cleanup.
-
-## Styling
-
-Do not require Tailwind CSS. Components should be unstyled and expose state through props, render props, context, `data-*` attributes, and CSS variables where useful. Examples may demonstrate Tailwind, Panda CSS, and vanilla CSS independently.
+Resolution treats `options.scope` (set while resolving an exclusion) as "read a bare period as a recurring filter inside the parent window". It propagates through wrappers such as sampling but not into a selector's range argument: in `except the third week of august`, `august` names the range to select from.
 
 # Coding Conventions and Style Guidelines
 
@@ -176,8 +151,7 @@ Do not require Tailwind CSS. Components should be unstyled and expose state thro
 Prefer simple public names:
 
 - `parseDate`
-- `Calchemy`
-- `useCalchemy`
+- `createCalchemy`
 - `DateValue`
 - `ParseDateResult`
 
@@ -189,7 +163,7 @@ Do not throw for normal invalid user input. Return structured invalid results. R
 
 ## Dependencies
 
-Keep dependencies minimal. Parser behavior should be testable without React or browser APIs. Treat holiday providers, fuzzy matching, and styling integrations as optional layers.
+Keep dependencies minimal. Parser behavior must be testable without any browser or framework APIs. Treat holiday providers and fuzzy matching as optional layers.
 
 # Testing Guidelines
 
@@ -203,28 +177,16 @@ Build the parser from a corpus of real phrases and expected results. Cover:
 - Exclusions: `excluding holidays`, `except tomorrow`, `skip next week`.
 - Ambiguity: numeric dates, two-digit years, relative anchors.
 - Typos and shorthand: month names, weekdays, common abbreviations.
+- Phrasing variants: a wording the parser did not accept, paired with the pinned value of the equivalent wording it already did (`in 10 days` = `10 days from now`). Lives in the `phrasing variants` block of `tests/parser.test.ts`; the expected value must come from an already-pinned row, never from running the implementation.
+- Nested selections: a compositional phrase inside another boundary (`start of last 2 weeks of next quarter`), pinned to agree with the top-level phrase.
+- Impossible dates: `29 feb 2027` and friends must return `impossible-date` with suggestions, never `unsupported-expression`. Lives in `tests/impossible-date.test.ts`.
+- Lowering invariant: `tests/expression-lowering.test.ts` lists every compositional phrase shape and asserts no `scope` node carries a compositional boundary. Add a row there whenever a new compositional boundary kind is introduced.
 
 Tests should fix the reference date, locale, week-start, and holiday calendars to avoid flaky results.
 
-## React Tests
-
-Test behavior, not styling. Cover:
-
-- Input typing.
-- Inline completion display and `Tab` acceptance.
-- Candidate selection for ambiguous parses.
-- Controlled and uncontrolled value flows.
-- Form serialization.
-- Keyboard accessibility.
-
-## Accessibility
-
-Follow WAI-ARIA guidance for combobox, dialog/popover, listbox, grid, and calendar interactions where applicable. Keyboard behavior is part of the public contract.
-
 # General Instructions
 
-- Parser semantics belong in `date-core`; UI packages should consume parser behavior through public core APIs.
-- Keep React components independent from styling systems and popover libraries.
+- Parser semantics belong in `date-core`; anything built on it consumes the public core API.
 - Preserve ambiguity and candidate metadata so product UIs can explain choices.
 - Prefer Temporal and canonical JSON over JavaScript `Date`.
 - Keep examples separate from library internals.

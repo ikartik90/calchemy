@@ -1,5 +1,5 @@
 import type { Correction, Token } from "../types";
-import { ArticleWords, GrammarWordSet } from "./types";
+import { ArticleWords, GrammarAliasMap, GrammarWordSet, PhraseShorthandMap, PhraseShorthandMaxWords } from "./types";
 import {
   createDateVocabulary,
   createDateVocabularyLookups,
@@ -9,6 +9,12 @@ import {
 
 const DefaultLookups = createDateVocabularyLookups(createDateVocabulary());
 const ArticleWordSet = new Set(ArticleWords);
+
+// Treat the full family of Unicode dash and minus characters (hyphen, non-breaking hyphen,
+// figure dash, en dash, em dash, horizontal bar, two/three-em dashes, minus sign, and the
+// small/fullwidth compatibility forms) as a plain hyphen so ranges and date math parse the
+// same regardless of which dash a user types or pastes.
+const DashLikeCharacters = /[\u2010\u2011\u2012\u2013\u2014\u2015\u2E3A\u2E3B\u2212\uFE58\uFE63\uFF0D]/g;
 
 export type NormalizedInput = {
   normalized: string;
@@ -24,19 +30,24 @@ export function normalizeInput(input: string, lookups: DateVocabularyLookups = D
     .replace(/[’]/g, "'")
     .replace(/\+/g, " plus ")
     .replace(/\s*&\s*/g, " and ")
-    .replace(/[–—]/g, "-")
+    .replace(DashLikeCharacters, "-")
     .replace(/\s+/g, " ");
 
   const tokens = tokenize(normalized);
   const corrections: Correction[] = [];
   const correctedTokens = tokens
-    .map((token): Token | null => {
+    .map((token, index): Token | null => {
       if (token.kind !== "word") {
         return token;
       }
 
       if (ArticleWordSet.has(token.normalized as never)) {
-        return null;
+        // `a week from now` and `in a month` count one unit. `the` never
+        // does — `end of the year` — and every other article is filler.
+        const next = tokens[index + 1];
+        const countsOne =
+          token.normalized !== "the" && next?.kind === "word" && lookups.durationUnits.has(next.normalized);
+        return countsOne ? { ...token, kind: "number", normalized: "1" } : null;
       }
 
       const possessiveBase = stripKnownPossessive(token.normalized, lookups);
@@ -44,13 +55,15 @@ export function normalizeInput(input: string, lookups: DateVocabularyLookups = D
         return { ...token, normalized: possessiveBase };
       }
 
-      const alias = lookups.aliases.get(token.normalized);
+      const alias = lookups.aliases.get(token.normalized) ?? GrammarAliasMap.get(token.normalized);
       if (alias) {
         corrections.push({ from: token.normalized, to: alias, reason: "shorthand", confidence: 1 });
         return { ...token, normalized: alias };
       }
 
-      if (GrammarWordSet.has(token.normalized)) {
+      // A grammar word or a shorthand we expand ourselves is known as typed;
+      // without this, `fortnight` is "corrected" to `fortnightly`.
+      if (GrammarWordSet.has(token.normalized) || PhraseShorthandMap.has(token.normalized)) {
         return token;
       }
 
@@ -63,8 +76,9 @@ export function normalizeInput(input: string, lookups: DateVocabularyLookups = D
       return token;
     })
     .filter((token): token is Token => token !== null);
-  const semanticTokens = correctedTokens.filter((token, index) =>
-    isSemanticToken(token, correctedTokens[index - 1], correctedTokens[index + 1]),
+  const expandedTokens = expandPhraseShorthands(correctedTokens, corrections);
+  const semanticTokens = expandedTokens.filter((token, index) =>
+    isSemanticToken(token, expandedTokens[index - 1], expandedTokens[index + 1]),
   );
 
   return {
@@ -78,6 +92,71 @@ export function normalizeInput(input: string, lookups: DateVocabularyLookups = D
     tokens: semanticTokens,
     corrections,
   };
+}
+
+/**
+ * Replaces phrase shorthands with the tokens of the phrase they stand for.
+ *
+ * Every token produced from one shorthand keeps the shorthand's original span,
+ * so a later diagnostic still points at what the user actually typed. Longer
+ * shorthands win over shorter ones at the same position.
+ *
+ * Example: `expandPhraseShorthands(tokensFor("eom"), corrections)` yields the
+ * tokens `end`, `of`, `this`, `month` and records `eom` → `end of this month`.
+ */
+function expandPhraseShorthands(tokens: readonly Token[], corrections: Correction[]): Token[] {
+  const expanded: Token[] = [];
+  let index = 0;
+
+  while (index < tokens.length) {
+    const match = matchPhraseShorthandAt(tokens, index);
+    if (!match) {
+      expanded.push(tokens[index] as Token);
+      index += 1;
+      continue;
+    }
+
+    const matched = tokens.slice(index, index + match.length);
+    const first = matched[0] as Token;
+    const last = matched[matched.length - 1] as Token;
+    const raw = matched.map((token) => token.raw).join(" ");
+    corrections.push({ from: match.shorthand, to: match.phrase, reason: "shorthand", confidence: 1 });
+
+    for (const word of match.phrase.split(" ")) {
+      expanded.push({
+        kind: /^\d+$/.test(word) ? "number" : "word",
+        raw,
+        normalized: word,
+        start: first.start,
+        end: last.end,
+      });
+    }
+
+    index += match.length;
+  }
+
+  return expanded;
+}
+
+// Example: `matchPhraseShorthandAt(tokensFor("year to date"), 0)` matches all three words.
+function matchPhraseShorthandAt(
+  tokens: readonly Token[],
+  index: number,
+): { shorthand: string; phrase: string; length: number } | null {
+  for (let length = Math.min(PhraseShorthandMaxWords, tokens.length - index); length >= 1; length -= 1) {
+    const candidate = tokens.slice(index, index + length);
+    if (candidate.some((token) => token.kind !== "word")) {
+      continue;
+    }
+
+    const shorthand = candidate.map((token) => token.normalized).join(" ");
+    const phrase = PhraseShorthandMap.get(shorthand);
+    if (phrase) {
+      return { shorthand, phrase, length };
+    }
+  }
+
+  return null;
 }
 
 // Example: `tokenize("q4-next year")` returns word, number, separator, and word tokens.
