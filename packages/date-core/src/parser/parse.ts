@@ -1,4 +1,4 @@
-import { findUnsupportedExpressionToken } from "./diagnostics";
+import { diagnoseImpossibleDate, findUnsupportedExpressionToken } from "./diagnostics";
 import { normalizeInput } from "./normalize";
 import { resolveDateSlice } from "./resolve";
 import { sliceDateExpression, type DateSlice } from "./slice";
@@ -10,7 +10,7 @@ import {
 } from "./primitives/month-day-list";
 import { parseNumericCandidates } from "./primitives/numeric-date";
 import { createCandidate, labelDateValue } from "./primitives/shared";
-import { createDateVocabulary, createDateVocabularyLookups, type DateVocabularyLookups } from "./vocabulary";
+import { getDateVocabularyLookups, type DateVocabularyLookups } from "./vocabulary";
 import { resolveHolidayProvider } from "../holidays";
 import type { PlainDate, TemporalApi } from "../temporal/types";
 import type {
@@ -37,8 +37,7 @@ export function parseDateWithTemporal(
   Temporal: TemporalApi,
   options: ParseDateWithTemporalOptions = {},
 ): ParseDateResult {
-  const vocabulary = createDateVocabulary(options.namedDatesVocabulary);
-  const lookups = createDateVocabularyLookups(vocabulary);
+  const lookups = getDateVocabularyLookups(options.namedDatesVocabulary);
   const normalized = normalizeInput(input, lookups);
   const chunks = standardizeChunks(normalized.tokens, lookups);
   const source = {
@@ -57,7 +56,7 @@ export function parseDateWithTemporal(
     };
   }
 
-  const resolved = resolveContext(context, Temporal, vocabulary.namedDates ?? []);
+  const resolved = resolveContext(context, Temporal, lookups.namedDates);
   const anchorDate = resolved.referenceDate;
   const numericCandidates = parseNumericCandidates(normalized.normalized, resolved, Temporal, source);
 
@@ -136,6 +135,23 @@ export function parseDateWithTemporal(
   const parsed = parseKnownExpression(normalized.normalized, anchorDate, resolved, Temporal, lookups, chunks);
 
   if (!parsed.value) {
+    const impossibleDate = diagnoseImpossibleDate(
+      chunks,
+      input,
+      normalized.normalized,
+      resolved,
+      Temporal,
+    );
+    if (impossibleDate) {
+      return {
+        status: "invalid",
+        input,
+        errors: [impossibleDate],
+        corrections: normalized.corrections,
+        warnings: [],
+      };
+    }
+
     const token = findUnsupportedExpressionToken(
       chunks,
       parsed.slice,
@@ -197,7 +213,7 @@ function resolveContext(
 }
 
 // Example: `normalizeDateOrderPreference(["MDY", "MDY"])` returns a de-duplicated preference list.
-function normalizeDateOrderPreference(value: DateOrder[] | undefined): DateOrder[] {
+function normalizeDateOrderPreference(value: readonly DateOrder[] | undefined): DateOrder[] {
   if (!value || value.length === 0) {
     return DefaultDateOrderPreference;
   }

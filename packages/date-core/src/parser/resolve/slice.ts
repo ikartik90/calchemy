@@ -1,15 +1,12 @@
-import { applyRelations } from "./relations";
-import { applySampler } from "./sampler";
 import { applyTransforms } from "./transforms";
-import { resolveBoundary, type ResolveBoundaryOptions } from "./boundary";
-import type { DateSlice } from "../slice";
+import { resolveExpression, type ResolveExpressionOptions } from "./expression";
+import type { DateSlice } from "../expression/types";
 import type { PlainDate, TemporalApi } from "../../temporal/types";
 import type { DateValue, ResolvedParseDateContext } from "../../types";
 import type { DateVocabularyLookups } from "../vocabulary";
 
-export type ResolveDateSliceOptions = ResolveBoundaryOptions;
+export type ResolveDateSliceOptions = ResolveExpressionOptions;
 
-// Example: `resolveDateSliceWithoutExclusions(slice, anchor, Temporal, context, lookups)` resolves boundary, relation, sampler, and transform intent.
 export function resolveDateSliceWithoutExclusions(
   slice: DateSlice,
   anchorDate: PlainDate,
@@ -18,20 +15,17 @@ export function resolveDateSliceWithoutExclusions(
   lookups: DateVocabularyLookups,
   options?: ResolveDateSliceOptions,
 ): DateValue | null {
-  const boundary = resolveBoundary(slice.boundary, anchorDate, Temporal, context, lookups, options);
-  if (!boundary) {
+  const resolved = resolveExpression(
+    slice.expression,
+    anchorDate,
+    Temporal,
+    context,
+    lookups,
+    options,
+  );
+  if (!resolved) {
     return null;
   }
 
-  const related = applyRelations(boundary, slice.relation);
-  if (!related) {
-    return null;
-  }
-
-  const sampled = slice.sampler ? applySampler(related, slice.sampler, context.weekStartsOn) : related;
-  if (!sampled) {
-    return null;
-  }
-
-  return applyTransforms(sampled, slice.transforms);
+  return applyTransforms(resolved, slice.transforms);
 }

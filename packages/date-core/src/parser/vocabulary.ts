@@ -16,12 +16,131 @@ export type DateVocabularyLookups = {
   namedDates: readonly NamedDatesVocabularyEntry[];
 };
 
+/**
+ * Lookup tables are derived purely from a vocabulary and are never mutated
+ * after construction, so they can be shared across parses.
+ *
+ * This matters because `parseDate` is called on every keystroke in a typing UI,
+ * and inline completion can trigger a dozen parses per keystroke. Rebuilding
+ * every map and set each time was pure waste.
+ */
+const lookupsByNamedDates = new WeakMap<object, DateVocabularyLookups>();
+let defaultLookups: DateVocabularyLookups | undefined;
+
+/**
+ * Returns cached lookups for a named-dates vocabulary, building them on first
+ * use.
+ *
+ * Caching is keyed on the identity of the `namedDates` array. Callers that hold
+ * a stable array — as `createCalchemyWithTemporal` does — get the cache; callers
+ * that build a fresh array per call still get correct results, just uncached.
+ *
+ * Example: `getDateVocabularyLookups()` returns the shared default lookups.
+ */
+export function getDateVocabularyLookups(
+  namedDates: readonly NamedDatesVocabularyEntry[] = [],
+): DateVocabularyLookups {
+  if (namedDates.length === 0) {
+    defaultLookups ??= createDateVocabularyLookups(createDateVocabulary());
+    return defaultLookups;
+  }
+
+  const cached = lookupsByNamedDates.get(namedDates);
+  if (cached) {
+    return cached;
+  }
+
+  const lookups = createDateVocabularyLookups(createDateVocabulary(namedDates));
+  lookupsByNamedDates.set(namedDates, lookups);
+  return lookups;
+}
+
 // Example: `createDateVocabulary([{ value: "christmas", ... }])` adds caller-provided named dates.
 export function createDateVocabulary(namedDates: readonly NamedDatesVocabularyEntry[] = []): DateVocabulary {
+  assertNamedDatesVocabulary(namedDates);
+
   return {
     ...DefaultDateVocabulary,
     namedDates,
   };
+}
+
+/**
+ * Rejects malformed `namedDatesVocabulary` entries at the point of
+ * configuration.
+ *
+ * This is caller-supplied configuration rather than user input, so a bad entry
+ * is a programmer mistake and throwing is correct. Validating here keeps the
+ * failure legible: without it, a missing `value` surfaces much later as
+ * `Cannot read properties of undefined (reading 'trim')` from deep inside
+ * lookup construction.
+ *
+ * Example: `assertNamedDatesVocabulary([{ aliases: ["xmas"] }])` throws naming
+ * entry 0 and the missing `value` field.
+ */
+function assertNamedDatesVocabulary(entries: readonly NamedDatesVocabularyEntry[]): void {
+  if (!Array.isArray(entries)) {
+    throw new TypeError(
+      `namedDatesVocabulary must be an array, received ${describeValue(entries)}.`,
+    );
+  }
+
+  entries.forEach((entry, index) => {
+    const at = `namedDatesVocabulary[${index}]`;
+
+    if (typeof entry !== "object" || entry === null) {
+      throw new TypeError(`${at} must be an object, received ${describeValue(entry)}.`);
+    }
+
+    if (typeof entry.value !== "string" || entry.value.trim() === "") {
+      throw new TypeError(
+        `${at}.value must be a non-empty string, received ${describeValue(entry.value)}.`,
+      );
+    }
+
+    if (typeof entry.resolveDate !== "function") {
+      throw new TypeError(
+        `${at}.resolveDate must be a function, received ${describeValue(entry.resolveDate)}. ` +
+          `It receives { year, context } and returns a PlainDate or null.`,
+      );
+    }
+
+    if (entry.aliases !== undefined) {
+      if (!Array.isArray(entry.aliases)) {
+        throw new TypeError(
+          `${at}.aliases must be an array of strings, received ${describeValue(entry.aliases)}.`,
+        );
+      }
+
+      entry.aliases.forEach((alias: unknown, aliasIndex: number) => {
+        if (typeof alias !== "string" || alias.trim() === "") {
+          throw new TypeError(
+            `${at}.aliases[${aliasIndex}] must be a non-empty string, received ${describeValue(alias)}.`,
+          );
+        }
+      });
+    }
+
+    if (entry.isHoliday !== undefined && typeof entry.isHoliday !== "boolean") {
+      throw new TypeError(
+        `${at}.isHoliday must be a boolean, received ${describeValue(entry.isHoliday)}.`,
+      );
+    }
+  });
+}
+
+// Example: `describeValue(undefined)` returns `undefined`; `describeValue("x")` returns `"x"` (quoted).
+function describeValue(value: unknown): string {
+  if (typeof value === "string") {
+    return JSON.stringify(value);
+  }
+  if (value === null) {
+    return "null";
+  }
+  if (Array.isArray(value)) {
+    return "an array";
+  }
+  return typeof value;
 }
 
 // Example: `createDateVocabularyLookups(DefaultDateVocabulary)` builds alias and unit maps.

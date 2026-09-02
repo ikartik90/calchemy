@@ -21,6 +21,7 @@ import {
 import type {
   BoundaryEndpointSlice,
   BoundarySlice,
+  EachUnitPeriod,
   YearReferenceSlice,
 } from "./types";
 import type { DateVocabularyLookups } from "../vocabulary";
@@ -47,6 +48,7 @@ export function parseBoundary(
     parseYearBoundary(normalized) ??
     parseHolidaysBoundary(normalized) ??
     parseDayGroupFilterBoundary(normalized) ??
+    parseEachUnitBoundary(normalized, lookups) ??
     parseRelativeBoundary(normalized, lookups) ??
     parseShorthandRangeListBoundary(normalized) ??
     parseMonthDayBoundary(normalized, lookups, options) ??
@@ -297,7 +299,14 @@ function parseNamedMonthBoundary(input: string, lookups: DateVocabularyLookups):
 // Example: `parseRangeBoundary("from christmas to 7/1/2027", lookups)` returns typed endpoint boundaries.
 function parseRangeBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
   const parts = parseRangeParts(input);
-  return parts ? rangeBoundary(parseBoundary(parts[0], lookups), parseBoundary(parts[1], lookups)) : null;
+  // Both sides of an explicit range are endpoints, so a bare `<month> <day>` such as
+  // `sep 30` is a calendar day rather than a `<month> <two-digit year>` shorthand.
+  return parts
+    ? rangeBoundary(
+        parseBoundary(parts[0], lookups, { preferDay: true }),
+        parseBoundary(parts[1], lookups, { preferDay: true }),
+      )
+    : null;
 }
 
 // Example: `parseRangeParts("q1-q3")` returns `["q1", "q3"]`.
@@ -354,7 +363,9 @@ export function parseOrdinalUnitFromAnchorBoundary(input: string, lookups: DateV
     return null;
   }
 
-  const ordinal = parseOrdinal(match[1]);
+  // Only an ordinal-shaped head steps calendar units: `ninth week from today`.
+  // A cardinal head is a duration — `1 week from now` is seven days out.
+  const ordinal = parseOrdinalShaped(match[1]);
   return ordinal && ordinal >= 1
     ? {
         kind: "ordinal-unit-from-anchor",
@@ -416,6 +427,20 @@ function parseDurationFromAnchorBoundary(input: string, lookups: DateVocabularyL
 
 // Example: `parseDurationNearBoundary("3 days before christmas", lookups)` returns offset intent.
 function parseDurationNearBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
+  // `2 months ago` is `2 months before today`.
+  const agoMatch = /^(.+) ([a-z]+) ago$/.exec(input);
+  const agoAmount = parseAmount(agoMatch?.[1]);
+  const agoUnit = parseDurationUnit(agoMatch?.[2], lookups);
+  if (agoAmount && agoUnit && !parseDayGroup(agoMatch?.[2] ?? "")) {
+    return {
+      kind: "duration-near-boundary",
+      amount: agoAmount,
+      unit: agoUnit,
+      direction: "before",
+      anchor: { kind: "relative", expression: { kind: "bare", value: "today" } },
+    };
+  }
+
   const match = /^(?:(.+) )?([a-z]+) (after|before|following|preceding) (.+)$/.exec(input);
   if (!match?.[2] || !match[3] || !match[4]) {
     return null;
@@ -438,6 +463,53 @@ function parseDurationNearBoundary(input: string, lookups: DateVocabularyLookups
     : null;
 }
 
+// Example: `parseEachUnitBoundary("every month", lookups)` returns recurrence scope over months in this year.
+function parseEachUnitBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
+  const match = /^(each|every) ([a-z]+)(?: (?:of|in) (?:the )?(.+))?$/.exec(input);
+  if (!match?.[2]) {
+    return null;
+  }
+
+  const unit = parseEachUnitPeriod(match[2], lookups);
+  if (!unit) {
+    return null;
+  }
+
+  return {
+    kind: "each-unit",
+    unit,
+    within: match[3] ? parseBoundary(match[3], lookups) : defaultEachUnitWithinBoundary(),
+  };
+}
+
+// Example: `defaultEachUnitWithinBoundary()` scopes each-unit phrases to the reference year by default.
+function defaultEachUnitWithinBoundary(): BoundarySlice {
+  return {
+    kind: "relative",
+    expression: {
+      kind: "modifier",
+      modifier: "this",
+      target: { kind: "calendar-unit", unit: "year" },
+    },
+  };
+}
+
+// Example: `parseEachUnitPeriod("month", lookups)` returns `month`.
+function parseEachUnitPeriod(input: string, lookups: DateVocabularyLookups): EachUnitPeriod | null {
+  const period = parsePeriod(input);
+  if (period === "week" || period === "month" || period === "quarter" || period === "year") {
+    return period;
+  }
+
+  const durationUnit = parseDurationUnit(input, lookups);
+  return durationUnit === "week" ||
+    durationUnit === "month" ||
+    durationUnit === "quarter" ||
+    durationUnit === "year"
+    ? durationUnit
+    : null;
+}
+
 // Example: `parseRelativeBoundary("next month", lookups)` returns a typed relative modifier boundary.
 function parseRelativeBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
   const bare = RelativeDateSet.has(input as never) ? input : null;
@@ -448,6 +520,12 @@ function parseRelativeBoundary(input: string, lookups: DateVocabularyLookups): B
   const bareCalendarUnit = parseDurationUnit(input, lookups);
   if (bareCalendarUnit) {
     return { kind: "relative", expression: { kind: "modifier", modifier: "this", target: { kind: "calendar-unit", unit: bareCalendarUnit } } };
+  }
+
+  // A weekday on its own means its next occurrence, the way `upcoming tuesday` does.
+  const bareWeekday = lookups.weekdays.get(input);
+  if (bareWeekday) {
+    return { kind: "relative", expression: { kind: "modifier", modifier: "upcoming", target: { kind: "weekday", weekday: bareWeekday } } };
   }
 
   const subset = parseLeadingOrTrailingDaysBoundary(input, lookups);
@@ -487,6 +565,18 @@ function parseRelativeBoundary(input: string, lookups: DateVocabularyLookups): B
     return null;
   }
 
+  // `this` adds nothing in front of another modifier: `this coming friday` is
+  // `upcoming friday`, `this past week` is `past week`.
+  if (modifier === "this" && parseRelativeModifier(modifierMatch[2].split(" ")[0])) {
+    return parseRelativeBoundary(modifierMatch[2], lookups);
+  }
+
+  // `next april` is the next occurrence of April; the year is settled at resolve time.
+  const relativeMonth = lookups.months.get(modifierMatch[2]);
+  if (relativeMonth) {
+    return relativeMonthBoundary(relativeMonth, modifier);
+  }
+
   const target = parseRelativeTarget(modifierMatch[2], lookups);
   return target ? { kind: "relative", expression: { kind: "modifier", modifier, target } } : null;
 }
@@ -495,33 +585,47 @@ function parseRelativeBoundary(input: string, lookups: DateVocabularyLookups): B
 function parseLeadingOrTrailingDaysBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
   const skipHolidays = /\s+(?:excluding|excl|skip) holidays$/.test(input);
   const rangeInput = skipHolidays ? input.replace(/\s+(?:excluding|excl|skip) holidays$/, "") : input;
-  const singularMatch = /^(first|last) day (?:of|in) (?:the )?(.+)$/.exec(rangeInput);
-  if (singularMatch?.[1] && singularMatch[2]) {
+  const trailingUnitMatch = /^(last) (day|weekday|week|month|quarter|year) (?:of|in) (?:the )?(.+)$/.exec(rangeInput);
+  if (trailingUnitMatch?.[1] && trailingUnitMatch[2] && trailingUnitMatch[3]) {
+    const unit = parseDurationUnit(trailingUnitMatch[2], lookups);
+    if (!unit) {
+      return null;
+    }
+
     return {
-      kind: "relative",
-      expression: {
-        kind: "leading-trailing-days",
-        edge: singularMatch[1] as BoundaryPlacement,
-        count: 1,
-        range: parseBoundary(singularMatch[2], lookups),
-        skipHolidays,
-      },
+      kind: "edge-count-unit-in-range",
+      edge: "last",
+      count: 1,
+      unit,
+      range: parseBoundary(trailingUnitMatch[3], lookups),
+      skipHolidays,
+    };
+  }
+
+  // `first day of` and `first weekday of` both pick one date off an edge.
+  const singularDayMatch = /^(first|last) (day|weekday) (?:of|in) (?:the )?(.+)$/.exec(rangeInput);
+  if (singularDayMatch?.[1] && singularDayMatch[2] && singularDayMatch[3]) {
+    return {
+      kind: "edge-count-unit-in-range",
+      edge: singularDayMatch[1] as BoundaryPlacement,
+      count: 1,
+      unit: singularDayMatch[2] === "weekday" ? "weekdays" : "day",
+      range: parseBoundary(singularDayMatch[3], lookups),
+      skipHolidays,
     };
   }
 
   const match = /^(first|last) (.+) ([a-z]+) (?:of|in) (?:the )?(.+)$/.exec(rangeInput);
   const count = parseAmount(match?.[2]);
   const unit = parseDurationUnit(match?.[3], lookups);
-  return match?.[1] && count && unit === "day" && match[4]
+  return match?.[1] && count && unit && match[4]
     ? {
-        kind: "relative",
-        expression: {
-          kind: "leading-trailing-days",
-          edge: match[1] as BoundaryPlacement,
-          count,
-          range: parseBoundary(match[4], lookups),
-          skipHolidays,
-        },
+        kind: "edge-count-unit-in-range",
+        edge: match[1] as BoundaryPlacement,
+        count,
+        unit,
+        range: parseBoundary(match[4], lookups),
+        skipHolidays,
       }
     : null;
 }
@@ -565,8 +669,56 @@ function parseCompositeAnchorBoundary(input: string, lookups: DateVocabularyLook
     parseOrdinalDayGroupBoundary(input, lookups) ??
     parseOrdinalWeekdayBoundary(input, lookups) ??
     parseUniqueWeekdayBoundary(input, lookups) ??
+    parseHalfBoundary(input, lookups) ??
+    parseOrdinalDayBoundary(input, lookups) ??
     parseShiftedAnchorBoundary(input, lookups)
   );
+}
+
+// Example: `parseHalfBoundary("second half of next year", lookups)` selects July through December of next year.
+function parseHalfBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
+  const match = /^(?:the )?(first|second|last|latter) half (?:of|in) (?:the )?(.+)$/.exec(input);
+  if (!match?.[1] || !match[2]) {
+    return null;
+  }
+
+  return {
+    kind: "half-of-range",
+    half: match[1] === "first" ? "first" : "second",
+    range: parseBoundary(match[2], lookups),
+  };
+}
+
+// Example: `parseOrdinalDayBoundary("15th of next month", lookups)` selects the 15th inside next month;
+// `parseOrdinalDayBoundary("the 15th", lookups)` selects it inside this month.
+function parseOrdinalDayBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
+  const scoped = /^(?:the )?(.+?)(?: day)? (?:of|in) (?:the )?(.+)$/.exec(input);
+  const day = parseOrdinalDay(scoped ? scoped[1] : input);
+  if (!day) {
+    return null;
+  }
+
+  const range: BoundarySlice = scoped?.[2]
+    ? parseBoundary(scoped[2], lookups)
+    : { kind: "relative", expression: { kind: "modifier", modifier: "this", target: { kind: "calendar-unit", unit: "month" } } };
+  return { kind: "ordinal-day-in-range", day, range };
+}
+
+// Example: `parseOrdinalDay("15th")` and `parseOrdinalDay("fifteenth")` return 15; `parseOrdinalDay("15")` returns null,
+// because a bare number is not a day-of-month claim.
+function parseOrdinalDay(input: string | undefined): number | null {
+  const day = parseOrdinalShaped(input);
+  return day && day >= 1 && day <= 31 ? day : null;
+}
+
+// Example: `parseOrdinalShaped("3rd")` and `parseOrdinalShaped("third")` return 3; `parseOrdinalShaped("3")` and
+// `parseOrdinalShaped("three")` return null, because a cardinal is not an ordinal even though it names a number.
+function parseOrdinalShaped(input: string | undefined): number | null {
+  if (!input || !/(?:\d(?:st|nd|rd|th)|first|second|third|th)$/.test(input)) {
+    return null;
+  }
+
+  return parseOrdinal(input);
 }
 
 // Example: `parseOrdinalCalendarUnitSpanBoundary("between 50th and 52nd week this year", lookups)` returns a span boundary.
@@ -615,7 +767,14 @@ function parseOrdinalCalendarUnitBoundary(input: string, lookups: DateVocabulary
 
   const ordinal = parseOrdinal(parts.ordinalInput);
   const ordinals = ordinal ? [ordinal] : parseOrdinalList(parts.ordinalInput);
-  return ordinals.length > 0 ? { kind: "ordinal-calendar-unit", ordinals, unit: parts.unit, range: parseBoundary(parts.rangeInput, lookups) } : null;
+  return ordinals.length > 0
+    ? {
+        kind: "ordinal-calendar-unit",
+        ordinals,
+        unit: parts.unit,
+        range: coerceOrdinalRangeToEachUnit(parseBoundary(parts.rangeInput, lookups)),
+      }
+    : null;
 }
 
 // Example: `parseOrdinalCalendarUnitParts("third week of last quarter")` splits ordinal, unit, and range text.
@@ -660,7 +819,12 @@ function parseOrdinalWeekdayBoundary(input: string, lookups: DateVocabularyLooku
   const ordinal = parseOrdinal(parts?.ordinalInput);
   const weekday = parts?.weekdayInput ? lookups.weekdays.get(parts.weekdayInput) : undefined;
   return parts && ordinal && weekday
-    ? { kind: "ordinal-weekday-in-range", ordinal, weekday, range: parseBoundary(parts.rangeInput, lookups) }
+    ? {
+        kind: "ordinal-weekday-in-range",
+        ordinal,
+        weekday,
+        range: coerceOrdinalRangeToEachUnit(parseBoundary(parts.rangeInput, lookups)),
+      }
     : null;
 }
 
@@ -708,7 +872,12 @@ function parseOrdinalDayGroupBoundary(input: string, lookups: DateVocabularyLook
     const ordinal = parseOrdinal(postfixMatch[1]);
     const group = parseDayGroup(postfixMatch[2]);
     return ordinal && group
-      ? { kind: "ordinal-day-group-in-range", ordinal, group, range: parseBoundary(postfixMatch[3], lookups) }
+      ? {
+          kind: "ordinal-day-group-in-range",
+          ordinal,
+          group,
+          range: coerceOrdinalRangeToEachUnit(parseBoundary(postfixMatch[3], lookups)),
+        }
       : null;
   }
 
@@ -717,7 +886,12 @@ function parseOrdinalDayGroupBoundary(input: string, lookups: DateVocabularyLook
     const ordinal = parseOrdinal(prefixMatch[2]);
     const group = parseDayGroup(prefixMatch[3]);
     return ordinal && group
-      ? { kind: "ordinal-day-group-in-range", ordinal, group, range: parseBoundary(prefixMatch[1], lookups) }
+      ? {
+          kind: "ordinal-day-group-in-range",
+          ordinal,
+          group,
+          range: coerceOrdinalRangeToEachUnit(parseBoundary(prefixMatch[1], lookups)),
+        }
       : null;
   }
 
@@ -815,7 +989,47 @@ function isNamedDateYearPhrase(input: string, lookups: DateVocabularyLookups): b
   return Boolean(name && lookups.namedDates.some((entry) => entry.value.toLowerCase() === name));
 }
 
-// Example: `normalizeBoundaryInput(" the next month ")` removes ignorable wrapper text.
+// Example: `coerceOrdinalRangeToEachUnit({ kind: "relative", expression: next 5 months })` iterates each month in the counted span.
+function coerceOrdinalRangeToEachUnit(range: BoundarySlice): BoundarySlice {
+  if (range.kind === "each-unit") {
+    return range;
+  }
+
+  if (range.kind !== "relative" || range.expression.kind !== "modifier") {
+    return range;
+  }
+
+  const target = range.expression.target;
+  if (target.kind !== "counted-duration") {
+    return range;
+  }
+
+  const eachUnit = countedDurationToEachUnitPeriod(target.unit);
+  return eachUnit ? { kind: "each-unit", unit: eachUnit, within: range } : range;
+}
+
+// Example: `countedDurationToEachUnitPeriod("month")` returns `month`.
+function countedDurationToEachUnitPeriod(unit: DurationUnit): EachUnitPeriod | null {
+  switch (unit) {
+    case "week":
+      return "week";
+    case "month":
+      return "month";
+    case "quarter":
+      return "quarter";
+    case "year":
+      return "year";
+    default:
+      return null;
+  }
+}
+
+// Example: `normalizeBoundaryInput(" in the next month ")` removes ignorable wrapper text: a leading
+// article, and a leading `in` or `during`, which only ever introduce the phrase that follows.
 function normalizeBoundaryInput(input: string): string {
-  return input.trim().replace(/^the /, "");
+  return input
+    .trim()
+    .replace(/^(?:in|during) /, "")
+    .replace(/^within (?:the )?(?:next )?/, "next ")
+    .replace(/^the /, "");
 }

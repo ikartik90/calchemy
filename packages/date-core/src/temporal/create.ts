@@ -125,9 +125,13 @@ function getNextCalendarCycleCompletion(
   return null;
 }
 
-function hasFloatingCalendarRangeEnd(input: string): boolean {
+const FloatingCalendarRangeEndPattern = (() => {
   const month = String.raw`jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?`;
   const quarter = String.raw`q[1-4]|(?:first|second|third|fourth) quarter`;
   const boundary = String.raw`(?:(?:start|beginning|end) of )?(?:${month}|${quarter})`;
-  return new RegExp(String.raw`\b(?:until|till|up to|upto|to)\s+(?:the\s+)?${boundary}$`, "i").test(input.trim());
+  return new RegExp(String.raw`\b(?:until|till|up to|upto|to)\s+(?:the\s+)?${boundary}$`, "i");
+})();
+
+function hasFloatingCalendarRangeEnd(input: string): boolean {
+  return FloatingCalendarRangeEndPattern.test(input.trim());
 }

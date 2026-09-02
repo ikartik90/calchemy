@@ -311,6 +311,50 @@ const NumberWords = [
 const BoundarySideValues = ["end", "start"] as const;
 export type BoundaryEndpointSide = (typeof BoundarySideValues)[number];
 
+/**
+ * Grammar words with a canonical spelling. Normalization rewrites the alias
+ * to the canonical word and records a shorthand correction, so every grammar
+ * rule only ever has to know the canonical form.
+ *
+ * Example: `beginning of next year` becomes `start of next year`.
+ */
+export const GrammarAliasEntries = [
+  ["beginning", "start"],
+  ["coming", "upcoming"],
+] as const satisfies readonly (readonly [string, string])[];
+export const GrammarAliasMap: ReadonlyMap<string, string> = new Map(GrammarAliasEntries);
+const GrammarAliasValues = GrammarAliasEntries.map(([alias]) => alias);
+
+/**
+ * Shorthands that stand for a whole phrase. Normalization replaces the
+ * shorthand with the phrase's tokens, so the grammar only ever sees the long
+ * form, and records a shorthand correction naming both.
+ *
+ * Example: `eom` becomes `end of this month`; `ytd` becomes
+ * `start of this year until today`.
+ */
+export const PhraseShorthandEntries = [
+  ["eod", "today"],
+  ["eow", "end of this week"],
+  ["eom", "end of this month"],
+  ["eoq", "end of this quarter"],
+  ["eoy", "end of this year"],
+  ["ytd", "start of this year until today"],
+  ["qtd", "start of this quarter until today"],
+  ["mtd", "start of this month until today"],
+  ["year to date", "start of this year until today"],
+  ["quarter to date", "start of this quarter until today"],
+  ["month to date", "start of this month until today"],
+  ["business day", "weekday"],
+  ["business days", "weekdays"],
+  ["next business day", "1 weekday from now"],
+  ["fortnight", "2 weeks"],
+] as const satisfies readonly (readonly [string, string])[];
+export const PhraseShorthandMap: ReadonlyMap<string, string> = new Map(PhraseShorthandEntries);
+export const PhraseShorthandMaxWords = Math.max(
+  ...PhraseShorthandEntries.map(([shorthand]) => shorthand.split(" ").length),
+);
+
 const RelativeModifierRecords = [
   { value: "this", yearReference: true },
   { value: "next", yearReference: true, forward: true },
@@ -450,6 +494,23 @@ const SamplerWords = Array.from(
   ]),
 );
 
+// Words that only carry meaning as a suffix of a relative phrase, such as the
+// `ago` in `2 months ago`.
+const RelativeSuffixWords = ["ago"] as const;
+
+// Words that name a fraction of a range, as in `first half of next year`.
+const FractionWords = ["half", "latter"] as const;
+
+// Prepositions that introduce a boundary phrase without changing it, as in
+// `during next month` or `within 2 weeks`. (`in` is already a connector.)
+const PrepositionWords = ["during", "within"] as const;
+
+const RecurrenceMarkerWords = ["each"] as const;
+export const RecurrenceMarkerSet = new Set<string>([
+  ...RecurrenceMarkerWords,
+  "every",
+]);
+
 const RelationDirectionValues = ConnectorValues.filter(
   (
     connector,
@@ -479,4 +540,9 @@ export const GrammarWordSet = new Set([
   ...BoundarySideValues,
   ...ExclusionWords,
   ...SamplerWords,
+  ...RecurrenceMarkerWords,
+  ...RelativeSuffixWords,
+  ...FractionWords,
+  ...PrepositionWords,
+  ...GrammarAliasValues,
 ]);

@@ -87,19 +87,64 @@ function parseOccurrencePrefix(input: string): { parity: SamplerParity; input: s
   return { parity: match[1] as SamplerParity, input: match[2] };
 }
 
-// Example: `parseWeekdayList("monday and friday", lookups)` returns `[1, 5]`.
+// Example: `parseWeekdayList("monday-wednesday and friday", lookups)` returns `[1, 2, 3, 5]`.
 function parseWeekdayList(input: string, lookups: DateVocabularyLookups): number[] {
-  const values = input
-    .split(/\s+(?:and|or)\s+|,\s*/)
+  // Weekdays may be separated by whitespace, commas, and/or the connectors `and`/`or`
+  // in any combination (`mon wed fri`, `mon, wed, fri`, `mon, wed and fri`), so split on
+  // every separator and drop the connector words before looking each token up. A single
+  // token may itself be an inclusive weekday range such as `mon-wed`.
+  const tokens = input
+    .split(/[,\s]+/)
     .map((value) => value.trim())
-    .filter(Boolean);
-  const weekdays = values.map((value) => lookups.weekdays.get(value));
-
-  if (values.length === 0 || weekdays.some((value) => value === undefined)) {
+    .filter((value) => value !== "" && value !== "and" && value !== "or");
+  if (tokens.length === 0) {
     return [];
   }
 
-  return Array.from(new Set(weekdays as number[]));
+  const weekdays: number[] = [];
+  for (const token of tokens) {
+    const expanded = parseWeekdayToken(token, lookups);
+    if (expanded === null) {
+      return [];
+    }
+
+    weekdays.push(...expanded);
+  }
+
+  return Array.from(new Set(weekdays));
+}
+
+// Example: `parseWeekdayToken("mon-wed", lookups)` returns `[1, 2, 3]`; `parseWeekdayToken("fri", lookups)` returns `[5]`.
+function parseWeekdayToken(token: string, lookups: DateVocabularyLookups): number[] | null {
+  const single = lookups.weekdays.get(token);
+  if (single !== undefined) {
+    return [single];
+  }
+
+  const range = /^([a-z]+)-([a-z]+)$/.exec(token);
+  const start = range?.[1] ? lookups.weekdays.get(range[1]) : undefined;
+  const end = range?.[2] ? lookups.weekdays.get(range[2]) : undefined;
+  if (start === undefined || end === undefined) {
+    return null;
+  }
+
+  return expandWeekdayRange(start, end);
+}
+
+// Example: `expandWeekdayRange(1, 3)` returns `[1, 2, 3]`; `expandWeekdayRange(6, 1)` wraps to `[6, 7, 1]`.
+function expandWeekdayRange(start: number, end: number): number[] {
+  const days: number[] = [];
+  let cursor = start;
+  for (let step = 0; step < 7; step += 1) {
+    days.push(cursor);
+    if (cursor === end) {
+      break;
+    }
+
+    cursor = cursor === 7 ? 1 : cursor + 1;
+  }
+
+  return days;
 }
 
 // Example: `weekdaysForDayGroup("weekdays")` returns Monday through Friday indices.

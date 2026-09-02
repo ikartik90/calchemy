@@ -30,9 +30,9 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm --sourcemap --tsconfig tsconfig.build.json --external @js-temporal/polyfill && tsc -p tsconfig.build.json --emitDeclarationOnly",
+    "build": "tsup src/index.ts --format esm --sourcemap --clean --tsconfig tsconfig.build.json --external @js-temporal/polyfill && tsc -p tsconfig.build.json --emitDeclarationOnly",
     "test": "pnpm run build && vitest run --root ../.. --config vitest.config.ts packages/date-core/tests",
-    "typecheck": "tsc -b",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "clean": "rm -rf dist tsconfig.tsbuildinfo"
   },
   "dependencies": {
