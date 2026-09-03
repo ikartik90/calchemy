@@ -46,6 +46,11 @@ export function sliceDateExpression(
   const { baseChunks, exclusions } = splitExclusionsFromChunks(chunks, lookups);
   const { expressionChunks, transforms } = splitTransformsFromChunks(baseChunks, lookups);
 
+  const trailingSampler = sliceTrailingSampler(expressionChunks, exclusions, transforms, lookups);
+  if (trailingSampler) {
+    return trailingSampler;
+  }
+
   const weekdayInMonth = sliceWeekdayInMonth(expressionChunks, exclusions, transforms);
   if (weekdayInMonth) {
     return weekdayInMonth;
@@ -245,6 +250,95 @@ function isImplicitScopedSamplerBoundary(boundary: BoundarySlice): boolean {
     default:
       return true;
   }
+}
+
+// Example: `sliceTrailingSampler(chunksFor("august all days"), [], [], lookups)` reads a sampler that
+// follows its range the way `all days in august` is read. The range is whatever the rest of the
+// grammar makes of the leading chunks, so `august 2020`, `next week`, `q3`, and `between aug 15 and
+// sep 30` all take a trailing sampler.
+function sliceTrailingSampler(
+  chunks: readonly StandardChunk[],
+  exclusions: readonly ExclusionSlice[],
+  transforms: readonly TransformSlice[],
+  lookups: DateVocabularyLookups,
+): DateSlice | null {
+  for (let split = 1; split < chunks.length; split += 1) {
+    const rangeChunks = chunks.slice(0, split);
+    if (!endsWithCalendarWord(rangeChunks)) {
+      continue;
+    }
+
+    const samplerChunks = chunks.slice(split);
+    if (isBareSingularWeekday(samplerChunks, lookups)) {
+      continue;
+    }
+
+    const sampler = parseSamplerFromChunks(samplerChunks, lookups);
+    if (!sampler) {
+      continue;
+    }
+
+    const range = sliceDateExpression(chunkText(rangeChunks), rangeChunks, lookups);
+    if (!isTrailingSamplerRange(range)) {
+      continue;
+    }
+
+    return {
+      expression: { kind: "sample", sampler, inner: range.expression },
+      exclusions: [...exclusions],
+      transforms: [...transforms],
+    };
+  }
+
+  return null;
+}
+
+// Example: `isBareSingularWeekday(chunksFor("sunday"), lookups)` returns true; `chunksFor("sundays")`
+// and `chunksFor("mon and wed")` return false. A lone singular weekday after a range names that
+// range's weekday (`next week sunday`, `thursday before next week's sunday`), which the boundary
+// grammar already reads, so it is not taken as a sampler. Normalization rewrites `sundays` to
+// `sunday`, so the plural is only visible on the token's raw text.
+function isBareSingularWeekday(chunks: readonly StandardChunk[], lookups: DateVocabularyLookups): boolean {
+  const [only] = chunks;
+  if (chunks.length !== 1 || only?.kind !== "weekday") {
+    return false;
+  }
+
+  const typed = only.token.raw;
+  const canonical = lookups.aliases.get(typed) ?? typed;
+  return typed !== `${canonical}s`;
+}
+
+// Example: `endsWithCalendarWord(chunksFor("next month"))` and `chunksFor("august 2020")` return true;
+// `chunksFor("thursday before next")` and `chunksFor("3rd")` return false, so a trailing weekday there
+// keeps its relation or ordinal meaning. A bare digit token is a year or a day number (`sep 30`),
+// while `3rd`, `third`, and `15th` are day-of-month claims that take no sampler.
+function endsWithCalendarWord(chunks: readonly StandardChunk[]): boolean {
+  const last = chunks[chunks.length - 1];
+  switch (last?.kind) {
+    case "month":
+    case "duration-unit":
+    case "period":
+    case "relative":
+    case "shorthand":
+      return true;
+    case "number":
+    case "ordinal":
+      return /^\d+$/.test(last.token.raw);
+    default:
+      return false;
+  }
+}
+
+// Example: `isTrailingSamplerRange(sliceFor("august"))` returns true; a range that is already sampled,
+// or a bare atom the grammar could not read, cannot take a trailing sampler.
+function isTrailingSamplerRange(range: DateSlice): boolean {
+  const { expression } = range;
+  if (expression.kind === "sample") {
+    return false;
+  }
+
+  return expression.kind !== "scope" || isImplicitScopedSamplerBoundary(expression.boundary);
 }
 
 // Example: `sliceUntilSampler(chunksFor("all mon until end of next month"), [], [], lookups)` builds an anchor-until range.

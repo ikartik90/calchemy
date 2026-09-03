@@ -12,6 +12,7 @@ import { parseNumericCandidates } from "../primitives/numeric-date";
 import { comparePlainDate, expandDatesBetween, toDuration } from "../primitives/shared";
 import { applyRelations } from "./relations";
 import { resolveExpression } from "./expression";
+import { materializeSampledDates } from "./sampler";
 import { boundaryToExpression, isCompositionalBoundary } from "../expression/from-slice";
 import {
   BackwardRelativeModifierSet,
@@ -646,6 +647,10 @@ function resolveDurationRange(
   anchorDate: PlainDate,
   context: ResolvedParseDateContext,
 ): DateValue | null {
+  if (unit === "weekdays" || unit === "weekend") {
+    return resolveCountedDayGroup(modifier, count, unit, anchorDate, context);
+  }
+
   if (isBackwardModifier(modifier)) {
     const end = anchorDate;
     if (unit === "day") {
@@ -671,6 +676,51 @@ function resolveDurationRange(
   }
 
   return null;
+}
+
+// Example: `resolveCountedDayGroup("next", 10, "weekdays", anchor, context)` returns the next ten
+// working days, counted from the anchor the way `next 10 days` counts from today; `("next", 2,
+// "weekend", ...)` returns next weekend and the one after it, the weekends `next weekend` counts by.
+// A day group is not a span of days, so `toDuration` cannot measure it.
+function resolveCountedDayGroup(
+  modifier: RelativeModifier,
+  count: number,
+  group: DayGroupPeriod,
+  anchorDate: PlainDate,
+  context: ResolvedParseDateContext,
+): DateValue | null {
+  const backward = isBackwardModifier(modifier);
+  if (!backward && !isForwardModifier(modifier)) {
+    return null;
+  }
+
+  const step = backward ? -1 : 1;
+  if (group === "weekend") {
+    const firstOffset = modifier === "next" ? 1 : backward ? -1 : 0;
+    const dates = Array.from({ length: count }, (_, index) => {
+      const weekend = resolveDayGroupRange(
+        "this",
+        "weekend",
+        anchorDate.add({ weeks: firstOffset + index * step }),
+        context,
+      );
+      return weekend.kind === "range" ? [weekend.start, weekend.end] : [];
+    })
+      .flat()
+      .sort(comparePlainDate);
+    return materializeSampledDates(dates);
+  }
+
+  const dates: PlainDate[] = [];
+  let cursor = backward && !context.lastNDaysIncludesToday ? anchorDate.add({ days: step }) : anchorDate;
+  while (dates.length < count) {
+    if (matchesDayGroup(cursor, group)) {
+      dates.push(cursor);
+    }
+    cursor = cursor.add({ days: step });
+  }
+
+  return materializeSampledDates(dates.sort(comparePlainDate));
 }
 
 // Example: `shiftDateByDuration(anchor, 3, "weekdays")` skips weekend days.

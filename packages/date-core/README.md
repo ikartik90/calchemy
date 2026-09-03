@@ -42,6 +42,7 @@ A sample of accepted phrasings, each pinned by the test corpus. The reference da
 | `start of last 2 weeks of next quarter` | a single date, composed from the inner phrase |
 | `every monday next month`, `15th of every month`, `last day of every month` | multiple dates |
 | `all weekdays in october excluding holidays`, `next week except tomorrow` | multiple dates with exclusions |
+| `2020 august`, `august all days`, `august mondays` | the same as `august 2020`, `all days in august`, `mondays in august`; a year or a day pattern may sit on either side of its range |
 | `29 feb 2027` | an `impossible-date` error suggesting `2027-02-28` and `2028-02-29` |
 | `03/04/25` | an `ambiguous` result with one candidate per date order |
 

@@ -156,7 +156,7 @@ function selectAlternateWeekdayDates(
 }
 
 // Example: `materializeSampledDates([mon, tue, wed, thu, fri])` returns a contiguous weekday range.
-function materializeSampledDates(dates: readonly PlainDate[]): DateValue | null {
+export function materializeSampledDates(dates: readonly PlainDate[]): DateValue | null {
   if (dates.length === 0) {
     return null;
   }
