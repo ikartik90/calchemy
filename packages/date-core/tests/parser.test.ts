@@ -90,10 +90,15 @@ describe("parseDate", () => {
     ["tomorrow next week", { kind: "single", date: "2026-06-04" }],
     ["tomorrow next quarter", { kind: "single", date: "2026-07-28" }],
     ["last 90 days", { kind: "range", start: "2026-02-27", end: "2026-05-27" }],
+    // Counted backwards like `last 90 days`: today (a Wednesday) counts, then the nine working days before it.
+    ["last 10 weekdays", { kind: "multiple", dates: ["2026-05-14", "2026-05-15", "2026-05-18", "2026-05-19", "2026-05-20", "2026-05-21", "2026-05-22", "2026-05-25", "2026-05-26", "2026-05-27"] }],
     ["past 10 days", { kind: "range", start: "2026-05-18", end: "2026-05-27" }],
     ["previous 10 days", { kind: "range", start: "2026-05-18", end: "2026-05-27" }],
     ["upcoming 10 days", { kind: "range", start: "2026-05-27", end: "2026-06-05" }],
     ["next 10 days", { kind: "range", start: "2026-05-27", end: "2026-06-05" }],
+    // A counted `weekdays` window is that many working days, counted like `next 10 days`
+    // (from today, inclusive), not a span of working weeks.
+    ["next 10 weekdays", { kind: "multiple", dates: ["2026-05-27", "2026-05-28", "2026-05-29", "2026-06-01", "2026-06-02", "2026-06-03", "2026-06-04", "2026-06-05", "2026-06-08", "2026-06-09"] }],
     ["future 2 weeks", { kind: "range", start: "2026-05-27", end: "2026-06-09" }],
     ["25 days from tomorrow", { kind: "range", start: "2026-05-28", end: "2026-06-22" }],
     ["three weeks from today until aug 15", { kind: "range", start: "2026-06-17", end: "2026-08-15" }],
@@ -207,6 +212,20 @@ describe("parseDate", () => {
     ["mar 06 2027", { kind: "single", date: "2027-03-06" }],
     ["christmas this year", { kind: "single", date: "2026-12-25" }],
     ["easter next year", { kind: "single", date: "2027-03-28" }],
+    // Forward-order phrases that the `phrasing variants` block pairs reversed
+    // wordings with. Values come from the calendar: August has 31 days, August
+    // 2026 starts on a Saturday, and next week from Wednesday 27 May (Sunday
+    // start) is 31 May – 6 June.
+    ["august 2020", { kind: "range", start: "2020-08-01", end: "2020-08-31" }],
+    ["march 15 2020", { kind: "single", date: "2020-03-15" }],
+    // A four-digit year after a day list is the year of every day in it, so the
+    // two-digit-year ambiguity of `aug 10, 14` does not arise.
+    ["august 10 and 14 2020", { kind: "multiple", dates: ["2020-08-10", "2020-08-14"] }],
+    ["all days in august", { kind: "range", start: "2026-08-01", end: "2026-08-31" }],
+    ["every day in august", { kind: "range", start: "2026-08-01", end: "2026-08-31" }],
+    ["all days next month", { kind: "range", start: "2026-06-01", end: "2026-06-30" }],
+    ["all days next week", { kind: "range", start: "2026-05-31", end: "2026-06-06" }],
+    ["mondays in august", { kind: "multiple", dates: ["2026-08-03", "2026-08-10", "2026-08-17", "2026-08-24", "2026-08-31"] }],
   ] satisfies Array<[string, DateValueJSON]>)("parses %s", (input, expected) => {
     const result = calchemy.parseDate(input, context);
 
@@ -253,6 +272,9 @@ describe("parseDate", () => {
     ["upcoming weekend", { kind: "range", start: "2026-05-30", end: "2026-05-31" }],
     ["next weekend", { kind: "range", start: "2026-06-06", end: "2026-06-07" }],
     ["previous weekend", { kind: "range", start: "2026-05-23", end: "2026-05-24" }],
+    // Counted weekends are whole weekends, counted the way `next weekend` and
+    // `previous weekend` count: next weekend plus the one after it.
+    ["next 2 weekends", { kind: "multiple", dates: ["2026-06-06", "2026-06-07", "2026-06-13", "2026-06-14"] }],
     ["this month", { kind: "range", start: "2026-05-01", end: "2026-05-31" }],
     ["next month", { kind: "range", start: "2026-06-01", end: "2026-06-30" }],
     ["last month", { kind: "range", start: "2026-04-01", end: "2026-04-30" }],
@@ -2747,6 +2769,34 @@ describe("phrasing variants", () => {
     ["fortnight from now", { kind: "single", date: "2026-06-10" }], // = `2 weeks from now`
     ["in a fortnight", { kind: "single", date: "2026-06-10" }],
     ["in 2 business days", { kind: "single", date: "2026-05-29" }], // = `2 weekdays from now`
+    // Reversed word orders: the same known words, with the year or the sampler
+    // on the other side of the range.
+    ["2020 august", { kind: "range", start: "2020-08-01", end: "2020-08-31" }], // = `august 2020`
+    ["august all days", { kind: "range", start: "2026-08-01", end: "2026-08-31" }], // = `all days in august`
+    ["next month all days", { kind: "range", start: "2026-06-01", end: "2026-06-30" }], // = `all days next month`
+    [
+      "october all weekdays", // = `all weekdays in october excluding holidays`; this corpus has no October holidays
+      {
+        kind: "multiple",
+        dates: [
+          "2026-10-01", "2026-10-02",
+          "2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09",
+          "2026-10-12", "2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16",
+          "2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23",
+          "2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30",
+        ],
+      },
+    ],
+    ["august mondays", { kind: "multiple", dates: ["2026-08-03", "2026-08-10", "2026-08-17", "2026-08-24", "2026-08-31"] }], // = `mondays in august`
+    ["2020 march 15", { kind: "single", date: "2020-03-15" }], // = `march 15 2020`
+    ["2020 august 10 and 14", { kind: "multiple", dates: ["2020-08-10", "2020-08-14"] }], // = `august 10 and 14 2020`
+    ["2027 q3", { kind: "range", start: "2027-07-01", end: "2027-09-30" }], // = `Q3 2027`
+    ["next year april", { kind: "range", start: "2027-04-01", end: "2027-04-30" }], // = `next april`
+    ["next year easter", { kind: "single", date: "2027-03-28" }], // = `easter next year`
+    ["august every day", { kind: "range", start: "2026-08-01", end: "2026-08-31" }], // = `every day in august`
+    ["in august all days", { kind: "range", start: "2026-08-01", end: "2026-08-31" }], // = `all days in august`
+    ["next week all days", { kind: "range", start: "2026-05-31", end: "2026-06-06" }], // = `all days next week`
+    ["august 2020 all days", { kind: "range", start: "2020-08-01", end: "2020-08-31" }], // = `august 2020`
   ] satisfies ReadonlyArray<readonly [string, DateValueJSON]>)("%s", (input, expected) => {
     const result = calchemy.parseDate(input, context);
 

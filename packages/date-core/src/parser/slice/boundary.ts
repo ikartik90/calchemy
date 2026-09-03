@@ -45,6 +45,7 @@ export function parseBoundary(
     parseOrdinalWeekdayFromAnchorBoundary(normalized, lookups) ??
     parseDurationFromAnchorBoundary(normalized, lookups) ??
     parseDurationNearBoundary(normalized, lookups) ??
+    parseYearFirstBoundary(normalized, lookups) ??
     parseYearBoundary(normalized) ??
     parseHolidaysBoundary(normalized) ??
     parseDayGroupFilterBoundary(normalized) ??
@@ -270,6 +271,27 @@ function parseMonthDayRangeBoundary(input: string, lookups: DateVocabularyLookup
   return parsed
     ? { kind: "month-day-range", month: parsed.month, startDay: parsed.startDay, endDay: parsed.endDay }
     : null;
+}
+
+// Example: `parseYearFirstBoundary("2020 august", lookups)` reads `2020 august` the way
+// `august 2020` is read. A year — four digits, or `this|next|last|previous year` — may sit
+// on either side of a month, quarter, week, shorthand, or named date; only the
+// year-last form has grammar rules, so the year-first form is rewritten onto them.
+function parseYearFirstBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
+  const match = /^(\d{4}|(?:this|next|last|previous) year) (.+)$/.exec(input);
+  if (!match?.[1] || !match[2]) {
+    return null;
+  }
+
+  const yearLast = `${match[2]} ${match[1]}`;
+  return (
+    parseShorthandRangeListBoundary(yearLast) ??
+    parseNamedMonthBoundary(yearLast, lookups) ??
+    parseMonthBoundary(yearLast) ??
+    parseQuarterBoundary(yearLast) ??
+    parseWeekBoundary(yearLast) ??
+    (isNamedDateYearPhrase(yearLast, lookups) ? atomBoundary(yearLast) : null)
+  );
 }
 
 // Example: `parseYearBoundary("2027")` returns a full-year boundary.

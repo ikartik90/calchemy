@@ -115,8 +115,19 @@ export function parseMonthDayListResult(
     return null;
   }
 
-  const { month, days } = parsed;
+  const { month, days, year } = parsed;
   const anchorYear = context.referenceDate.year;
+
+  // An explicit four-digit year settles what the two-digit forms leave open:
+  // `august 10 and 14 2020` is two days in 2020, `march 15 2020` is one day.
+  if (year !== undefined) {
+    const [onlyDay] = days;
+    const value =
+      days.length === 1 && onlyDay !== undefined
+        ? resolveMonthDay(month, onlyDay, year, Temporal)
+        : resolveMonthDayList(month, days, year, Temporal);
+    return toValidResult(input, value, source, corrections);
+  }
 
   if (days.length >= 3) {
     return toValidResult(input, resolveMonthDayList(month, days, anchorYear, Temporal), source, corrections);
@@ -168,12 +179,13 @@ function parseSingleMonthDayExpression(
   return { month: monthChunk.value, day: dayChunk.value };
 }
 
-// Example: `parseMonthDayListExpression(chunksFor("august 10 and 14"), lookups)` returns month 8 and days `[10, 14]`.
+// Example: `parseMonthDayListExpression(chunksFor("august 10 and 14"), lookups)` returns month 8 and days `[10, 14]`;
+// `chunksFor("august 10 and 14 2020")` also returns year 2020, and `chunksFor("march 15 2020")` one day in 2020.
 export function parseMonthDayListExpression(
   chunks: readonly StandardChunk[],
   lookups: DateVocabularyLookups,
-): { month: number; days: number[] } | null {
-  const expression = trimTrailingSeparators(trimLeadingSeparators(chunks));
+): { month: number; days: number[]; year?: number } | null {
+  const expression = moveLeadingYearLast(trimTrailingSeparators(trimLeadingSeparators(chunks)));
   if (expression.length < 3) {
     return null;
   }
@@ -183,11 +195,11 @@ export function parseMonthDayListExpression(
     return null;
   }
 
-  const days: number[] = [];
+  const numbers: Extract<StandardChunk, { kind: "number" | "ordinal" }>[] = [];
   for (let index = 1; index < expression.length; index += 1) {
     const chunk = expression[index];
     if (chunk?.kind === "number" || chunk?.kind === "ordinal") {
-      days.push(chunk.value);
+      numbers.push(chunk);
       continue;
     }
 
@@ -198,11 +210,24 @@ export function parseMonthDayListExpression(
     return null;
   }
 
-  if (days.length < 2) {
+  // A trailing four-digit token is a year, never a day; a two-digit one stays a
+  // day so that `aug 10, 14` keeps its day-versus-year ambiguity.
+  const last = numbers[numbers.length - 1];
+  const year = last && /^\d{4}$/.test(last.token.raw) ? last.value : undefined;
+  const days = (year === undefined ? numbers : numbers.slice(0, -1)).map((chunk) => chunk.value);
+  if (days.length < (year === undefined ? 2 : 1)) {
     return null;
   }
 
-  return { month: monthChunk.value, days };
+  return year === undefined ? { month: monthChunk.value, days } : { month: monthChunk.value, days, year };
+}
+
+// Example: `moveLeadingYearLast(chunksFor("2020 march 15"))` returns chunks for `march 15 2020`, so a
+// year typed first reads the way the year-last form does. Only a four-digit token before a month is a year.
+function moveLeadingYearLast(chunks: readonly StandardChunk[]): readonly StandardChunk[] {
+  const [first, second] = chunks;
+  const isYear = (first?.kind === "number" || first?.kind === "ordinal") && /^\d{4}$/.test(first.token.raw);
+  return isYear && first && second?.kind === "month" ? [...chunks.slice(1), first] : chunks;
 }
 
 // Example: `parseMonthDayRangeExpression(chunksFor("august 10-14"), lookups)` returns month 8 with days 10 and 14.
