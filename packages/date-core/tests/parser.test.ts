@@ -35,6 +35,22 @@ const namedDatesVocabulary = [
       return context.referenceDate.with({ year, month: 6, day: 6 });
     },
   },
+  // A named set: one entry that stands for several dates in a year.
+  {
+    value: "board meeting",
+    // One alias is the first word of the full name, one is two words long.
+    aliases: ["board", "quarterly board"],
+    resolveDates({ year, context }) {
+      return [1, 4, 7, 10].map((month) => context.referenceDate.with({ year, month, day: 15 }));
+    },
+  },
+  // A named set whose dates are contiguous, so it reads back as a range.
+  {
+    value: "team offsite",
+    resolveDates({ year, context }) {
+      return [14, 15, 16].map((day) => context.referenceDate.with({ year, month: 9, day }));
+    },
+  },
 ] satisfies readonly NamedDatesVocabularyEntry[];
 const calchemy = createCalchemyWithTemporal(Temporal, { namedDatesVocabulary });
 const context: ParseDateContext = {
@@ -108,6 +124,8 @@ describe("parseDate", () => {
     ["25 days from tomorrow upto the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
     ["25 days from tomorrow to the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
     ["tomorrow until end of next month", { kind: "range", start: "2026-05-28", end: "2026-06-30" }],
+    // Mondays from 28 Dec 2026 to Easter Sunday 28 Mar 2027.
+    ["mondays between christmas this year and easter next year", { kind: "multiple", dates: ["2026-12-28", "2027-01-04", "2027-01-11", "2027-01-18", "2027-01-25", "2027-02-01", "2027-02-08", "2027-02-15", "2027-02-22", "2027-03-01", "2027-03-08", "2027-03-15", "2027-03-22"] }],
     ["3rd quarter until the end of the year.", { kind: "range", start: "2026-07-01", end: "2026-12-31" }],
     ["ninth week from today", { kind: "range", start: "2026-07-26", end: "2026-08-01" }],
     ["9th week from today", { kind: "range", start: "2026-07-26", end: "2026-08-01" }],
@@ -156,6 +174,12 @@ describe("parseDate", () => {
     ["W3 22", { kind: "range", start: "2022-01-17", end: "2022-01-23" }],
     ["w52 next year", { kind: "range", start: "2027-12-27", end: "2028-01-02" }],
     ["w48-w52", { kind: "range", start: "2026-11-23", end: "2026-12-27" }],
+    // A month, quarter, or week number past the calendar rolls into the next year
+    // when no year is written. 2026 has 53 ISO weeks and week 1 of 2027 starts on 4 Jan.
+    ["m13", { kind: "range", start: "2027-01-01", end: "2027-01-31" }],
+    ["q5", { kind: "range", start: "2027-01-01", end: "2027-03-31" }],
+    ["w54", { kind: "range", start: "2027-01-04", end: "2027-01-10" }],
+    ["week 60", { kind: "range", start: "2027-02-15", end: "2027-02-21" }],
     ["m8-m12", { kind: "range", start: "2026-08-01", end: "2026-12-31" }],
     ["q1-q3", { kind: "range", start: "2026-01-01", end: "2026-09-30" }],
     ["Q3 27", { kind: "range", start: "2027-07-01", end: "2027-09-30" }],
@@ -212,6 +236,34 @@ describe("parseDate", () => {
     ["mar 06 2027", { kind: "single", date: "2027-03-06" }],
     ["christmas this year", { kind: "single", date: "2026-12-25" }],
     ["easter next year", { kind: "single", date: "2027-03-28" }],
+    // Named sets: the `board meeting` entry returns the 15th of Jan, Apr, Jul and Oct.
+    ["board meeting", { kind: "multiple", dates: ["2026-01-15", "2026-04-15", "2026-07-15", "2026-10-15"] }],
+    ["board meeting next year", { kind: "multiple", dates: ["2027-01-15", "2027-04-15", "2027-07-15", "2027-10-15"] }],
+    // Aliases: a two-word alias, and a one-word alias that also starts the full name.
+    ["quarterly board", { kind: "multiple", dates: ["2026-01-15", "2026-04-15", "2026-07-15", "2026-10-15"] }],
+    ["board next year", { kind: "multiple", dates: ["2027-01-15", "2027-04-15", "2027-07-15", "2027-10-15"] }],
+    // A named set inside a period keeps only the dates that fall in it. The period
+    // may come first, the name may be plural or carry `all`/`every`, and an empty
+    // answer is a valid empty list rather than a phrase the parser could not read.
+    ["board meeting in q3", { kind: "single", date: "2026-07-15" }],
+    ["q3 board meeting", { kind: "single", date: "2026-07-15" }],
+    ["board meetings in q3", { kind: "single", date: "2026-07-15" }],
+    ["all board meetings in q3", { kind: "single", date: "2026-07-15" }],
+    ["board meeting in august", { kind: "multiple", dates: [] }],
+    ["board meeting in first half of 2027", { kind: "multiple", dates: ["2027-01-15", "2027-04-15"] }],
+    ["board meeting between july and december", { kind: "multiple", dates: ["2026-07-15", "2026-10-15"] }],
+    ["board meeting from tomorrow until end of year", { kind: "multiple", dates: ["2026-07-15", "2026-10-15"] }],
+    ["board meeting in 2027 excluding january", { kind: "multiple", dates: ["2027-04-15", "2027-07-15", "2027-10-15"] }],
+    // A bare quarter used as an exclusion is read inside the parent window, like a bare month.
+    ["board meeting in 2027 excluding q1", { kind: "multiple", dates: ["2027-04-15", "2027-07-15", "2027-10-15"] }],
+    ["team offsite in september", { kind: "range", start: "2026-09-14", end: "2026-09-16" }],
+    // `holidays` works the same way; christmas is the only December holiday configured.
+    ["holidays in december", { kind: "single", date: "2026-12-25" }],
+    ["team offsite", { kind: "range", start: "2026-09-14", end: "2026-09-16" }],
+    // `and` between named phrases is a union, as it is for `today and tomorrow`.
+    ["board meeting and christmas", { kind: "multiple", dates: ["2026-01-15", "2026-04-15", "2026-07-15", "2026-10-15", "2026-12-25"] }],
+    // July 2026 starts on a Wednesday and has 23 weekdays; the board meeting on the 15th drops out.
+    ["weekdays in july excluding board meeting", { kind: "multiple", dates: ["2026-07-01", "2026-07-02", "2026-07-03", "2026-07-06", "2026-07-07", "2026-07-08", "2026-07-09", "2026-07-10", "2026-07-13", "2026-07-14", "2026-07-16", "2026-07-17", "2026-07-20", "2026-07-21", "2026-07-22", "2026-07-23", "2026-07-24", "2026-07-27", "2026-07-28", "2026-07-29", "2026-07-30", "2026-07-31"] }],
     // Forward-order phrases that the `phrasing variants` block pairs reversed
     // wordings with. Values come from the calendar: August has 31 days, August
     // 2026 starts on a Saturday, and next week from Wednesday 27 May (Sunday
@@ -916,6 +968,50 @@ describe("parseDate", () => {
         kind: "multiple",
         dates: expect.not.arrayContaining(["2026-12-25"]),
       });
+    }
+  });
+
+  test("pools every date of an isHoliday named set into holidays", () => {
+    const holidayCalchemy = createCalchemyWithTemporal(Temporal, {
+      namedDatesVocabulary: [
+        {
+          value: "bank holiday",
+          isHoliday: true,
+          resolveDates({ year, context }) {
+            return [
+              context.referenceDate.with({ year, month: 5, day: 4 }),
+              context.referenceDate.with({ year, month: 8, day: 31 }),
+            ];
+          },
+        },
+      ],
+    });
+    const holidayContext: ParseDateContext = {
+      referenceDate,
+      locale: "en-US",
+      weekStartsOn: 0,
+      dateOrderPreference: ["DMY", "MDY", "YMD"],
+    };
+
+    const listed = holidayCalchemy.parseDate("holidays", holidayContext);
+    expect(listed.status).toBe("valid");
+    if (listed.status === "valid") {
+      expect(holidayCalchemy.toJSON(listed.value)).toEqual({
+        kind: "multiple",
+        dates: ["2026-05-04", "2026-08-31"],
+      });
+    }
+
+    // August 2026 starts on a Saturday and has 21 weekdays; the bank holiday on the 31st drops out.
+    const excluded = holidayCalchemy.parseDate("weekdays in august excluding holidays", holidayContext);
+    expect(excluded.status).toBe("valid");
+    if (excluded.status === "valid") {
+      const dates = holidayCalchemy.toJSON(excluded.value);
+      expect(dates.kind).toBe("multiple");
+      if (dates.kind === "multiple") {
+        expect(dates.dates).not.toContain("2026-08-31");
+        expect(dates.dates).toHaveLength(20);
+      }
     }
   });
 

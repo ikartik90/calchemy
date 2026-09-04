@@ -34,6 +34,14 @@ const namedDatesVocabulary = [
       return context.referenceDate.with({ year, month: 7, day: 4 });
     },
   },
+  // A named set: several dates a year under one name.
+  {
+    value: "board meeting",
+    aliases: ["board", "quarterly board"],
+    resolveDates({ year, context }) {
+      return [1, 4, 7, 10].map((month) => context.referenceDate.with({ year, month, day: 15 }));
+    },
+  },
 ];
 const calchemy = await calchemyModule.createCalchemy({
   namedDatesVocabulary,

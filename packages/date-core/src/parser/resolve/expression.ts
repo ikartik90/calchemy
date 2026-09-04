@@ -3,7 +3,7 @@ import {
 } from "../primitives/date-math";
 import { comparePlainDate, expandDatesBetween } from "../primitives/shared";
 import { applyRelations } from "./relations";
-import { applySampler } from "./sampler";
+import { applyMembershipSampler, applySampler } from "./sampler";
 import { resolveBoundary, type ResolveBoundaryOptions } from "./boundary";
 import {
   clipRangeToWindow,
@@ -57,7 +57,14 @@ export function resolveExpression(
       return resolveBoundary(expression.boundary, anchorDate, Temporal, context, lookups, options);
     case "sample": {
       const inner = resolveExpression(expression.inner, anchorDate, Temporal, context, lookups, options);
-      return inner ? applySampler(inner, expression.sampler, context.weekStartsOn) : null;
+      if (!inner) {
+        return null;
+      }
+
+      const { sampler } = expression;
+      return sampler.kind === "named-set" || sampler.kind === "holidays"
+        ? applyMembershipSampler(inner, sampler, context, lookups)
+        : applySampler(inner, sampler, context.weekStartsOn);
     }
     case "select":
       return resolveSelectExpression(

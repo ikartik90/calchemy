@@ -40,6 +40,7 @@ export type {
   InvalidParseDateResult,
   MonthVocabularyEntry,
   MultipleDatesValue,
+  NamedDateResolveArgs,
   NamedDatesVocabularyEntry,
   ParseDateContext,
   ParseDateError,

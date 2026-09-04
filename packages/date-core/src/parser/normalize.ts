@@ -33,11 +33,11 @@ export function normalizeInput(input: string, lookups: DateVocabularyLookups = D
     .replace(DashLikeCharacters, "-")
     .replace(/\s+/g, " ");
 
-  const tokens = tokenize(normalized);
   const corrections: Correction[] = [];
+  const { tokens, settled } = expandNamedDatePhrases(tokenize(normalized), lookups, corrections);
   const correctedTokens = tokens
     .map((token, index): Token | null => {
-      if (token.kind !== "word") {
+      if (token.kind !== "word" || settled.has(token)) {
         return token;
       }
 
@@ -92,6 +92,96 @@ export function normalizeInput(input: string, lookups: DateVocabularyLookups = D
     tokens: semanticTokens,
     corrections,
   };
+}
+
+/**
+ * Replaces named-date values and aliases with the tokens of their canonical
+ * value, matching whole phrases so that multi-word names and aliases work.
+ *
+ * Every token that comes out of a match is "settled": the word-by-word pass
+ * that follows leaves it alone. That is what stops a one-word alias such as
+ * `board` from rewriting the first word of `board meeting` a second time. The
+ * longest phrase at each position wins, and a verbatim value is kept as typed.
+ *
+ * Example: `expandNamedDatePhrases(tokensFor("quarterly board next year"), lookups, corrections)`
+ * yields the tokens `board`, `meeting`, `next`, `year` and records
+ * `quarterly board` → `board meeting`.
+ */
+function expandNamedDatePhrases(
+  tokens: readonly Token[],
+  lookups: DateVocabularyLookups,
+  corrections: Correction[],
+): { tokens: Token[]; settled: Set<Token> } {
+  const settled = new Set<Token>();
+  if (lookups.namedDatePhrases.size === 0) {
+    return { tokens: [...tokens], settled };
+  }
+
+  const expanded: Token[] = [];
+  let index = 0;
+
+  while (index < tokens.length) {
+    const match = matchNamedDatePhraseAt(tokens, index, lookups);
+    if (!match) {
+      expanded.push(tokens[index] as Token);
+      index += 1;
+      continue;
+    }
+
+    const matched = tokens.slice(index, index + match.length);
+    if (match.phrase === match.value) {
+      for (const token of matched) {
+        settled.add(token);
+        expanded.push(token);
+      }
+      index += match.length;
+      continue;
+    }
+
+    const first = matched[0] as Token;
+    const last = matched[matched.length - 1] as Token;
+    const raw = matched.map((token) => token.raw).join(" ");
+    corrections.push({ from: match.phrase, to: match.value, reason: "shorthand", confidence: 1 });
+
+    for (const word of match.value.split(" ")) {
+      const token: Token = { kind: "word", raw, normalized: word, start: first.start, end: last.end };
+      settled.add(token);
+      expanded.push(token);
+    }
+
+    index += match.length;
+  }
+
+  return { tokens: expanded, settled };
+}
+
+// Example: `matchNamedDatePhraseAt(tokensFor("quarterly board"), 0, lookups)` matches both words.
+function matchNamedDatePhraseAt(
+  tokens: readonly Token[],
+  index: number,
+  lookups: DateVocabularyLookups,
+): { phrase: string; value: string; length: number } | null {
+  for (let length = Math.min(lookups.namedDatePhraseMaxWords, tokens.length - index); length >= 1; length -= 1) {
+    const candidate = tokens.slice(index, index + length);
+    if (candidate.some((token) => token.kind !== "word")) {
+      continue;
+    }
+
+    const phrase = candidate.map((token) => token.normalized).join(" ");
+    const value = lookups.namedDatePhrases.get(phrase);
+    if (value) {
+      return { phrase, value, length };
+    }
+
+    // `board meetings` names the `board meeting` set, the way `mondays` names Monday.
+    const singular = phrase.endsWith("s") ? phrase.slice(0, -1) : null;
+    const pluralValue = singular ? lookups.namedDatePhrases.get(singular) : undefined;
+    if (pluralValue) {
+      return { phrase, value: pluralValue, length };
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -234,7 +324,7 @@ function findFuzzyMatch(value: string, vocabulary: readonly string[]): string | 
 }
 
 // Example: `levenshtein("march", "marhc")` returns the edit distance between the words.
-function levenshtein(a: string, b: string): number {
+export function levenshtein(a: string, b: string): number {
   const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
   const current = Array.from({ length: b.length + 1 }, () => 0);
 

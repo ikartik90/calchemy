@@ -1,24 +1,61 @@
 import { expandTwoDigitYear } from "./date-math";
+import { comparePlainDate } from "./shared";
 import { normalizeVocabularyValue, type DateVocabularyLookups } from "../vocabulary";
 import type { PlainDate, TemporalApi } from "../../temporal/types";
-import type { ResolvedParseDateContext } from "../../types";
+import type { NamedDatesVocabularyEntry, ResolvedParseDateContext } from "../../types";
 
-// Example: `parseNamedDate("christmas 2026", 2026, Temporal, lookups, context)` returns Christmas 2026.
-export function parseNamedDate(
+/**
+ * Resolves a named phrase to the sorted, de-duplicated dates it stands for.
+ *
+ * A configured entry may return one date a year (`christmas`) or many
+ * (`board meeting`); both come back as a list so callers treat them alike. A
+ * month-name date such as `july 1 27` is a one-item list. Returns `null` when
+ * the phrase is not a named date at all, and an empty list when it is one but
+ * has no dates in that year.
+ *
+ * Example: `parseNamedDates("christmas 2026", 2026, Temporal, lookups, context)` returns `[2026-12-25]`.
+ */
+export function parseNamedDates(
   input: string,
   anchorYear: number,
   Temporal: TemporalApi,
   lookups: DateVocabularyLookups,
   context: ResolvedParseDateContext,
-): PlainDate | null {
+): PlainDate[] | null {
   const compact = input.replace(/,/g, " ").replace(/\s+/g, " ").trim();
 
-  const namedDate = parseConfiguredNamedDate(compact, anchorYear, lookups, context);
-  if (namedDate) {
-    return namedDate;
+  const namedDates = parseConfiguredNamedDates(compact, anchorYear, lookups, context);
+  if (namedDates) {
+    return namedDates;
   }
 
-  return parseMonthNameDate(compact, anchorYear, Temporal, lookups);
+  const monthNameDate = parseMonthNameDate(compact, anchorYear, Temporal, lookups);
+  return monthNameDate ? [monthNameDate] : null;
+}
+
+/**
+ * Asks a vocabulary entry for its dates in a year, whichever resolver it
+ * defines, and normalizes the answer to a sorted list without duplicates.
+ *
+ * Example: `resolveNamedDateEntryDates(christmasEntry, 2026, context)` returns `[2026-12-25]`.
+ */
+export function resolveNamedDateEntryDates(
+  entry: NamedDatesVocabularyEntry,
+  year: number,
+  context: ResolvedParseDateContext,
+): PlainDate[] {
+  const resolved = entry.resolveDates
+    ? entry.resolveDates({ year, context })
+    : [entry.resolveDate({ year, context })];
+  const unique = new Map<string, PlainDate>();
+
+  for (const date of resolved) {
+    if (date) {
+      unique.set(date.toString(), date);
+    }
+  }
+
+  return Array.from(unique.values()).sort(comparePlainDate);
 }
 
 // Example: `parseMonthNameDate("july 1 27", 2026, Temporal, lookups)` returns July 1, 2027.
@@ -65,13 +102,13 @@ function createMonthNameDate(
   }
 }
 
-// Example: `parseConfiguredNamedDate("easter next year", 2026, lookups, context)` resolves the configured Easter date.
-function parseConfiguredNamedDate(
+// Example: `parseConfiguredNamedDates("easter next year", 2026, lookups, context)` resolves the configured Easter date.
+function parseConfiguredNamedDates(
   input: string,
   anchorYear: number,
   lookups: DateVocabularyLookups,
   context: ResolvedParseDateContext,
-): PlainDate | null {
+): PlainDate[] | null {
   const normalized = normalizeVocabularyValue(input);
   const relativeYearMatch = /^(.*) (this|next|last|previous) year$/.exec(normalized);
   const yearMatch = /^(.*) (\d{2,4})$/.exec(normalized);
@@ -87,7 +124,7 @@ function parseConfiguredNamedDate(
       continue;
     }
 
-    return entry.resolveDate({ year, context });
+    return resolveNamedDateEntryDates(entry, year, context);
   }
 
   return null;

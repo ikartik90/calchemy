@@ -12,13 +12,46 @@ export type SamplerSlice =
   | { kind: "all-days"; interval: number; startIndex: number }
   | { kind: "day-number-parity"; parity: SamplerParity }
   | { kind: "weekdays"; weekdays: number[]; interval: number; startIndex: number }
-  | { kind: "weeks"; interval: number; startIndex: number };
+  | { kind: "weeks"; interval: number; startIndex: number }
+  | MembershipSamplerSlice;
+
+/**
+ * A sampler that keeps the dates of a period which belong to a named set
+ * (`board meeting in q3`) or to the configured holidays (`holidays in december`).
+ * `name` is the canonical, normalized named-date value.
+ */
+export type MembershipSamplerSlice =
+  | { kind: "named-set"; name: string }
+  | { kind: "holidays" };
+
+export type SliceSamplerOptions = {
+  /**
+   * Whether a named set or `holidays` may stand as the sampler. Only phrasings
+   * that pair the sampler with an explicit period (`X in q3`, `q3 X`) turn this
+   * on, so that `board meeting next year` keeps reading as a year phrase.
+   */
+  namedSets?: boolean;
+};
 
 // Example: `sliceSampler("mondays", "all", lookups)` returns weekday sampler intent.
-export function sliceSampler(input: string, command: SamplerCommand, lookups: DateVocabularyLookups): SamplerSlice | null {
+export function sliceSampler(
+  input: string,
+  command: SamplerCommand,
+  lookups: DateVocabularyLookups,
+  options: SliceSamplerOptions = {},
+): SamplerSlice | null {
   const dayNumberParity = parseDayNumberParity(input, lookups);
   if (dayNumberParity) {
     return dayNumberParity;
+  }
+
+  // `all board meetings in q3` and `every board meeting in q3` read like the bare
+  // phrase; `every other board meeting` has no meaning for a set, so it is refused.
+  if (options.namedSets && !AlternatingSamplerCommandSet.has(command)) {
+    const membership = parseMembershipSampler(input, lookups);
+    if (membership) {
+      return membership;
+    }
   }
 
   const occurrence = parseOccurrencePrefix(input);
@@ -55,6 +88,17 @@ export function sliceSampler(input: string, command: SamplerCommand, lookups: Da
   }
 
   return null;
+}
+
+// Example: `parseMembershipSampler("board meeting", lookups)` returns named-set intent for the
+// configured `board meeting` entry; `parseMembershipSampler("holidays", lookups)` returns holiday intent.
+function parseMembershipSampler(input: string, lookups: DateVocabularyLookups): MembershipSamplerSlice | null {
+  if (input === "holidays") {
+    return { kind: "holidays" };
+  }
+
+  const name = lookups.namedDatePhrases.get(input);
+  return name ? { kind: "named-set", name } : null;
 }
 
 // Example: `parseDayNumberParity("even dates", lookups)` returns even day-of-month intent.

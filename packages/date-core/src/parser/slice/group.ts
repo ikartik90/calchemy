@@ -35,7 +35,7 @@ import type {
   RelationSlice,
   TransformSlice,
 } from "./types";
-import type { SamplerSlice } from "./sampler";
+import type { SamplerSlice, SliceSamplerOptions } from "./sampler";
 
 // Example: `sliceDateExpression("all mondays in june", chunks, lookups)` returns boundary plus sampler intent.
 export function sliceDateExpression(
@@ -116,7 +116,7 @@ function sliceWeekdayBetween(
     return null;
   }
 
-  const sampler = parseSamplerFromChunks(chunks.slice(0, betweenIndex), lookups);
+  const sampler = parseSamplerFromChunks(chunks.slice(0, betweenIndex), lookups, { namedSets: true });
   if (!sampler) {
     return null;
   }
@@ -179,7 +179,7 @@ function sliceScopedSampler(
 ): DateSlice | null {
   const connectorIndex = findScopedSamplerConnectorIndex(chunks);
   if (connectorIndex > 0 && connectorIndex < chunks.length - 1) {
-    const sampler = parseSamplerFromChunks(chunks.slice(0, connectorIndex), lookups);
+    const sampler = parseSamplerFromChunks(chunks.slice(0, connectorIndex), lookups, { namedSets: true });
     if (sampler) {
       const connector = chunks[connectorIndex];
       if (
@@ -273,8 +273,15 @@ function sliceTrailingSampler(
       continue;
     }
 
-    const sampler = parseSamplerFromChunks(samplerChunks, lookups);
+    const sampler = parseSamplerFromChunks(samplerChunks, lookups, { namedSets: true });
     if (!sampler) {
+      continue;
+    }
+
+    // `next year board meeting` is the year phrase `board meeting next year`, which the
+    // named-date primitive answers by asking the entry for that year; it is not a set
+    // filtered against the whole of next year.
+    if (isMembershipSampler(sampler) && isBareYearPhrase(chunkText(rangeChunks))) {
       continue;
     }
 
@@ -339,6 +346,16 @@ function isTrailingSamplerRange(range: DateSlice): boolean {
   }
 
   return expression.kind !== "scope" || isImplicitScopedSamplerBoundary(expression.boundary);
+}
+
+// Example: `isMembershipSampler({ kind: "named-set", name: "board meeting" })` returns true.
+function isMembershipSampler(sampler: SamplerSlice): boolean {
+  return sampler.kind === "named-set" || sampler.kind === "holidays";
+}
+
+// Example: `isBareYearPhrase("next year")` and `isBareYearPhrase("2027")` return true; `isBareYearPhrase("q3")` does not.
+function isBareYearPhrase(input: string): boolean {
+  return /^(?:\d{4}|(?:this|next|last|previous) year)$/.test(input);
 }
 
 // Example: `sliceUntilSampler(chunksFor("all mon until end of next month"), [], [], lookups)` builds an anchor-until range.
@@ -450,7 +467,7 @@ function sliceScopedSamplerUpperBound(
     return null;
   }
 
-  const sampler = parseSamplerFromChunks(split.leftChunks.slice(0, scopeIndex), lookups);
+  const sampler = parseSamplerFromChunks(split.leftChunks.slice(0, scopeIndex), lookups, { namedSets: true });
   if (!sampler) {
     return null;
   }
@@ -744,9 +761,13 @@ function findTrailingTransformOperatorIndex(chunks: readonly StandardChunk[]): n
 }
 
 // Example: `parseSamplerFromChunks(chunksFor("every other monday"), lookups)` returns alternate Monday intent.
-function parseSamplerFromChunks(chunks: readonly StandardChunk[], lookups: DateVocabularyLookups): ReturnType<typeof sliceSampler> {
+function parseSamplerFromChunks(
+  chunks: readonly StandardChunk[],
+  lookups: DateVocabularyLookups,
+  options: SliceSamplerOptions = {},
+): ReturnType<typeof sliceSampler> {
   const { command, samplerChunks } = splitSamplerCommand(trimLeadingArticle(chunks));
-  return sliceSampler(chunkText(samplerChunks), command, lookups);
+  return sliceSampler(chunkText(samplerChunks), command, lookups, options);
 }
 
 // Example: `splitSamplerCommand(chunksFor("every other monday"))` returns command `every other` and sampler chunks.
