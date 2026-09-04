@@ -14,6 +14,13 @@ export type DateVocabularyLookups = {
   durationUnits: Map<string, DurationUnitVocabularyEntry["unit"]>;
   relatives: Set<RelativeVocabularyEntry["value"]>;
   namedDates: readonly NamedDatesVocabularyEntry[];
+  /**
+   * Every named-date value and alias, normalized, mapped to its canonical
+   * value. Names may span several words, so normalization matches them as
+   * phrases (longest first) rather than word by word.
+   */
+  namedDatePhrases: Map<string, string>;
+  namedDatePhraseMaxWords: number;
 };
 
 /**
@@ -98,10 +105,34 @@ function assertNamedDatesVocabulary(entries: readonly NamedDatesVocabularyEntry[
       );
     }
 
-    if (typeof entry.resolveDate !== "function") {
+    const hasResolveDate = entry.resolveDate !== undefined;
+    const hasResolveDates = entry.resolveDates !== undefined;
+
+    if (hasResolveDate && hasResolveDates) {
+      throw new TypeError(
+        `${at} must define either resolveDate or resolveDates, not both.`,
+      );
+    }
+
+    if (!hasResolveDate && !hasResolveDates) {
+      throw new TypeError(
+        `${at}.resolveDate must be a function, received undefined. ` +
+          `Provide resolveDate ({ year, context } → PlainDate | null) for one date a year, ` +
+          `or resolveDates ({ year, context } → PlainDate[]) for several.`,
+      );
+    }
+
+    if (hasResolveDate && typeof entry.resolveDate !== "function") {
       throw new TypeError(
         `${at}.resolveDate must be a function, received ${describeValue(entry.resolveDate)}. ` +
           `It receives { year, context } and returns a PlainDate or null.`,
+      );
+    }
+
+    if (hasResolveDates && typeof entry.resolveDates !== "function") {
+      throw new TypeError(
+        `${at}.resolveDates must be a function, received ${describeValue(entry.resolveDates)}. ` +
+          `It receives { year, context } and returns an array of PlainDate.`,
       );
     }
 
@@ -152,6 +183,8 @@ export function createDateVocabularyLookups(vocabulary: DateVocabulary): DateVoc
   const relativeValues = new Set<RelativeVocabularyEntry["value"]>();
   const fuzzyValues = new Set<string>();
   const namedDates = vocabulary.namedDates ?? [];
+  const namedDatePhrases = new Map<string, string>();
+  let namedDatePhraseMaxWords = 0;
 
   for (const entry of vocabulary.months) {
     addVocabularyAliasEntries(aliases, entry.value, entry.aliases);
@@ -188,6 +221,11 @@ export function createDateVocabularyLookups(vocabulary: DateVocabulary): DateVoc
     const value = normalizeVocabularyValue(entry.value);
     addVocabularyAliasEntries(aliases, value, entry.aliases ?? []);
     addFuzzyEntries(fuzzyValues, value, entry.aliases ?? []);
+
+    for (const phrase of [value, ...(entry.aliases ?? []).map(normalizeVocabularyValue)]) {
+      namedDatePhrases.set(phrase, value);
+      namedDatePhraseMaxWords = Math.max(namedDatePhraseMaxWords, phrase.split(" ").length);
+    }
   }
 
   return {
@@ -198,6 +236,8 @@ export function createDateVocabularyLookups(vocabulary: DateVocabulary): DateVoc
     durationUnits,
     relatives: relativeValues,
     namedDates,
+    namedDatePhrases,
+    namedDatePhraseMaxWords,
   };
 }
 

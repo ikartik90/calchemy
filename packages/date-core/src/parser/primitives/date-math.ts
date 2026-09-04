@@ -1,4 +1,4 @@
-import type { PlainDate } from "../../temporal/types";
+import type { PlainDate, TemporalApi } from "../../temporal/types";
 import type { WeekdayIndex } from "../../types";
 
 // Example: `expandTwoDigitYear(27, 2026)` returns `2027`.
@@ -71,3 +71,15 @@ export function endOfCalendarWeek(date: PlainDate, weekStartsOn: WeekdayIndex): 
   return startOfCalendarWeek(date, weekStartsOn).add({ days: 6 });
 }
 
+
+/**
+ * ISO years have 52 weeks, or 53 when 1 January is a Thursday, or a Wednesday
+ * in a leap year.
+ *
+ * Example: `weeksInIsoYear(2026, Temporal)` returns `53`; `weeksInIsoYear(2027, Temporal)` returns `52`.
+ */
+export function weeksInIsoYear(year: number, Temporal: TemporalApi): number {
+  const january1 = Temporal.PlainDate.from({ year, month: 1, day: 1 });
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  return january1.dayOfWeek === 4 || (leap && january1.dayOfWeek === 3) ? 53 : 52;
+}

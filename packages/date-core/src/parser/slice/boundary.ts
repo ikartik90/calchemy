@@ -201,14 +201,16 @@ function parseQuarterBoundary(input: string): BoundarySlice | null {
   const ordinalMatch = /^(.+) quarter(?: of)? (?:(this|next|last|previous) year|(\d{2,4}))$/.exec(input);
   if (ordinalMatch?.[1]) {
     const quarter = parseOrdinal(ordinalMatch[1]);
-    return quarter && quarter >= 1 && quarter <= 4
+    // Any quarter number is sliced; the resolver rolls `fifth quarter` forward or
+    // rejects it when a year is written, and the diagnostics explain which.
+    return quarter && quarter >= 1
       ? { kind: "quarter-range", quarter, year: parseYearReference(ordinalMatch[2], ordinalMatch[3]) }
       : null;
   }
 
   const shorthandMatch = /^(.+?)(?: (?:of )?(?:(this|next|last|previous) year|(\d{2,4})))?$/.exec(input);
   const shorthand = shorthandMatch?.[1] ? parseStructuralShorthand(shorthandMatch[1]) : null;
-  return shorthand?.kind === "quarter" && shorthand.ordinal >= 1 && shorthand.ordinal <= 4
+  return shorthand?.kind === "quarter"
     ? { kind: "quarter-range", quarter: shorthand.ordinal, year: parseYearReference(shorthandMatch?.[2], shorthandMatch?.[3]) }
     : null;
 }

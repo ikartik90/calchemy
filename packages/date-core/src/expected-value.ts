@@ -9,6 +9,30 @@ export type ResolveExpectedDateValueOptions = {
   multipleRangeExpansionLimit?: number;
 };
 
+const ValueKindLabels: Record<ExpectedDateValue, string> = {
+  single: "a single date",
+  range: "one continuous range",
+  multiple: "a list of dates",
+};
+
+// Example: `describeUnexpectedValueKind("next 10 weekdays", "multiple", "range")` explains why the list cannot become a range.
+function describeUnexpectedValueKind(input: string, actual: ExpectedDateValue, expected: ExpectedDateValue): string {
+  const lead = `"${input}" gives ${ValueKindLabels[actual]}, but ${ValueKindLabels[expected]} was expected.`;
+  if (actual === "multiple" && expected === "range") {
+    return `${lead} The dates have gaps between them, so they cannot be joined into one range.`;
+  }
+
+  if (actual === "multiple" && expected === "single") {
+    return `${lead} Pick one of the dates, or ask for a phrase that names exactly one day.`;
+  }
+
+  if (actual === "range" && expected === "single") {
+    return `${lead} Ask for one end of it, for example "start of" or "end of" the same phrase.`;
+  }
+
+  return lead;
+}
+
 // Resolves a parse result against an expected output kind, including supported coercions.
 export function resolveExpectedDateValue(
   result: ParseDateResult,
@@ -30,7 +54,7 @@ export function resolveExpectedDateValue(
     errors: [
       {
         code: "unexpected-value-kind",
-        message: `Expected a ${expectedValue} date result, but parser returned ${result.value.kind}.`,
+        message: describeUnexpectedValueKind(result.input, result.value.kind, expectedValue),
       },
     ],
     corrections: result.corrections,

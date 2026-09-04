@@ -1,3 +1,4 @@
+import { resolveNamedDateEntryDates } from "./parser/primitives/named-date";
 import type { PlainDate } from "./temporal/types";
 import type { HolidayProvider, NamedDatesVocabularyEntry, ResolvedParseDateContext } from "./types";
 
@@ -21,12 +22,10 @@ function createNamedDatesHolidayProvider(
     id: "named-dates-holidays",
     label: "Configured holidays",
     includes(date: PlainDate) {
-      return entries.some(
-        (entry) =>
-          entry.resolveDate({
-            year: date.year,
-            context: { ...context, referenceDate: date },
-          })?.equals(date) ?? false,
+      return entries.some((entry) =>
+        resolveNamedDateEntryDates(entry, date.year, { ...context, referenceDate: date }).some(
+          (holiday) => holiday.equals(date),
+        ),
       );
     },
   };

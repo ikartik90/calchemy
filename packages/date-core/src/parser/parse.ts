@@ -1,4 +1,4 @@
-import { diagnoseImpossibleDate, findUnsupportedExpressionToken } from "./diagnostics";
+import { diagnoseImpossibleDate, diagnoseUnsupportedExpression } from "./diagnostics";
 import { normalizeInput } from "./normalize";
 import { resolveDateSlice } from "./resolve";
 import { sliceDateExpression, type DateSlice } from "./slice";
@@ -152,28 +152,23 @@ export function parseDateWithTemporal(
       };
     }
 
-    const token = findUnsupportedExpressionToken(
+    const error = diagnoseUnsupportedExpression({
       chunks,
-      parsed.slice,
+      slice: parsed.slice,
       input,
       anchorDate,
       Temporal,
-      resolved,
+      context: resolved,
       lookups,
-    );
+      // Rewritten candidates are checked without diagnostics of their own, so a
+      // suggestion can never trigger another round of suggestions.
+      parses: (candidate) => quickParses(candidate, anchorDate, resolved, Temporal, lookups),
+    });
 
     return {
       status: "invalid",
       input,
-      errors: [
-        {
-          code: "unsupported-expression",
-          message: token
-            ? `Calchemy does not understand "${token.raw}".`
-            : "Calchemy does not understand this date phrase yet.",
-          ...(token ? { token } : {}),
-        },
-      ],
+      errors: [error],
       corrections: normalized.corrections,
       warnings: [],
     };
@@ -189,6 +184,24 @@ export function parseDateWithTemporal(
     corrections: normalized.corrections,
     warnings: [],
   };
+}
+
+// Example: `quickParses("tomorrow until march 2027", anchor, context, Temporal, lookups)` is true.
+function quickParses(
+  candidate: string,
+  anchorDate: PlainDate,
+  context: ResolvedParseDateContext,
+  Temporal: TemporalApi,
+  lookups: DateVocabularyLookups,
+): boolean {
+  const normalized = normalizeInput(candidate, lookups);
+  const source = { normalizedInput: normalized.normalized, tokens: normalized.tokens, corrections: normalized.corrections };
+  if (parseNumericCandidates(normalized.normalized, context, Temporal, source).length > 0) {
+    return true;
+  }
+
+  const chunks = standardizeChunks(normalized.tokens, lookups);
+  return parseKnownExpression(normalized.normalized, anchorDate, context, Temporal, lookups, chunks).value !== null;
 }
 
 // Example: `resolveContext({}, Temporal)` fills parser defaults around the current reference date.

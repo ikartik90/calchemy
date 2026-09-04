@@ -5,9 +5,10 @@ import {
   firstWeekdayBefore,
   firstWeekdayOnOrAfter,
   startOfCalendarWeek,
+  weeksInIsoYear,
 } from "../primitives/date-math";
 import { resolveMonthDayList, resolveMonthDayRange } from "../primitives/month-day-list";
-import { parseNamedDate } from "../primitives/named-date";
+import { parseNamedDates } from "../primitives/named-date";
 import { parseNumericCandidates } from "../primitives/numeric-date";
 import { comparePlainDate, expandDatesBetween, toDuration } from "../primitives/shared";
 import { applyRelations } from "./relations";
@@ -201,17 +202,21 @@ export function resolveBoundary(
             boundary.month,
             resolveYearReference(boundary.year, anchorDate.year),
             Temporal,
+            boundary.year.kind === "anchor",
           );
     case "named-month-range":
       return options?.scope
         ? resolveMonthInScope(boundary.month, options.scope)
         : resolveMonthRange(boundary.month, anchorDate.year, Temporal);
     case "quarter-range":
-      return resolveQuarterRange(
-        boundary.quarter,
-        resolveYearReference(boundary.year, anchorDate.year),
-        Temporal,
-      );
+      return options?.scope && boundary.year.kind === "anchor"
+        ? resolveQuarterInScope(boundary.quarter, options.scope)
+        : resolveQuarterRange(
+            boundary.quarter,
+            resolveYearReference(boundary.year, anchorDate.year),
+            Temporal,
+            boundary.year.kind === "anchor",
+          );
     case "range": {
       const start = resolveBoundaryEndpoint(
         boundary.start,
@@ -269,6 +274,7 @@ export function resolveBoundary(
         boundary.week,
         resolveYearReference(boundary.year, anchorDate.year),
         Temporal,
+        boundary.year.kind === "anchor",
       );
     case "year-range":
       return resolveYearRange(boundary.year, Temporal);
@@ -333,15 +339,15 @@ function resolveAtomBoundary(
     return { kind: "single", date: bareAnchor };
   }
 
-  const namedDate = parseNamedDate(
+  const namedDates = parseNamedDates(
     input,
     anchorDate.year,
     Temporal,
     lookups,
     context,
   );
-  if (namedDate) {
-    return { kind: "single", date: namedDate };
+  if (namedDates) {
+    return materializeSampledDates(namedDates);
   }
 
   const numericCandidates = parseNumericCandidates(input, context, Temporal, {
@@ -368,6 +374,26 @@ function resolveBareDateAnchor(
     default:
       return null;
   }
+}
+
+/**
+ * Resolves both ends of a range boundary without the "end must not precede
+ * start" check, so a diagnostic can say which dates the phrase named.
+ *
+ * Example: `resolveRangeEndpoints(rangeFor("tomorrow until march"), anchor, ...)`
+ * returns 28 May 2026 and 31 March 2026.
+ */
+export function resolveRangeEndpoints(
+  boundary: Extract<BoundarySlice, { kind: "range" }>,
+  anchorDate: PlainDate,
+  Temporal: TemporalApi,
+  context: ResolvedParseDateContext,
+  lookups: DateVocabularyLookups,
+): { start: PlainDate | null; end: PlainDate | null } {
+  return {
+    start: resolveBoundaryEndpoint(boundary.start, anchorDate, Temporal, context, lookups),
+    end: resolveBoundaryEndpoint(boundary.end, anchorDate, Temporal, context, lookups),
+  };
 }
 
 // Example: `resolveBoundaryEndpoint(endpoint, anchor, Temporal, context, lookups)` materializes a start or end date.
@@ -455,7 +481,7 @@ function resolveBoundaryAsEndpoint(
 }
 
 // Example: `resolveYearReference({ kind: "relative", value: "next" }, 2026)` returns `2027`.
-function resolveYearReference(
+export function resolveYearReference(
   year: YearReferenceSlice,
   anchorYear: number,
 ): number {
@@ -474,6 +500,16 @@ function resolveYearReference(
   return anchorYear;
 }
 
+// Example: `resolveQuarterInScope(1, scope)` returns every Q1 date inside a scoped range, whichever year.
+function resolveQuarterInScope(quarter: number, scope: { start: PlainDate; end: PlainDate }): DateValue {
+  return {
+    kind: "multiple",
+    dates: expandDatesBetween(scope.start, scope.end).filter(
+      (date) => Math.floor((date.month - 1) / 3) + 1 === quarter,
+    ),
+  };
+}
+
 // Example: `resolveMonthInScope(4, scope)` returns every April date inside a scoped range.
 function resolveMonthInScope(month: number, scope: { start: PlainDate; end: PlainDate }): DateValue {
   return {
@@ -483,12 +519,26 @@ function resolveMonthInScope(month: number, scope: { start: PlainDate; end: Plai
 }
 
 // Example: `resolveMonthRange(3, 2027, Temporal)` returns March 2027.
+/**
+ * A month number past 12 rolls into the following year when no year was
+ * written (`m13` is January next year, the way `week 60` rolls), and is
+ * outside the calendar when one was (`m13 2026`).
+ *
+ * Example: `resolveMonthRange(13, 2026, Temporal, true)` returns January 2027.
+ */
 function resolveMonthRange(
   month: number,
   year: number,
   Temporal: TemporalApi,
-): DateValue {
-  const start = Temporal.PlainDate.from({ year, month, day: 1 });
+  rollOver = false,
+): DateValue | null {
+  if (month < 1 || (month > 12 && !rollOver)) {
+    return null;
+  }
+
+  const rolledYear = year + Math.floor((month - 1) / 12);
+  const rolledMonth = ((month - 1) % 12) + 1;
+  const start = Temporal.PlainDate.from({ year: rolledYear, month: rolledMonth, day: 1 });
   return { kind: "range", start, end: endOfCalendarMonth(start) };
 }
 
@@ -497,14 +547,15 @@ function resolveQuarterRange(
   quarter: number,
   year: number,
   Temporal: TemporalApi,
+  rollOver = false,
 ): DateValue | null {
-  if (quarter < 1 || quarter > 4) {
+  if (quarter < 1 || (quarter > 4 && !rollOver)) {
     return null;
   }
 
   const start = Temporal.PlainDate.from({
-    year,
-    month: (quarter - 1) * 3 + 1,
+    year: year + Math.floor((quarter - 1) / 4),
+    month: ((quarter - 1) % 4) * 3 + 1,
     day: 1,
   });
   return {
@@ -543,8 +594,9 @@ function resolveWeekRange(
   week: number,
   year: number,
   Temporal: TemporalApi,
+  rollOver = false,
 ): DateValue | null {
-  if (week < 1) {
+  if (week < 1 || (!rollOver && week > weeksInIsoYear(year, Temporal))) {
     return null;
   }
 
@@ -962,10 +1014,11 @@ function resolveShorthandRangeListBoundary(
   Temporal: TemporalApi,
 ): DateValue | null {
   const year = resolveYearReference(boundary.year, anchorDate.year);
+  const rollOver = boundary.year.kind === "anchor";
   const ranges = boundary.ordinals.map((ordinal) =>
     boundary.unit === "week"
-      ? resolveWeekRange(ordinal, year, Temporal)
-      : resolveMonthRange(ordinal, year, Temporal),
+      ? resolveWeekRange(ordinal, year, Temporal, rollOver)
+      : resolveMonthRange(ordinal, year, Temporal, rollOver),
   );
   if (ranges.some((range) => range?.kind !== "range")) {
     return null;

@@ -120,6 +120,24 @@ describe("named dates vocabulary validation", () => {
     ).toThrow(/namedDatesVocabulary\[0\]\.resolveDate must be a function/);
   });
 
+  test("rejects an entry that defines both resolveDate and resolveDates", () => {
+    expect(() =>
+      createCalchemyWithTemporal(Temporal, {
+        // @ts-expect-error deliberately malformed configuration
+        namedDatesVocabulary: [{ value: "christmas", resolveDate, resolveDates: () => [] }],
+      }).parseDate("today"),
+    ).toThrow(/namedDatesVocabulary\[0\] must define either resolveDate or resolveDates, not both\./);
+  });
+
+  test("names the entry and field when resolveDates is not a function", () => {
+    expect(() =>
+      createCalchemyWithTemporal(Temporal, {
+        // @ts-expect-error deliberately malformed configuration
+        namedDatesVocabulary: [{ value: "board meeting", resolveDates: [] }],
+      }).parseDate("today"),
+    ).toThrow(/namedDatesVocabulary\[0\]\.resolveDates must be a function, received an array\./);
+  });
+
   test("rejects a non-string alias", () => {
     expect(() =>
       createCalchemyWithTemporal(Temporal, {
@@ -144,5 +162,31 @@ describe("named dates vocabulary validation", () => {
 
     expect(configured.parseDate("christmas").status).toBe("valid");
     expect(configured.parseDate("xmas").status).toBe("valid");
+  });
+
+  test("accepts a resolveDates entry and ignores nulls and duplicates in its answer", () => {
+    const configured = createCalchemyWithTemporal(Temporal, {
+      defaultContext: { referenceDate: Temporal.PlainDate.from("2026-09-01") },
+      namedDatesVocabulary: [
+        {
+          value: "payday",
+          resolveDates: ({ year, context }) => [
+            context.referenceDate.with({ year, month: 3, day: 31 }),
+            null as unknown as ReturnType<typeof context.referenceDate.with>,
+            context.referenceDate.with({ year, month: 1, day: 30 }),
+            context.referenceDate.with({ year, month: 3, day: 31 }),
+          ],
+        },
+      ],
+    });
+
+    const result = configured.parseDate("payday");
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(configured.toJSON(result.value)).toEqual({
+        kind: "multiple",
+        dates: ["2026-01-30", "2026-03-31"],
+      });
+    }
   });
 });

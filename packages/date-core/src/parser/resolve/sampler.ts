@@ -1,14 +1,69 @@
 import { endOfCalendarWeek, startOfCalendarWeek } from "../primitives/date-math";
+import { resolveNamedDateEntryDates } from "../primitives/named-date";
 import { comparePlainDate, expandDatesBetween } from "../primitives/shared";
 import { SamplerParityDayRemainderMap } from "../types";
-import type { SamplerSlice } from "../slice";
+import { normalizeVocabularyValue, type DateVocabularyLookups } from "../vocabulary";
+import type { MembershipSamplerSlice, SamplerSlice } from "../slice/sampler";
 import type { PlainDate } from "../../temporal/types";
-import type { DateValue, WeekdayIndex } from "../../types";
+import type { DateValue, ResolvedParseDateContext, WeekdayIndex } from "../../types";
+
+/**
+ * Keeps the dates of `value` that belong to a named set or to the configured
+ * holidays. Membership is asked of the entry once per calendar year touched.
+ *
+ * An empty answer is a valid, empty list rather than `null`: "no board
+ * meetings in august" is an answer, not a phrase the parser failed to read.
+ *
+ * Example: `applyMembershipSampler(q3Range, { kind: "named-set", name: "board meeting" }, context, lookups)`
+ * returns the July board meeting.
+ */
+export function applyMembershipSampler(
+  value: DateValue,
+  sampler: MembershipSamplerSlice,
+  context: ResolvedParseDateContext,
+  lookups: DateVocabularyLookups,
+): DateValue | null {
+  const includes = createMembershipCheck(sampler, context, lookups);
+  if (!includes) {
+    return null;
+  }
+
+  const dates = expandValueDates(value).filter(includes);
+  return materializeSampledDates(dates) ?? { kind: "multiple", dates: [] };
+}
+
+// Example: `createMembershipCheck({ kind: "holidays" }, context, lookups)` returns the holiday provider's check.
+function createMembershipCheck(
+  sampler: MembershipSamplerSlice,
+  context: ResolvedParseDateContext,
+  lookups: DateVocabularyLookups,
+): ((date: PlainDate) => boolean) | null {
+  if (sampler.kind === "holidays") {
+    const holidays = context.holidays;
+    return holidays ? (date) => holidays.includes(date) : null;
+  }
+
+  const entry = lookups.namedDates.find((candidate) => normalizeVocabularyValue(candidate.value) === sampler.name);
+  if (!entry) {
+    return null;
+  }
+
+  const datesByYear = new Map<number, Set<string>>();
+  return (date) => {
+    let members = datesByYear.get(date.year);
+    if (!members) {
+      members = new Set(resolveNamedDateEntryDates(entry, date.year, context).map((member) => member.toString()));
+      datesByYear.set(date.year, members);
+    }
+
+    return members.has(date.toString());
+  };
+}
 
 // Example: `applySampler(monthRange, mondaySampler, 0)` returns matching Mondays in the month.
 export function applySampler(
   value: DateValue,
-  sampler: SamplerSlice,
+  sampler: Exclude<SamplerSlice, MembershipSamplerSlice>,
   weekStartsOn: WeekdayIndex,
 ): DateValue | null {
   if (sampler.kind === "weeks") {

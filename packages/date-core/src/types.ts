@@ -70,15 +70,33 @@ export type RecurrenceFrequencyVocabularyEntry = {
   aliases?: readonly string[];
 };
 
+export type NamedDateResolveArgs = {
+  year: number;
+  context: ResolvedParseDateContext;
+};
+
+/**
+ * A phrase the parser can resolve, such as `christmas` or `board meeting`.
+ *
+ * An entry stands for either one date a year (`resolveDate`) or any number of
+ * dates a year (`resolveDates`). The parser treats both the same way: a set of
+ * dates that is a single date, a contiguous range, or a list depending on what
+ * comes back. Exactly one of the two resolvers must be provided.
+ */
 export type NamedDatesVocabularyEntry = {
   value: string;
   aliases?: readonly string[];
   isHoliday?: boolean;
-  resolveDate(args: {
-    year: number;
-    context: ResolvedParseDateContext;
-  }): PlainDate | null;
-};
+} & (
+  | {
+      resolveDate(args: NamedDateResolveArgs): PlainDate | null;
+      resolveDates?: undefined;
+    }
+  | {
+      resolveDate?: undefined;
+      resolveDates(args: NamedDateResolveArgs): readonly PlainDate[];
+    }
+);
 
 export type DateVocabulary = {
   months: readonly MonthVocabularyEntry[];
@@ -186,6 +204,12 @@ export type ParseDateError = {
    * exist, as in `29 feb 2027`.
    */
   suggestions?: string[];
+  /**
+   * A rewritten phrase that parses, when the parser can work one out: the same
+   * phrase with a year added when a range ends before it starts, or
+   * `2020-03-15` for `2020 03 15`. A UI can offer it as a one-click fix.
+   */
+  suggestedInput?: string;
 };
 
 export type ParseDateWarning = {
