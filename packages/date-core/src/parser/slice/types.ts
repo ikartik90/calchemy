@@ -97,6 +97,7 @@ export type BoundarySlice =
   | { kind: "year-range"; year: number }
   | { kind: "holidays" }
   | { kind: "day-group-filter"; group: DayGroupPeriod }
+  | { kind: "day-of-month"; day: number }
   | { kind: "month-day-list"; month: number; days: number[] }
   | { kind: "month-day-range"; month: number; startDay: number; endDay: number }
   | { kind: "date-list"; items: BoundarySlice[] }

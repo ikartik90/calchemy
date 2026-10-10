@@ -714,7 +714,8 @@ function parseHalfBoundary(input: string, lookups: DateVocabularyLookups): Bound
 }
 
 // Example: `parseOrdinalDayBoundary("15th of next month", lookups)` selects the 15th inside next month;
-// `parseOrdinalDayBoundary("the 15th", lookups)` selects it inside this month.
+// `parseOrdinalDayBoundary("the 15th", lookups)` returns a bare day of the month, which the resolver reads
+// inside this month, or inside the parent window when it is an exclusion.
 function parseOrdinalDayBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
   const scoped = /^(?:the )?(.+?)(?: day)? (?:of|in) (?:the )?(.+)$/.exec(input);
   const day = parseOrdinalDay(scoped ? scoped[1] : input);
@@ -722,10 +723,9 @@ function parseOrdinalDayBoundary(input: string, lookups: DateVocabularyLookups):
     return null;
   }
 
-  const range: BoundarySlice = scoped?.[2]
-    ? parseBoundary(scoped[2], lookups)
-    : { kind: "relative", expression: { kind: "modifier", modifier: "this", target: { kind: "calendar-unit", unit: "month" } } };
-  return { kind: "ordinal-day-in-range", day, range };
+  return scoped?.[2]
+    ? { kind: "ordinal-day-in-range", day, range: parseBoundary(scoped[2], lookups) }
+    : { kind: "day-of-month", day };
 }
 
 // Example: `parseOrdinalDay("15th")` and `parseOrdinalDay("fifteenth")` return 15; `parseOrdinalDay("15")` returns null,
