@@ -282,6 +282,10 @@ export function resolveBoundary(
       return resolveHolidaysBoundary(options?.scope, context, anchorDate, Temporal);
     case "day-group-filter":
       return resolveDayGroupFilterBoundary(boundary.group, anchorDate, context, options?.scope);
+    case "day-of-month":
+      return options?.scope
+        ? resolveDayOfMonthInScope(boundary.day, options.scope)
+        : resolveDayOfMonth(boundary.day, anchorDate);
     case "date-list":
       return resolveDateListBoundary(boundary, anchorDate, Temporal, context, lookups, options);
   }
@@ -516,6 +520,23 @@ function resolveMonthInScope(month: number, scope: { start: PlainDate; end: Plai
     kind: "multiple",
     dates: expandDatesBetween(scope.start, scope.end).filter((date) => date.month === month),
   };
+}
+
+// Example: `resolveDayOfMonthInScope(4, scope)` returns the 4th of every month inside a scoped range.
+function resolveDayOfMonthInScope(day: number, scope: { start: PlainDate; end: PlainDate }): DateValue {
+  return {
+    kind: "multiple",
+    dates: expandDatesBetween(scope.start, scope.end).filter((date) => date.day === day),
+  };
+}
+
+// Example: `resolveDayOfMonth(15, may27)` returns 2026-05-15; `resolveDayOfMonth(31, june10)` returns null.
+function resolveDayOfMonth(day: number, anchorDate: PlainDate): DateValue | null {
+  try {
+    return { kind: "single", date: anchorDate.with({ day }, { overflow: "reject" }) };
+  } catch {
+    return null;
+  }
 }
 
 // Example: `resolveMonthRange(3, 2027, Temporal)` returns March 2027.

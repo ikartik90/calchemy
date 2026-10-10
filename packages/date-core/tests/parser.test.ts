@@ -264,6 +264,12 @@ describe("parseDate", () => {
     ["board meeting and christmas", { kind: "multiple", dates: ["2026-01-15", "2026-04-15", "2026-07-15", "2026-10-15", "2026-12-25"] }],
     // July 2026 starts on a Wednesday and has 23 weekdays; the board meeting on the 15th drops out.
     ["weekdays in july excluding board meeting", { kind: "multiple", dates: ["2026-07-01", "2026-07-02", "2026-07-03", "2026-07-06", "2026-07-07", "2026-07-08", "2026-07-09", "2026-07-10", "2026-07-13", "2026-07-14", "2026-07-16", "2026-07-17", "2026-07-20", "2026-07-21", "2026-07-22", "2026-07-23", "2026-07-24", "2026-07-27", "2026-07-28", "2026-07-29", "2026-07-30", "2026-07-31"] }],
+    // A bare day of the month used as an exclusion is read inside the parent window, like a bare month:
+    // `the 4th` here is June 4, as in `every weekday in june except june 4`. June 2026 starts on a Monday
+    // and has 22 weekdays; June 4 drops out.
+    ["every weekday in june except the 4th", { kind: "multiple", dates: ["2026-06-01", "2026-06-02", "2026-06-03", "2026-06-05", "2026-06-08", "2026-06-09", "2026-06-10", "2026-06-11", "2026-06-12", "2026-06-15", "2026-06-16", "2026-06-17", "2026-06-18", "2026-06-19", "2026-06-22", "2026-06-23", "2026-06-24", "2026-06-25", "2026-06-26", "2026-06-29", "2026-06-30"] }],
+    // The same holds when the parent window is a range: June 1 – 10 less June 4.
+    ["june 1 to june 10 except the 4th", { kind: "multiple", dates: ["2026-06-01", "2026-06-02", "2026-06-03", "2026-06-05", "2026-06-06", "2026-06-07", "2026-06-08", "2026-06-09", "2026-06-10"] }],
     // Forward-order phrases that the `phrasing variants` block pairs reversed
     // wordings with. Values come from the calendar: August has 31 days, August
     // 2026 starts on a Saturday, and next week from Wednesday 27 May (Sunday
