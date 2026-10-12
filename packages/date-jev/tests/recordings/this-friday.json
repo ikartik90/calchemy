@@ -40,6 +40,54 @@
           "last": "The one before, as in `last friday`",
           "none": "No word picks which one, as in a bare `friday`"
         }
+      },
+      "shift": {
+        "type": "choice",
+        "instructions": {
+          "question": "Does `phrase` shift its day by an extra amount, on top of the day it names?",
+          "note": "Words that name a day by themselves are not a shift: today, tomorrow, yesterday, a weekday, and a weekday with this, next, or last."
+        },
+        "criteria": {
+          "none": {
+            "what": "No extra shift: the phrase names its day directly",
+            "examples": [
+              "today",
+              "tomorrow",
+              "yesterday",
+              "friday",
+              "this friday",
+              "next friday",
+              "last friday"
+            ]
+          },
+          "day_later": {
+            "what": "One day after the day it names",
+            "examples": [
+              "the day after tomorrow",
+              "the day after friday"
+            ]
+          },
+          "day_earlier": {
+            "what": "One day before the day it names",
+            "examples": [
+              "the day before yesterday",
+              "the day before friday"
+            ]
+          },
+          "week_later": {
+            "what": "One week after the day it names",
+            "examples": [
+              "a week on friday",
+              "a week from tuesday"
+            ]
+          },
+          "week_earlier": {
+            "what": "One week before the day it names",
+            "examples": [
+              "a week before friday"
+            ]
+          }
+        }
       }
     },
     "model": "jev-latest"
@@ -84,11 +132,23 @@
           "last": 0,
           "none": 0
         }
+      },
+      "shift": {
+        "type": "choice",
+        "choice": "none",
+        "confidence": 1,
+        "probabilities": {
+          "none": 1,
+          "day_later": 0,
+          "day_earlier": 0,
+          "week_later": 0,
+          "week_earlier": 0
+        }
       }
     },
     "usage": {
-      "input_tokens": 603,
-      "output_tokens": 180
+      "input_tokens": 935,
+      "output_tokens": 239
     }
   }
 }

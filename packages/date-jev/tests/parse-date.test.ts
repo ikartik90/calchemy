@@ -19,6 +19,7 @@ describe("parseDate", () => {
     ["this friday", { kind: "single", date: "2026-05-29" }],
     ["next friday", { kind: "single", date: "2026-06-05" }],
     ["last friday", { kind: "single", date: "2026-05-22" }],
+    ["a week on friday", { kind: "single", date: "2026-06-05" }], // this friday plus a week, decided by the user
   ])("%s", async (input, expected) => {
     const jev = await createJevParser({ client: replayClient(input) });
     const result = await jev.parseDate(input, context);
@@ -37,11 +38,11 @@ describe("parseDate", () => {
   });
 
   // Expected values are read off the recordings. "tomorrow" never uses its modifier answer
-  // (0.56), so only its day answer (1) counts; "next friday" uses day (0.97), weekday (1),
-  // and modifier (1).
+  // (0.49), so only its day (1) and shift (1) answers count; "a week on friday" uses day (0.84),
+  // weekday (0.92), modifier (0.76), and shift (0.96).
   test.each([
     ["tomorrow", 1],
-    ["next friday", 0.97],
+    ["a week on friday", 0.76],
   ])("%s is as confident as the weakest answer its reading uses", async (input, expected) => {
     const jev = await createJevParser({ client: replayClient(input) });
     const result = await jev.parseDate(input, context);

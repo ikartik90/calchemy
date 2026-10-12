@@ -1,6 +1,7 @@
+import { boundaryToExpression } from "./core/parser/expression/from-slice";
 import type { DateSlice } from "./core/parser/expression/types";
-import type { RelativeExpressionSlice } from "./core/parser/slice/types";
-import type { RelativeModifier } from "./core/parser/types";
+import type { BoundarySlice, RelativeExpressionSlice } from "./core/parser/slice/types";
+import type { DurationUnit, RelationDirection, RelativeModifier } from "./core/parser/types";
 
 const DayOptions = {
   today: "The current day",
@@ -41,14 +42,41 @@ const Modifiers = {
   none: "upcoming",
 } as const satisfies Record<ModifierOption, RelativeModifier>;
 
+// Jev answers each question on its own, so the examples spell out that a day named directly,
+// such as `tomorrow` or `next friday`, is not a shift.
+const ShiftOptions = {
+  none: {
+    what: "No extra shift: the phrase names its day directly",
+    examples: ["today", "tomorrow", "yesterday", "friday", "this friday", "next friday", "last friday"],
+  },
+  day_later: { what: "One day after the day it names", examples: ["the day after tomorrow", "the day after friday"] },
+  day_earlier: { what: "One day before the day it names", examples: ["the day before yesterday", "the day before friday"] },
+  week_later: { what: "One week after the day it names", examples: ["a week on friday", "a week from tuesday"] },
+  week_earlier: { what: "One week before the day it names", examples: ["a week before friday"] },
+};
+
+// Each shift becomes date-core's `<amount> <unit> before/after <day>` boundary.
+const Shifts = {
+  day_later: { amount: 1, unit: "day", direction: "after" },
+  day_earlier: { amount: 1, unit: "day", direction: "before" },
+  week_later: { amount: 1, unit: "week", direction: "after" },
+  week_earlier: { amount: 1, unit: "week", direction: "before" },
+} as const satisfies Record<
+  Exclude<ShiftOption, "none">,
+  { amount: number; unit: DurationUnit; direction: RelationDirection }
+>;
+
 type DayOption = keyof typeof DayOptions;
 type WeekdayOption = keyof typeof WeekdayOptions;
 type ModifierOption = keyof typeof ModifierOptions;
+type ShiftOption = keyof typeof ShiftOptions;
+type Answer = { confidence: number };
 
 export type DayAnswers = {
   day: { choice: DayOption; confidence: number };
   weekday: { choice: WeekdayOption; confidence: number };
   modifier: { choice: ModifierOption; confidence: number };
+  shift: { choice: ShiftOption; confidence: number };
 };
 
 // Example: `dayQuestions()` asks Jev which single day the phrase in `state.phrase` names.
@@ -69,6 +97,14 @@ export function dayQuestions() {
       instructions: "Which word in `phrase` picks out which occurrence of the day of the week?",
       criteria: ModifierOptions,
     },
+    shift: {
+      type: "choice",
+      instructions: {
+        question: "Does `phrase` shift its day by an extra amount, on top of the day it names?",
+        note: "Words that name a day by themselves are not a shift: today, tomorrow, yesterday, a weekday, and a weekday with this, next, or last.",
+      },
+      criteria: ShiftOptions,
+    },
   } as const;
 }
 
@@ -80,6 +116,24 @@ export type Reading = {
 
 // Example: `treeFromAnswers({ day: { choice: "tomorrow", confidence: 1 }, ... })` reads `tomorrow` with confidence 1.
 export function treeFromAnswers(answers: DayAnswers): Reading | null {
+  const day = dayBoundary(answers);
+  if (!day) {
+    return null;
+  }
+
+  const shift = answers.shift.choice;
+  const boundary: BoundarySlice =
+    shift === "none" ? day.boundary : { kind: "duration-near-boundary", ...Shifts[shift], anchor: day.boundary };
+
+  return {
+    slice: { expression: boundaryToExpression(boundary), exclusions: [], transforms: [] },
+    confidence: Math.min(...[...day.used, answers.shift].map((answer) => answer.confidence)),
+  };
+}
+
+// Example: `dayBoundary(answers)` returns the `upcoming friday` boundary and the answers that chose it.
+// Only the answers a reading uses count toward its confidence: `tomorrow` ignores the modifier answer.
+function dayBoundary(answers: DayAnswers): { boundary: BoundarySlice; used: Answer[] } | null {
   const day = answers.day.choice;
   if (day === "none") {
     return null;
@@ -91,29 +145,21 @@ export function treeFromAnswers(answers: DayAnswers): Reading | null {
       return null;
     }
 
-    return relative(
-      {
+    return {
+      boundary: relative({
         kind: "modifier",
         modifier: Modifiers[answers.modifier.choice],
         target: { kind: "weekday", weekday: Weekdays[weekday] },
-      },
-      [answers.day, answers.weekday, answers.modifier],
-    );
+      }),
+      used: [answers.day, answers.weekday, answers.modifier],
+    };
   }
 
-  return relative({ kind: "bare", value: day }, [answers.day]);
+  return { boundary: relative({ kind: "bare", value: day }), used: [answers.day] };
 }
 
-// Only the answers a reading uses count toward its confidence: `tomorrow` ignores the modifier answer.
-function relative(expression: RelativeExpressionSlice, used: readonly { confidence: number }[]): Reading {
-  return {
-    slice: {
-      expression: { kind: "scope", boundary: { kind: "relative", expression } },
-      exclusions: [],
-      transforms: [],
-    },
-    confidence: Math.min(...used.map((answer) => answer.confidence)),
-  };
+function relative(expression: RelativeExpressionSlice): BoundarySlice {
+  return { kind: "relative", expression };
 }
 
 function nullOptions<T extends Record<string, unknown>>(record: T): { [K in keyof T]: null } {

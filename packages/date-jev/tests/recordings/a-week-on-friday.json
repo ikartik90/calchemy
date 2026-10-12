@@ -1,0 +1,154 @@
+{
+  "phrase": "a week on friday",
+  "recordedAt": "2026-10-12",
+  "request": {
+    "state": {
+      "phrase": "a week on friday"
+    },
+    "questions": {
+      "day": {
+        "type": "choice",
+        "instructions": "Which day does `phrase` name?",
+        "criteria": {
+          "today": "The current day",
+          "tomorrow": "The day after today",
+          "yesterday": "The day before today",
+          "weekday": "A named day of the week, such as Tuesday",
+          "none": "Some other day, or no day at all"
+        }
+      },
+      "weekday": {
+        "type": "choice",
+        "instructions": "Which day of the week does `phrase` name?",
+        "criteria": {
+          "monday": null,
+          "tuesday": null,
+          "wednesday": null,
+          "thursday": null,
+          "friday": null,
+          "saturday": null,
+          "sunday": null,
+          "none": "The phrase names no day of the week"
+        }
+      },
+      "modifier": {
+        "type": "choice",
+        "instructions": "Which word in `phrase` picks out which occurrence of the day of the week?",
+        "criteria": {
+          "this": "This week's, as in `this friday`",
+          "next": "The following one, as in `next friday`",
+          "last": "The one before, as in `last friday`",
+          "none": "No word picks which one, as in a bare `friday`"
+        }
+      },
+      "shift": {
+        "type": "choice",
+        "instructions": {
+          "question": "Does `phrase` shift its day by an extra amount, on top of the day it names?",
+          "note": "Words that name a day by themselves are not a shift: today, tomorrow, yesterday, a weekday, and a weekday with this, next, or last."
+        },
+        "criteria": {
+          "none": {
+            "what": "No extra shift: the phrase names its day directly",
+            "examples": [
+              "today",
+              "tomorrow",
+              "yesterday",
+              "friday",
+              "this friday",
+              "next friday",
+              "last friday"
+            ]
+          },
+          "day_later": {
+            "what": "One day after the day it names",
+            "examples": [
+              "the day after tomorrow",
+              "the day after friday"
+            ]
+          },
+          "day_earlier": {
+            "what": "One day before the day it names",
+            "examples": [
+              "the day before yesterday",
+              "the day before friday"
+            ]
+          },
+          "week_later": {
+            "what": "One week after the day it names",
+            "examples": [
+              "a week on friday",
+              "a week from tuesday"
+            ]
+          },
+          "week_earlier": {
+            "what": "One week before the day it names",
+            "examples": [
+              "a week before friday"
+            ]
+          }
+        }
+      }
+    },
+    "model": "jev-latest"
+  },
+  "response": {
+    "model": "jev-1.13.0",
+    "answers": {
+      "day": {
+        "type": "choice",
+        "choice": "weekday",
+        "confidence": 0.84,
+        "probabilities": {
+          "today": 0.01,
+          "tomorrow": 0.01,
+          "yesterday": 0.01,
+          "weekday": 0.87,
+          "none": 0.1
+        }
+      },
+      "weekday": {
+        "type": "choice",
+        "choice": "friday",
+        "confidence": 0.92,
+        "probabilities": {
+          "monday": 0,
+          "tuesday": 0,
+          "wednesday": 0,
+          "thursday": 0.01,
+          "friday": 0.93,
+          "saturday": 0.01,
+          "sunday": 0,
+          "none": 0.04
+        }
+      },
+      "modifier": {
+        "type": "choice",
+        "choice": "none",
+        "confidence": 0.76,
+        "probabilities": {
+          "this": 0.04,
+          "next": 0.13,
+          "last": 0.01,
+          "none": 0.82
+        }
+      },
+      "shift": {
+        "type": "choice",
+        "choice": "week_later",
+        "confidence": 0.96,
+        "probabilities": {
+          "none": 0.03,
+          "day_later": 0,
+          "day_earlier": 0,
+          "week_later": 0.97,
+          "week_earlier": 0
+        }
+      }
+    },
+    "usage": {
+      "input_tokens": 937,
+      "output_tokens": 241
+    }
+  }
+}
