@@ -1,7 +1,6 @@
 import {
   endOfCalendarWeek,
   expandTwoDigitYear,
-  firstWeekdayAfter,
   firstWeekdayBefore,
   firstWeekdayOnOrAfter,
   startOfCalendarWeek,
@@ -855,7 +854,8 @@ function resolveCalendarUnitRange(
 }
 
 // Example: `resolveRelativeWeekday("next", 5, anchor, 0)` returns next Friday.
-// `this <weekday>` is that day of the current calendar week, even when it has passed.
+// `this <weekday>` is that day of the current calendar week, even when it has passed, and
+// `next <weekday>` is that day of the following week.
 function resolveRelativeWeekday(
   modifier: RelativeModifier,
   weekday: number,
@@ -871,10 +871,8 @@ function resolveRelativeWeekday(
   }
 
   if (modifier === "next") {
-    return firstWeekdayAfter(
-      firstWeekdayOnOrAfter(anchorDate, weekday),
-      weekday,
-    );
+    const nextWeekStart = startOfCalendarWeek(anchorDate, weekStartsOn).add({ weeks: 1 });
+    return firstWeekdayOnOrAfter(nextWeekStart, weekday);
   }
 
   return firstWeekdayBefore(anchorDate, weekday);

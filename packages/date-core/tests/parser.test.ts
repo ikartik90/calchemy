@@ -307,12 +307,30 @@ describe("parseDate", () => {
     ["this wednesday", { kind: "single", date: "2026-05-27" }],
     ["next wednesday", { kind: "single", date: "2026-06-03" }],
     ["this monday", { kind: "single", date: "2026-05-25" }], // monday of this week, even when it has passed
+    ["next monday", { kind: "single", date: "2026-06-01" }], // = `monday of next week`
+    ["this sunday", { kind: "single", date: "2026-05-24" }], // weeks start on sunday here, so this week's sunday has passed
+    ["next sunday", { kind: "single", date: "2026-05-31" }],
     ["this day", { kind: "single", date: "2026-05-27" }],
     ["next day", { kind: "single", date: "2026-05-28" }],
     ["last day", { kind: "single", date: "2026-05-26" }],
     ["previous day", { kind: "single", date: "2026-05-26" }],
   ] satisfies Array<[string, DateValueJSON]>)("parses relative weekday %s", (input, expected) => {
     const result = calchemy.parseDate(input, context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual(expected);
+    }
+  });
+
+  // With monday-start weeks, this week runs May 25 to 31, so its sunday is still ahead.
+  test.each([
+    ["this sunday", { kind: "single", date: "2026-05-31" }],
+    ["next sunday", { kind: "single", date: "2026-06-07" }],
+    ["this monday", { kind: "single", date: "2026-05-25" }],
+    ["next monday", { kind: "single", date: "2026-06-01" }],
+  ] satisfies Array<[string, DateValueJSON]>)("reads %s in the week the context starts on monday", (input, expected) => {
+    const result = calchemy.parseDate(input, { ...context, weekStartsOn: 1 });
 
     expect(result.status).toBe("valid");
     if (result.status === "valid") {
