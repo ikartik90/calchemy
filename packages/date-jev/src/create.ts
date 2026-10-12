@@ -17,10 +17,12 @@ export async function createJevParser(options: CreateJevParserOptions): Promise<
         state: { phrase: input },
         questions: dayQuestions(),
       });
-      const tree = treeFromAnswers(answers);
-      const value = tree ? resolveDateSlice(tree, resolved.referenceDate, Temporal, resolved, lookups) : null;
+      const reading = treeFromAnswers(answers);
+      const value = reading ? resolveDateSlice(reading.slice, resolved.referenceDate, Temporal, resolved, lookups) : null;
 
-      return value ? { status: "valid", input, value, model } : { status: "invalid", input, model };
+      return reading && value
+        ? { status: "valid", input, value, confidence: reading.confidence, model }
+        : { status: "invalid", input, model };
     },
   };
 }

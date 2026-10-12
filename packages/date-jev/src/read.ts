@@ -46,9 +46,9 @@ type WeekdayOption = keyof typeof WeekdayOptions;
 type ModifierOption = keyof typeof ModifierOptions;
 
 export type DayAnswers = {
-  day: { choice: DayOption };
-  weekday: { choice: WeekdayOption };
-  modifier: { choice: ModifierOption };
+  day: { choice: DayOption; confidence: number };
+  weekday: { choice: WeekdayOption; confidence: number };
+  modifier: { choice: ModifierOption; confidence: number };
 };
 
 // Example: `dayQuestions()` asks Jev which single day the phrase in `state.phrase` names.
@@ -72,8 +72,14 @@ export function dayQuestions() {
   } as const;
 }
 
-// Example: `treeFromAnswers({ day: { choice: "tomorrow" }, ... })` builds the tree date-core's resolver reads for `tomorrow`.
-export function treeFromAnswers(answers: DayAnswers): DateSlice | null {
+/** A tree plus how sure Jev was: the weakest of the answers that built it. */
+export type Reading = {
+  slice: DateSlice;
+  confidence: number;
+};
+
+// Example: `treeFromAnswers({ day: { choice: "tomorrow", confidence: 1 }, ... })` reads `tomorrow` with confidence 1.
+export function treeFromAnswers(answers: DayAnswers): Reading | null {
   const day = answers.day.choice;
   if (day === "none") {
     return null;
@@ -85,21 +91,28 @@ export function treeFromAnswers(answers: DayAnswers): DateSlice | null {
       return null;
     }
 
-    return relative({
-      kind: "modifier",
-      modifier: Modifiers[answers.modifier.choice],
-      target: { kind: "weekday", weekday: Weekdays[weekday] },
-    });
+    return relative(
+      {
+        kind: "modifier",
+        modifier: Modifiers[answers.modifier.choice],
+        target: { kind: "weekday", weekday: Weekdays[weekday] },
+      },
+      [answers.day, answers.weekday, answers.modifier],
+    );
   }
 
-  return relative({ kind: "bare", value: day });
+  return relative({ kind: "bare", value: day }, [answers.day]);
 }
 
-function relative(expression: RelativeExpressionSlice): DateSlice {
+// Only the answers a reading uses count toward its confidence: `tomorrow` ignores the modifier answer.
+function relative(expression: RelativeExpressionSlice, used: readonly { confidence: number }[]): Reading {
   return {
-    expression: { kind: "scope", boundary: { kind: "relative", expression } },
-    exclusions: [],
-    transforms: [],
+    slice: {
+      expression: { kind: "scope", boundary: { kind: "relative", expression } },
+      exclusions: [],
+      transforms: [],
+    },
+    confidence: Math.min(...used.map((answer) => answer.confidence)),
   };
 }
 

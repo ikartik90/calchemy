@@ -7,7 +7,14 @@ export type CreateJevParserOptions = {
 };
 
 export type ParseDateResult =
-  | { status: "valid"; input: string; value: DateValue; model: string }
+  | {
+      status: "valid";
+      input: string;
+      value: DateValue;
+      /** The weakest confidence among the Jev answers this reading used, from 0 to 1. */
+      confidence: number;
+      model: string;
+    }
   | { status: "invalid"; input: string; model: string };
 
 export type JevParser = {

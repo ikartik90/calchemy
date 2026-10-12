@@ -35,4 +35,20 @@ describe("parseDate", () => {
 
     expect(result.model).toBe("jev-1.13.0");
   });
+
+  // Expected values are read off the recordings. "tomorrow" never uses its modifier answer
+  // (0.56), so only its day answer (1) counts; "next friday" uses day (0.97), weekday (1),
+  // and modifier (1).
+  test.each([
+    ["tomorrow", 1],
+    ["next friday", 0.97],
+  ])("%s is as confident as the weakest answer its reading uses", async (input, expected) => {
+    const jev = await createJevParser({ client: replayClient(input) });
+    const result = await jev.parseDate(input, context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(result.confidence).toBe(expected);
+    }
+  });
 });
