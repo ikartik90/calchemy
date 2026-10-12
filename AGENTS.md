@@ -204,7 +204,7 @@ Tests should fix the reference date, locale, week-start, and holiday calendars t
 
 ## date-jev Tests
 
-Tests replay recorded Jev answers through a fake client (the SDK's `fetch` option), so the suite runs offline. Test at two seams: `parseDate(input, context)` end to end, and Jev answers into a tree. The resolver's tests come across with the copied math, from `tests/expression-resolver.test.ts`.
+Tests replay recorded Jev answers through a fake client (the SDK's `fetch` option), so the suite runs offline. `pnpm record-jev [phrase …]` records or refreshes them from the live API with the developer's own key, read from the project's git-ignored `.env`. A replay fails when date-jev's questions no longer match its recording; re-record that phrase. Test at two seams: `parseDate(input, context)` end to end, and Jev answers into a tree. The resolver's tests come across with the copied math, from `tests/expression-resolver.test.ts`.
 
 # General Instructions
 

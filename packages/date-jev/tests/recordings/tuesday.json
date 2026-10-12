@@ -1,29 +1,73 @@
 {
-  "note": "Hand-written stand-in in the API's response shape. Replace with a live recording once a TypeSafe key is available.",
+  "phrase": "tuesday",
+  "recordedAt": "2026-10-12",
+  "request": {
+    "state": {
+      "phrase": "tuesday"
+    },
+    "questions": {
+      "day": {
+        "type": "choice",
+        "instructions": "Which day does `phrase` name?",
+        "criteria": {
+          "today": "The current day",
+          "tomorrow": "The day after today",
+          "yesterday": "The day before today",
+          "weekday": "A named day of the week, such as Tuesday",
+          "none": "Some other day, or no day at all"
+        }
+      },
+      "weekday": {
+        "type": "choice",
+        "instructions": "Which day of the week does `phrase` name?",
+        "criteria": {
+          "monday": null,
+          "tuesday": null,
+          "wednesday": null,
+          "thursday": null,
+          "friday": null,
+          "saturday": null,
+          "sunday": null,
+          "none": "The phrase names no day of the week"
+        }
+      },
+      "modifier": {
+        "type": "choice",
+        "instructions": "Which word in `phrase` picks out which occurrence of the day of the week?",
+        "criteria": {
+          "this": "This week's, as in `this friday`",
+          "next": "The following one, as in `next friday`",
+          "last": "The one before, as in `last friday`",
+          "none": "No word picks which one, as in a bare `friday`"
+        }
+      }
+    },
+    "model": "jev-latest"
+  },
   "response": {
-    "model": "hand-written",
+    "model": "jev-1.13.0",
     "answers": {
       "day": {
         "type": "choice",
         "choice": "weekday",
-        "confidence": 0.96,
+        "confidence": 1,
         "probabilities": {
-          "today": 0.01,
-          "tomorrow": 0.01,
+          "today": 0,
+          "tomorrow": 0,
           "yesterday": 0,
-          "weekday": 0.97,
-          "none": 0.01
+          "weekday": 1,
+          "none": 0
         }
       },
       "weekday": {
         "type": "choice",
         "choice": "tuesday",
-        "confidence": 0.98,
+        "confidence": 1,
         "probabilities": {
           "monday": 0,
-          "tuesday": 0.99,
+          "tuesday": 1,
           "wednesday": 0,
-          "thursday": 0.01,
+          "thursday": 0,
           "friday": 0,
           "saturday": 0,
           "sunday": 0,
@@ -33,18 +77,18 @@
       "modifier": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.94,
+        "confidence": 1,
         "probabilities": {
-          "this": 0.01,
-          "next": 0.02,
+          "this": 0,
+          "next": 0,
           "last": 0,
-          "none": 0.97
+          "none": 1
         }
       }
     },
     "usage": {
-      "input_tokens": 0,
-      "output_tokens": 0
+      "input_tokens": 604,
+      "output_tokens": 181
     }
   }
 }

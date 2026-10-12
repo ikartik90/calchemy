@@ -8,6 +8,7 @@
     "parse-date:single": "node scripts/parse-date.mjs --expect single",
     "parse-date:multiple": "node scripts/parse-date.mjs --expect multiple",
     "parse-date:range": "node scripts/parse-date.mjs --expect range",
+    "record-jev": "pnpm --filter @calchemy/date-jev build && node --env-file-if-exists=.env scripts/record-jev.mjs",
     "test": "pnpm -r test",
     "lint": "pnpm typecheck",
     "typecheck": "pnpm -r typecheck",
@@ -16,6 +17,7 @@
   "devDependencies": {
     "@js-temporal/polyfill": "^0.5.1",
     "@types/node": "^22.15.21",
+    "@typesafe-ai/sdk": "^0.6.0",
     "fallow": "^2.93.0",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",

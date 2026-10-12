@@ -14,6 +14,9 @@ importers:
       '@types/node':
         specifier: ^22.15.21
         version: 22.19.20
+      '@typesafe-ai/sdk':
+        specifier: ^0.6.0
+        version: 0.6.0
       fallow:
         specifier: ^2.93.0
         version: 2.93.0
