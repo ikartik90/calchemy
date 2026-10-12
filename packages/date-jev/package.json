@@ -1,0 +1,47 @@
+{
+  "name": "@calchemy/date-jev",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Natural language date parser that reads phrases with TypeSafe's Jev model and returns Temporal values.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ikartik90/calchemy.git"
+  },
+  "homepage": "https://github.com/ikartik90/calchemy#readme",
+  "bugs": "https://github.com/ikartik90/calchemy/issues",
+  "keywords": [
+    "date",
+    "parser",
+    "temporal",
+    "natural-language",
+    "typesafe",
+    "jev"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --sourcemap --clean --tsconfig tsconfig.build.json --external @js-temporal/polyfill && tsc -p tsconfig.build.json --emitDeclarationOnly",
+    "test": "vitest run --root ../.. --config vitest.config.ts packages/date-jev/tests",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo"
+  },
+  "dependencies": {
+    "@js-temporal/polyfill": "^0.5.1"
+  },
+  "peerDependencies": {
+    "@typesafe-ai/sdk": "^0.6.0"
+  },
+  "devDependencies": {
+    "@typesafe-ai/sdk": "^0.6.0"
+  }
+}
