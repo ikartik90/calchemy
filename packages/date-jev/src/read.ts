@@ -1,5 +1,6 @@
 import type { DateSlice } from "./core/parser/expression/types";
 import type { RelativeExpressionSlice } from "./core/parser/slice/types";
+import type { RelativeModifier } from "./core/parser/types";
 
 const DayOptions = {
   today: "The current day",
@@ -25,12 +26,29 @@ const WeekdayOptions = {
   none: "The phrase names no day of the week",
 };
 
+const ModifierOptions = {
+  this: "This week's, as in `this friday`",
+  next: "The following one, as in `next friday`",
+  last: "The one before, as in `last friday`",
+  none: "No word picks which one, as in a bare `friday`",
+} as const;
+
+// A bare weekday is the upcoming one, as in date-core.
+const Modifiers = {
+  this: "this",
+  next: "next",
+  last: "last",
+  none: "upcoming",
+} as const satisfies Record<ModifierOption, RelativeModifier>;
+
 type DayOption = keyof typeof DayOptions;
 type WeekdayOption = keyof typeof WeekdayOptions;
+type ModifierOption = keyof typeof ModifierOptions;
 
 export type DayAnswers = {
   day: { choice: DayOption };
   weekday: { choice: WeekdayOption };
+  modifier: { choice: ModifierOption };
 };
 
 // Example: `dayQuestions()` asks Jev which single day the phrase in `state.phrase` names.
@@ -45,6 +63,11 @@ export function dayQuestions() {
       type: "choice",
       instructions: "Which day of the week does `phrase` name?",
       criteria: WeekdayOptions,
+    },
+    modifier: {
+      type: "choice",
+      instructions: "Which word in `phrase` picks out which occurrence of the day of the week?",
+      criteria: ModifierOptions,
     },
   } as const;
 }
@@ -62,10 +85,9 @@ export function treeFromAnswers(answers: DayAnswers): DateSlice | null {
       return null;
     }
 
-    // A bare weekday is the upcoming one, as in date-core.
     return relative({
       kind: "modifier",
-      modifier: "upcoming",
+      modifier: Modifiers[answers.modifier.choice],
       target: { kind: "weekday", weekday: Weekdays[weekday] },
     });
   }

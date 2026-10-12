@@ -29,8 +29,22 @@
           "sunday": 0,
           "none": 0.98
         }
+      },
+      "modifier": {
+        "type": "choice",
+        "choice": "none",
+        "confidence": 0.94,
+        "probabilities": {
+          "this": 0.01,
+          "next": 0.02,
+          "last": 0,
+          "none": 0.97
+        }
       }
     },
-    "usage": { "input_tokens": 0, "output_tokens": 0 }
+    "usage": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
   }
 }

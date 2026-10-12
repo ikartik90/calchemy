@@ -1,0 +1,50 @@
+{
+  "note": "Hand-written stand-in in the API's response shape. Replace with a live recording once a TypeSafe key is available.",
+  "response": {
+    "model": "hand-written",
+    "answers": {
+      "day": {
+        "type": "choice",
+        "choice": "weekday",
+        "confidence": 0.95,
+        "probabilities": {
+          "today": 0,
+          "tomorrow": 0.01,
+          "yesterday": 0,
+          "weekday": 0.97,
+          "none": 0.02
+        }
+      },
+      "weekday": {
+        "type": "choice",
+        "choice": "friday",
+        "confidence": 0.98,
+        "probabilities": {
+          "monday": 0,
+          "tuesday": 0,
+          "wednesday": 0,
+          "thursday": 0.01,
+          "friday": 0.99,
+          "saturday": 0,
+          "sunday": 0,
+          "none": 0
+        }
+      },
+      "modifier": {
+        "type": "choice",
+        "choice": "last",
+        "confidence": 0.9,
+        "probabilities": {
+          "this": 0.02,
+          "next": 0.02,
+          "last": 0.94,
+          "none": 0.02
+        }
+      }
+    },
+    "usage": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  }
+}
