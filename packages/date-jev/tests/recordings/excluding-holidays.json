@@ -39,6 +39,7 @@
         "criteria": {
           "this": "This week's, as in `this friday`",
           "next": "The following one, as in `next friday`",
+          "after_next": "The one after the coming one, as in `the friday after next`",
           "last": "The one before, as in `last friday`",
           "none": "No word picks which one, as in a bare `friday`"
         }
@@ -100,15 +101,15 @@
       "day": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.81,
+        "confidence": 0.8,
         "probabilities": {
           "today": 0,
           "tomorrow": 0,
           "yesterday": 0,
           "day_after_tomorrow": 0,
           "day_before_yesterday": 0,
-          "weekday": 0.16,
-          "none": 0.84
+          "weekday": 0.17,
+          "none": 0.83
         }
       },
       "weekday": {
@@ -133,6 +134,7 @@
         "probabilities": {
           "this": 0,
           "next": 0,
+          "after_next": 0,
           "last": 0,
           "none": 1
         }
@@ -151,8 +153,8 @@
       }
     },
     "usage": {
-      "input_tokens": 1007,
-      "output_tokens": 261
+      "input_tokens": 1034,
+      "output_tokens": 269
     }
   }
 }

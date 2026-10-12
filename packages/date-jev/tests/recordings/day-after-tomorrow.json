@@ -39,6 +39,7 @@
         "criteria": {
           "this": "This week's, as in `this friday`",
           "next": "The following one, as in `next friday`",
+          "after_next": "The one after the coming one, as in `the friday after next`",
           "last": "The one before, as in `last friday`",
           "none": "No word picks which one, as in a bare `friday`"
         }
@@ -129,21 +130,22 @@
       "modifier": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.68,
+        "confidence": 0.44,
         "probabilities": {
-          "this": 0.06,
-          "next": 0.18,
+          "this": 0.05,
+          "next": 0.11,
+          "after_next": 0.29,
           "last": 0,
-          "none": 0.76
+          "none": 0.55
         }
       },
       "shift": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.99,
+        "confidence": 1,
         "probabilities": {
-          "none": 0.99,
-          "day_later": 0.01,
+          "none": 1,
+          "day_later": 0,
           "day_earlier": 0,
           "week_later": 0,
           "week_earlier": 0
@@ -151,8 +153,8 @@
       }
     },
     "usage": {
-      "input_tokens": 1008,
-      "output_tokens": 266
+      "input_tokens": 1035,
+      "output_tokens": 274
     }
   }
 }

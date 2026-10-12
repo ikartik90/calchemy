@@ -42,17 +42,19 @@ const WeekdayOptions = {
 const ModifierOptions = {
   this: "This week's, as in `this friday`",
   next: "The following one, as in `next friday`",
+  after_next: "The one after the coming one, as in `the friday after next`",
   last: "The one before, as in `last friday`",
   none: "No word picks which one, as in a bare `friday`",
 } as const;
 
-// A bare weekday is the upcoming one, as in date-core.
+// A bare weekday is the upcoming one, as in date-core. `after_next` is the upcoming one plus a
+// week, which differs from `next` on days when the upcoming one already falls in next week.
 const Modifiers = {
   this: "this",
   next: "next",
   last: "last",
   none: "upcoming",
-} as const satisfies Record<ModifierOption, RelativeModifier>;
+} as const satisfies Record<Exclude<ModifierOption, "after_next">, RelativeModifier>;
 
 // Jev answers each question on its own, so the examples spell out that a day named directly,
 // such as `tomorrow` or `next friday`, is not a shift.
@@ -165,14 +167,18 @@ function dayBoundary(answers: DayAnswers): { boundary: BoundarySlice; used: Answ
       return null;
     }
 
-    return {
-      boundary: relative({
-        kind: "modifier",
-        modifier: Modifiers[answers.modifier.choice],
-        target: { kind: "weekday", weekday: Weekdays[weekday] },
-      }),
-      used: [answers.day, answers.weekday, answers.modifier],
-    };
+    const used = [answers.day, answers.weekday, answers.modifier];
+    const target = { kind: "weekday", weekday: Weekdays[weekday] } as const;
+    const modifier = answers.modifier.choice;
+    if (modifier === "after_next") {
+      const upcoming = relative({ kind: "modifier", modifier: "upcoming", target });
+      return {
+        boundary: { kind: "duration-near-boundary", amount: 1, unit: "week", direction: "after", anchor: upcoming },
+        used,
+      };
+    }
+
+    return { boundary: relative({ kind: "modifier", modifier: Modifiers[modifier], target }), used };
   }
 
   if (day === "day_after_tomorrow" || day === "day_before_yesterday") {

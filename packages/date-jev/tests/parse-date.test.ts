@@ -21,6 +21,7 @@ describe("parseDate", () => {
     ["last friday", { kind: "single", date: "2026-05-22" }],
     ["a week on friday", { kind: "single", date: "2026-06-05" }], // this friday plus a week, decided by the user
     ["day after tomorrow", { kind: "single", date: "2026-05-29" }],
+    ["day before yesterday", { kind: "single", date: "2026-05-25" }],
   ])("%s", async (input, expected) => {
     const jev = await createJevParser({ client: replayClient(input) });
     const result = await jev.parseDate(input, context);
@@ -28,6 +29,21 @@ describe("parseDate", () => {
     expect(result.status).toBe("valid");
     if (result.status === "valid") {
       expect(toJSON(result.value)).toEqual(expected);
+    }
+  });
+
+  // "the friday after next" is the friday after the coming one, decided by the user. On a
+  // saturday the coming friday is already in next week, so it differs from "next friday".
+  test("reads the friday after next from a saturday", async () => {
+    const jev = await createJevParser({ client: replayClient("the friday after next") });
+    const result = await jev.parseDate("the friday after next", {
+      ...context,
+      referenceDate: Temporal.PlainDate.from("2026-05-30"),
+    });
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(toJSON(result.value)).toEqual({ kind: "single", date: "2026-06-12" });
     }
   });
 
