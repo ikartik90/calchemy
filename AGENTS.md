@@ -8,7 +8,7 @@ This project is a headless natural language date engine. The core value is relia
 
 - `@calchemy/date-core`: parser, candidate ranking, ambiguity modeling, Temporal conversion, JSON/form serialization, and parser context.
 - `@calchemy/date-holidays`: optional holiday and landmark-date providers.
-- `@calchemy/date-jev` (planned): standalone parser for wording date-core rejects, such as typos, aliases, and unfamiliar phrasing. See [date-jev](#date-jev).
+- `@calchemy/date-jev` (in progress): standalone parser for wording date-core rejects, such as typos, aliases, and unfamiliar phrasing. See [date-jev](#date-jev).
 
 # Documentation References
 
@@ -46,6 +46,10 @@ Agents MUST consult official documentation before implementing APIs or framework
 │   │   │   └── temporal/
 │   │   ├── tests/
 │   │   └── README.md
+│   └── date-jev/
+│       ├── src/
+│       │   └── core/   (copy of date-core's math)
+│       └── tests/
 └── scripts/
 ```
 
@@ -140,11 +144,11 @@ Resolution treats `options.scope` (set while resolving an exclusion) as "read a 
 
 ## date-jev
 
-`@calchemy/date-jev` (planned, not yet created) is a standalone parser. It depends on `@typesafe-ai/sdk` and `@js-temporal/polyfill`. It and `date-core` each build, test, and ship without the other.
+`@calchemy/date-jev` (in progress, private until its first release) is a standalone parser. It depends on `@typesafe-ai/sdk` and `@js-temporal/polyfill`. It and `date-core` each build, test, and ship without the other.
 
 - **Jev reads, code calculates.** Code proposes split points at connector words. Jev judges with Nouls whether each piece is a complete date phrase, and labels each piece's role and words with Choices. All date math runs in code.
 - **Vocabulary lives in date-jev** as Choice lists: months, weekdays, ordinals, numbers, and shorthands. Ask Jev about meaning (`does "tmrw" mean "tomorrow" here?`); it reads meaning well and letters poorly.
-- **Copied math.** Jev's answers build the tree date-core's resolver takes (`DateExpression`), and date-jev resolves it with a copy of date-core's math: `parser/resolve`, `parser/expression`, `parser/slice/types.ts`, `parser/slice/sampler.ts`, `temporal`, and `serialize`. The commit that copies it names its source: `Copy date-core math from <hash>`. When date-core's math changes, list what to bring across with `git log --oneline <hash>..main -- <those paths under packages/date-core/src>`.
+- **Copied math.** Jev's answers build the tree date-core's resolver takes (`DateExpression`), and date-jev resolves it with a copy of date-core's math in `packages/date-jev/src/core/`. That folder mirrors `packages/date-core/src/` file for file and holds only copied code; date-jev's own code sits beside it. The `chunks/index.ts` and `slice/index.ts` barrels are the two edits: they drop date-core's phrase-reading entry points. Math fixes land in date-core first and reach the copy by syncing. Each copy or sync commit names its source, `Copy date-core math from <hash>`, and this lists the date-core changes to bring across: `git log --oneline <hash>..main -- $(cd packages/date-jev/src/core && git ls-files '*.ts' | sed 's#^#packages/date-core/src/#')`.
 - **Same results.** date-jev returns the same `valid` / `ambiguous` / `invalid` states and `DateValueJSON` shape as date-core, so apps can swap or mix the two.
 - **Caller's key, caller's choice.** date-jev takes a `TypeSafeClient` the app builds, so the app owns the API key. The caller decides when date-jev runs: after date-core returns `invalid`, after `invalid` or `ambiguous`, or for every phrase.
 - **Confidence.** An `ambiguous` result's confidence is the sum of its competing readings' confidences.
