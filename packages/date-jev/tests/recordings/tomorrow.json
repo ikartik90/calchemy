@@ -11,7 +11,23 @@
           "today": 0.02,
           "tomorrow": 0.97,
           "yesterday": 0.01,
+          "weekday": 0,
           "none": 0
+        }
+      },
+      "weekday": {
+        "type": "choice",
+        "choice": "none",
+        "confidence": 0.95,
+        "probabilities": {
+          "monday": 0,
+          "tuesday": 0,
+          "wednesday": 0.01,
+          "thursday": 0.01,
+          "friday": 0,
+          "saturday": 0,
+          "sunday": 0,
+          "none": 0.98
         }
       }
     },

@@ -15,6 +15,7 @@ const context: ParseDateContext = {
 describe("parseDate", () => {
   test.each<[string, DateValueJSON]>([
     ["tomorrow", { kind: "single", date: "2026-05-28" }],
+    ["tuesday", { kind: "single", date: "2026-06-02" }], // = `upcoming tuesday`
   ])("%s", async (input, expected) => {
     const jev = await createJevParser({ client: replayClient(input) });
     const result = await jev.parseDate(input, context);
