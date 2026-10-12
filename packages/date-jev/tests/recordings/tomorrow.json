@@ -1,0 +1,20 @@
+{
+  "note": "Hand-written stand-in in the API's response shape. Replace with a live recording once a TypeSafe key is available.",
+  "response": {
+    "model": "hand-written",
+    "answers": {
+      "day": {
+        "type": "choice",
+        "choice": "tomorrow",
+        "confidence": 0.97,
+        "probabilities": {
+          "today": 0.02,
+          "tomorrow": 0.97,
+          "yesterday": 0.01,
+          "none": 0
+        }
+      }
+    },
+    "usage": { "input_tokens": 0, "output_tokens": 0 }
+  }
+}
