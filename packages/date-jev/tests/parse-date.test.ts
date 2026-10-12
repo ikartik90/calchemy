@@ -1,7 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { describe, expect, test } from "vitest";
 import { createJevParser, toJSON, type DateValueJSON, type ParseDateContext } from "../src";
-import { replayClient } from "./support/replay";
+import { replayClient, unusedClient } from "./support/replay";
 
 // Expected values come from date-core's pinned corpus (`packages/date-core/tests/parser.test.ts`),
 // which uses this same reference date and context. Never take them from running date-jev.
@@ -50,5 +50,17 @@ describe("parseDate", () => {
     if (result.status === "valid") {
       expect(result.confidence).toBe(expected);
     }
+  });
+
+  // Same error as date-core's pinned row for "" in `packages/date-core/tests/error-messages.test.ts`.
+  test("answers empty input without asking Jev", async () => {
+    const jev = await createJevParser({ client: unusedClient() });
+    const result = await jev.parseDate("", context);
+
+    expect(result).toEqual({
+      status: "invalid",
+      input: "",
+      errors: [{ code: "empty-input", message: "Enter a date phrase." }],
+    });
   });
 });

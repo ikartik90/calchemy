@@ -1,5 +1,5 @@
 import type { TypeSafeClient } from "@typesafe-ai/sdk";
-import type { DateValue, ParseDateContext } from "./core/types";
+import type { DateValue, ParseDateContext, ParseDateError } from "./core/types";
 
 export type CreateJevParserOptions = {
   /** A client the app builds with its own TypeSafe key. date-jev never reads or stores the key. */
@@ -15,7 +15,13 @@ export type ParseDateResult =
       confidence: number;
       model: string;
     }
-  | { status: "invalid"; input: string; model: string };
+  | {
+      status: "invalid";
+      input: string;
+      errors: ParseDateError[];
+      /** Absent when date-jev answered without asking Jev, as for empty input. */
+      model?: string;
+    };
 
 export type JevParser = {
   parseDate(input: string, context?: ParseDateContext): Promise<ParseDateResult>;

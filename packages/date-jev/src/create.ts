@@ -12,6 +12,10 @@ export async function createJevParser(options: CreateJevParserOptions): Promise<
 
   return {
     async parseDate(input, context = {}) {
+      if (!input.trim()) {
+        return { status: "invalid", input, errors: [{ code: "empty-input", message: "Enter a date phrase." }] };
+      }
+
       const resolved = resolveContext(context, Temporal);
       const { answers, model } = await options.client.systemOne({
         state: { phrase: input },
@@ -22,7 +26,7 @@ export async function createJevParser(options: CreateJevParserOptions): Promise<
 
       return reading && value
         ? { status: "valid", input, value, confidence: reading.confidence, model }
-        : { status: "invalid", input, model };
+        : { status: "invalid", input, errors: [], model };
     },
   };
 }

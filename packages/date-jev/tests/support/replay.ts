@@ -24,6 +24,17 @@ export function replayClient(phrase: string): TypeSafeClient {
   });
 }
 
+// Example: `unusedClient()` fails any request, for inputs date-jev should answer without asking Jev.
+export function unusedClient(): TypeSafeClient {
+  return new TypeSafeClient({
+    apiKey: "replay",
+    retry: { maxRetries: 0 },
+    fetch: async () => {
+      throw new Error("date-jev asked Jev for an input it should answer on its own");
+    },
+  });
+}
+
 // A live recording only answers the questions it was recorded with. When date-jev asks something
 // else, replaying it would test stale answers, so fail and say how to re-record.
 function assertSameRequest(phrase: string, recording: Recording, sent: { state: unknown; questions: unknown }) {
