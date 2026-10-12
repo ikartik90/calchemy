@@ -28,4 +28,11 @@ describe("parseDate", () => {
       expect(toJSON(result.value)).toEqual(expected);
     }
   });
+
+  test("reports which model answered", async () => {
+    const jev = await createJevParser({ client: replayClient("tomorrow") });
+    const result = await jev.parseDate("tomorrow", context);
+
+    expect(result.model).toBe("jev-1.13.0");
+  });
 });

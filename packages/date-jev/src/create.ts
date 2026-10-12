@@ -13,14 +13,14 @@ export async function createJevParser(options: CreateJevParserOptions): Promise<
   return {
     async parseDate(input, context = {}) {
       const resolved = resolveContext(context, Temporal);
-      const { answers } = await options.client.systemOne({
+      const { answers, model } = await options.client.systemOne({
         state: { phrase: input },
         questions: dayQuestions(),
       });
       const tree = treeFromAnswers(answers);
       const value = tree ? resolveDateSlice(tree, resolved.referenceDate, Temporal, resolved, lookups) : null;
 
-      return value ? { status: "valid", input, value } : { status: "invalid", input };
+      return value ? { status: "valid", input, value, model } : { status: "invalid", input, model };
     },
   };
 }

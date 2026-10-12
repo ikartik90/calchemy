@@ -7,8 +7,8 @@ export type CreateJevParserOptions = {
 };
 
 export type ParseDateResult =
-  | { status: "valid"; input: string; value: DateValue }
-  | { status: "invalid"; input: string };
+  | { status: "valid"; input: string; value: DateValue; model: string }
+  | { status: "invalid"; input: string; model: string };
 
 export type JevParser = {
   parseDate(input: string, context?: ParseDateContext): Promise<ParseDateResult>;
