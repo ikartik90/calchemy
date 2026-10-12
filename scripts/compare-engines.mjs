@@ -2,9 +2,9 @@
 
 // Runs the same phrases through date-core and date-jev and lists where they disagree.
 //
-//   pnpm compare-engines                          phrases from scripts/compare-phrases.txt
+//   pnpm compare-engines                          phrases from scripts/compare-phrases.txt, relative to today
 //   pnpm compare-engines "next friday" fri        only these phrases
-//   pnpm compare-engines --reference-date 2026-10-12
+//   pnpm compare-engines --reference-date 2026-05-27   relative to another day, such as the corpus's
 //   pnpm compare-engines --fresh                  ask Jev again instead of reusing cached answers
 //
 // Both parsers share date-core's date math, so a disagreement points at how one of them read the
@@ -19,8 +19,8 @@ import { TypeSafeClient } from "@typesafe-ai/sdk";
 const { createCalchemy, toJSON } = await import(new URL("../packages/date-core/dist/index.js", import.meta.url));
 const { createJevParser } = await import(new URL("../packages/date-jev/dist/index.js", import.meta.url));
 
-const DefaultReferenceDate = "2026-05-27"; // the reference date of date-core's pinned corpus
 const cacheDir = new URL("../node_modules/.cache/calchemy-jev/", import.meta.url);
+const WeekdayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const VerdictOrder = ["disagree", "jev error", "date-core ambiguous", "only date-jev", "only date-core", "neither", "agree"];
 const { phrases, referenceDate, fresh } = parseArgs(process.argv.slice(2));
 
@@ -31,9 +31,10 @@ const client = new TypeSafeClient({
 });
 
 const calchemy = await createCalchemy();
+const { Temporal } = calchemy;
 const jev = await createJevParser({ client });
 const context = {
-  referenceDate: calchemy.Temporal.PlainDate.from(referenceDate),
+  referenceDate: referenceDate ? Temporal.PlainDate.from(referenceDate) : Temporal.Now.plainDateISO(),
   locale: "en-US",
   weekStartsOn: 0,
 };
@@ -57,7 +58,7 @@ for (const phrase of phrases) {
   });
 }
 
-printReport(rows, referenceDate);
+printReport(rows, context.referenceDate);
 
 // Example: `verdictFor(valid, valid)` returns "disagree" when the two dates differ.
 function verdictFor(coreResult, jevResult) {
@@ -75,14 +76,20 @@ function sameValue(a, b) {
   return JSON.stringify(toJSON(a)) === JSON.stringify(toJSON(b));
 }
 
-// Example: `describe(result)` returns "2026-06-05", "2026-06-01..2026-06-07", or "invalid".
+// Example: `describe(result)` returns "Fri 2026-06-05", "Mon 2026-06-01..Sun 2026-06-07", or "invalid".
 function describe(result) {
   if (result.status === "ambiguous") return `ambiguous (${result.candidates.length} readings)`;
   if (result.status !== "valid") return "invalid";
   const value = toJSON(result.value);
-  if (value.kind === "single") return value.date;
-  if (value.kind === "range") return `${value.start}..${value.end}`;
-  return value.dates.length <= 3 ? value.dates.join(", ") : `${value.dates.length} dates from ${value.dates[0]}`;
+  if (value.kind === "single") return withWeekday(value.date);
+  if (value.kind === "range") return `${withWeekday(value.start)}..${withWeekday(value.end)}`;
+  return value.dates.length <= 2
+    ? value.dates.map(withWeekday).join(", ")
+    : `${value.dates.length} dates from ${withWeekday(value.dates[0])}`;
+}
+
+function withWeekday(date) {
+  return `${WeekdayNames[Temporal.PlainDate.from(date).dayOfWeek - 1]} ${date}`;
 }
 
 function summarizeAnswers(response) {
@@ -95,7 +102,7 @@ function printReport(rows, referenceDate) {
   const counts = VerdictOrder.map((verdict) => [verdict, rows.filter((row) => row.verdict === verdict).length])
     .filter(([, count]) => count > 0)
     .map(([verdict, count]) => `${count} ${verdict}`);
-  console.log(`${rows.length} phrases, reference date ${referenceDate}: ${counts.join(", ")}`);
+  console.log(`${rows.length} phrases, reference date ${withWeekday(referenceDate.toString())}: ${counts.join(", ")}`);
 
   const width = Math.max(...rows.map((row) => row.phrase.length), 6);
   for (const verdict of VerdictOrder) {
@@ -103,7 +110,7 @@ function printReport(rows, referenceDate) {
     if (group.length === 0) continue;
     console.log(`\n## ${verdict}`);
     for (const row of group) {
-      console.log(`${row.phrase.padEnd(width)}  core ${row.core.padEnd(24)} jev ${row.jev.padEnd(24)} ${row.jevAnswers}`);
+      console.log(`${row.phrase.padEnd(width)}  core ${row.core.padEnd(30)} jev ${row.jev.padEnd(30)} ${row.jevAnswers}`);
     }
   }
 }
@@ -129,7 +136,7 @@ async function cachedFetch(url, init) {
 }
 
 function parseArgs(args) {
-  let referenceDate = DefaultReferenceDate;
+  let referenceDate = null;
   let fresh = false;
   const phrases = [];
   for (let index = 0; index < args.length; index += 1) {
