@@ -97,8 +97,8 @@ describe("parseDate", () => {
     ["last day of next month", { kind: "single", date: "2026-06-30" }],
     ["third sunday of the next month", { kind: "single", date: "2026-06-21" }],
     ["third monday next quarter", { kind: "single", date: "2026-07-20" }],
-    ["first monday from this monday", { kind: "single", date: "2026-06-01" }],
-    ["third monday from this monday", { kind: "single", date: "2026-06-15" }],
+    ["first monday from this monday", { kind: "single", date: "2026-05-25" }], // `this monday` = monday of this week; the anchor counts as the first
+    ["third monday from this monday", { kind: "single", date: "2026-06-08" }],
     ["3rd monday from tomorrow", { kind: "single", date: "2026-06-15" }],
     ["three mondays from last monday until jun 25", { kind: "range", start: "2026-06-08", end: "2026-06-25" }],
     ["three mondays before last friday until jun 25", { kind: "range", start: "2026-05-04", end: "2026-06-25" }],
@@ -306,6 +306,7 @@ describe("parseDate", () => {
     ["previous friday", { kind: "single", date: "2026-05-22" }],
     ["this wednesday", { kind: "single", date: "2026-05-27" }],
     ["next wednesday", { kind: "single", date: "2026-06-03" }],
+    ["this monday", { kind: "single", date: "2026-05-25" }], // monday of this week, even when it has passed
     ["this day", { kind: "single", date: "2026-05-27" }],
     ["next day", { kind: "single", date: "2026-05-28" }],
     ["last day", { kind: "single", date: "2026-05-26" }],

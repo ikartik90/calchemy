@@ -705,7 +705,7 @@ function resolveRelativeModifierExpression(
     case "weekday":
       return {
         kind: "single",
-        date: resolveRelativeWeekday(modifier, target.weekday, anchorDate),
+        date: resolveRelativeWeekday(modifier, target.weekday, anchorDate, context.weekStartsOn),
       };
   }
 
@@ -854,13 +854,19 @@ function resolveCalendarUnitRange(
   );
 }
 
-// Example: `resolveRelativeWeekday("next", 5, anchor)` returns next Friday.
+// Example: `resolveRelativeWeekday("next", 5, anchor, 0)` returns next Friday.
+// `this <weekday>` is that day of the current calendar week, even when it has passed.
 function resolveRelativeWeekday(
   modifier: RelativeModifier,
   weekday: number,
   anchorDate: PlainDate,
+  weekStartsOn: WeekdayIndex,
 ): PlainDate {
-  if (modifier === "this" || modifier === "upcoming" || modifier === "future") {
+  if (modifier === "this") {
+    return firstWeekdayOnOrAfter(startOfCalendarWeek(anchorDate, weekStartsOn), weekday);
+  }
+
+  if (modifier === "upcoming" || modifier === "future") {
     return firstWeekdayOnOrAfter(anchorDate, weekday);
   }
 
