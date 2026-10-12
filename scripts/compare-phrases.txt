@@ -1,0 +1,40 @@
+# Phrases for `pnpm compare-engines`, one per line. Lines starting with # are comments.
+# Grow this list as date-jev learns new shapes; disagreements are leads, not answers.
+
+# Pinned in date-core's corpus
+today
+tomorrow
+tuesday
+this friday
+next friday
+last friday
+previous friday
+
+# The same days, worded differently
+yesterday
+the day after tomorrow
+the day before yesterday
+tmrw
+tommorow
+wensday
+thrusday
+fri
+nxt friday
+coming friday
+this coming friday
+friday next week
+the friday after next
+a week on friday
+friday week
+monday of next week
+sunday just gone
+
+# Inside a sentence
+can we meet next tuesday?
+by friday
+due friday
+
+# Not a single day
+next month
+excluding holidays
+banana
