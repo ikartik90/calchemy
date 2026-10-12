@@ -26,7 +26,12 @@ export async function createJevParser(options: CreateJevParserOptions): Promise<
 
       return reading && value
         ? { status: "valid", input, value, confidence: reading.confidence, model }
-        : { status: "invalid", input, errors: [], model };
+        : {
+            status: "invalid",
+            input,
+            errors: [{ code: "unsupported-expression", message: `Calchemy could not read "${input}" as a date.` }],
+            model,
+          };
     },
   };
 }

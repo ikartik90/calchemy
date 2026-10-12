@@ -63,4 +63,17 @@ describe("parseDate", () => {
       errors: [{ code: "empty-input", message: "Enter a date phrase." }],
     });
   });
+
+  // date-core also returns `unsupported-expression` for this phrase (`tests/error-messages.test.ts`).
+  test("explains a phrase it cannot read", async () => {
+    const jev = await createJevParser({ client: replayClient("excluding holidays") });
+    const result = await jev.parseDate("excluding holidays", context);
+
+    expect(result.status).toBe("invalid");
+    if (result.status === "invalid") {
+      expect(result.errors).toEqual([
+        { code: "unsupported-expression", message: 'Calchemy could not read "excluding holidays" as a date.' },
+      ]);
+    }
+  });
 });
