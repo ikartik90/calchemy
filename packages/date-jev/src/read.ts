@@ -1,15 +1,27 @@
 import { boundaryToExpression } from "./core/parser/expression/from-slice";
 import type { DateSlice } from "./core/parser/expression/types";
 import type { BoundarySlice, RelativeExpressionSlice } from "./core/parser/slice/types";
-import type { DurationUnit, RelationDirection, RelativeModifier } from "./core/parser/types";
+import type { DurationUnit, RelationDirection, RelativeDateValue, RelativeModifier } from "./core/parser/types";
 
 const DayOptions = {
   today: "The current day",
   tomorrow: "The day after today",
   yesterday: "The day before today",
+  day_after_tomorrow: "Two days after today, as in `the day after tomorrow`",
+  day_before_yesterday: "Two days before today, as in `the day before yesterday`",
   weekday: "A named day of the week, such as Tuesday",
   none: "Some other day, or no day at all",
 } as const;
+
+// The two-day phrases are fixed expressions, so Jev names them as days; they become
+// date-core's `day after tomorrow` and `day before yesterday` boundaries.
+const TwoDayPhrases = {
+  day_after_tomorrow: { amount: 1, unit: "day", direction: "after", from: "tomorrow" },
+  day_before_yesterday: { amount: 1, unit: "day", direction: "before", from: "yesterday" },
+} as const satisfies Record<
+  string,
+  { amount: number; unit: DurationUnit; direction: RelationDirection; from: RelativeDateValue }
+>;
 
 // Numbered like date-core's weekday vocabulary: Monday 1 through Sunday 7.
 const Weekdays = {
@@ -47,10 +59,18 @@ const Modifiers = {
 const ShiftOptions = {
   none: {
     what: "No extra shift: the phrase names its day directly",
-    examples: ["today", "tomorrow", "yesterday", "friday", "this friday", "next friday", "last friday"],
+    examples: [
+      "today",
+      "tomorrow",
+      "the day after tomorrow",
+      "the day before yesterday",
+      "friday",
+      "next friday",
+      "last friday",
+    ],
   },
-  day_later: { what: "One day after the day it names", examples: ["the day after tomorrow", "the day after friday"] },
-  day_earlier: { what: "One day before the day it names", examples: ["the day before yesterday", "the day before friday"] },
+  day_later: { what: "One day after the day it names", examples: ["the day after friday", "the day after next monday"] },
+  day_earlier: { what: "One day before the day it names", examples: ["the day before friday", "the day before next monday"] },
   week_later: { what: "One week after the day it names", examples: ["a week on friday", "a week from tuesday"] },
   week_earlier: { what: "One week before the day it names", examples: ["a week before friday"] },
 };
@@ -101,7 +121,7 @@ export function dayQuestions() {
       type: "choice",
       instructions: {
         question: "Does `phrase` shift its day by an extra amount, on top of the day it names?",
-        note: "Words that name a day by themselves are not a shift: today, tomorrow, yesterday, a weekday, and a weekday with this, next, or last.",
+        note: "Words that name a day by themselves are not a shift: today, tomorrow, yesterday, the day after tomorrow, the day before yesterday, a weekday, and a weekday with this, next, or last.",
       },
       criteria: ShiftOptions,
     },
@@ -152,6 +172,14 @@ function dayBoundary(answers: DayAnswers): { boundary: BoundarySlice; used: Answ
         target: { kind: "weekday", weekday: Weekdays[weekday] },
       }),
       used: [answers.day, answers.weekday, answers.modifier],
+    };
+  }
+
+  if (day === "day_after_tomorrow" || day === "day_before_yesterday") {
+    const { from, ...shift } = TwoDayPhrases[day];
+    return {
+      boundary: { kind: "duration-near-boundary", ...shift, anchor: relative({ kind: "bare", value: from }) },
+      used: [answers.day],
     };
   }
 

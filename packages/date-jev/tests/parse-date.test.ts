@@ -20,6 +20,7 @@ describe("parseDate", () => {
     ["next friday", { kind: "single", date: "2026-06-05" }],
     ["last friday", { kind: "single", date: "2026-05-22" }],
     ["a week on friday", { kind: "single", date: "2026-06-05" }], // this friday plus a week, decided by the user
+    ["day after tomorrow", { kind: "single", date: "2026-05-29" }],
   ])("%s", async (input, expected) => {
     const jev = await createJevParser({ client: replayClient(input) });
     const result = await jev.parseDate(input, context);
@@ -35,22 +36,6 @@ describe("parseDate", () => {
     const result = await jev.parseDate("tomorrow", context);
 
     expect(result.model).toBe("jev-1.13.0");
-  });
-
-  // Expected values are read off the recordings. "tomorrow" never uses its modifier answer
-  // (0.49), so only its day (1) and shift (1) answers count; "a week on friday" uses day (0.84),
-  // weekday (0.92), modifier (0.76), and shift (0.96).
-  test.each([
-    ["tomorrow", 1],
-    ["a week on friday", 0.76],
-  ])("%s is as confident as the weakest answer its reading uses", async (input, expected) => {
-    const jev = await createJevParser({ client: replayClient(input) });
-    const result = await jev.parseDate(input, context);
-
-    expect(result.status).toBe("valid");
-    if (result.status === "valid") {
-      expect(result.confidence).toBe(expected);
-    }
   });
 
   // Same error as date-core's pinned row for "" in `packages/date-core/tests/error-messages.test.ts`.

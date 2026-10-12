@@ -13,6 +13,8 @@
           "today": "The current day",
           "tomorrow": "The day after today",
           "yesterday": "The day before today",
+          "day_after_tomorrow": "Two days after today, as in `the day after tomorrow`",
+          "day_before_yesterday": "Two days before today, as in `the day before yesterday`",
           "weekday": "A named day of the week, such as Tuesday",
           "none": "Some other day, or no day at all"
         }
@@ -45,7 +47,7 @@
         "type": "choice",
         "instructions": {
           "question": "Does `phrase` shift its day by an extra amount, on top of the day it names?",
-          "note": "Words that name a day by themselves are not a shift: today, tomorrow, yesterday, a weekday, and a weekday with this, next, or last."
+          "note": "Words that name a day by themselves are not a shift: today, tomorrow, yesterday, the day after tomorrow, the day before yesterday, a weekday, and a weekday with this, next, or last."
         },
         "criteria": {
           "none": {
@@ -53,9 +55,9 @@
             "examples": [
               "today",
               "tomorrow",
-              "yesterday",
+              "the day after tomorrow",
+              "the day before yesterday",
               "friday",
-              "this friday",
               "next friday",
               "last friday"
             ]
@@ -63,15 +65,15 @@
           "day_later": {
             "what": "One day after the day it names",
             "examples": [
-              "the day after tomorrow",
-              "the day after friday"
+              "the day after friday",
+              "the day after next monday"
             ]
           },
           "day_earlier": {
             "what": "One day before the day it names",
             "examples": [
-              "the day before yesterday",
-              "the day before friday"
+              "the day before friday",
+              "the day before next monday"
             ]
           },
           "week_later": {
@@ -98,13 +100,15 @@
       "day": {
         "type": "choice",
         "choice": "weekday",
-        "confidence": 0.99,
+        "confidence": 0.95,
         "probabilities": {
           "today": 0,
           "tomorrow": 0,
           "yesterday": 0,
-          "weekday": 0.99,
-          "none": 0.01
+          "day_after_tomorrow": 0,
+          "day_before_yesterday": 0,
+          "weekday": 0.96,
+          "none": 0.04
         }
       },
       "weekday": {
@@ -147,8 +151,8 @@
       }
     },
     "usage": {
-      "input_tokens": 935,
-      "output_tokens": 239
+      "input_tokens": 1007,
+      "output_tokens": 262
     }
   }
 }
