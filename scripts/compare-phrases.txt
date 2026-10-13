@@ -80,3 +80,14 @@ june 5 to june 10
 aug 15 to sep 30
 from dec 20 until jan 3
 aug 10-14
+june 5-10
+aug 10 - 14
+aug 31-sep 2
+monday-friday
+10-14 aug
+dec 28-3
+
+# Floating range ends, counted forward from the start
+tomorrow until march
+tomorrow until the 5th
+monday until friday
