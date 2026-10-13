@@ -16,6 +16,7 @@
           "day_after_tomorrow": "Two days after today, as in `the day after tomorrow`",
           "day_before_yesterday": "Two days before today, as in `the day before yesterday`",
           "weekday": "A named day of the week, such as Tuesday",
+          "date": "A date on the calendar, named by its month and day, as in `june 5` or `5th nov`",
           "none": "Some other day, or no day at all"
         }
       },
@@ -31,6 +32,63 @@
           "saturday": null,
           "sunday": null,
           "none": "The phrase names no day of the week"
+        }
+      },
+      "month": {
+        "type": "choice",
+        "instructions": "Which month does `phrase` name?",
+        "criteria": {
+          "january": null,
+          "february": null,
+          "march": null,
+          "april": null,
+          "may": null,
+          "june": null,
+          "july": null,
+          "august": null,
+          "september": null,
+          "october": null,
+          "november": null,
+          "december": null,
+          "none": "The phrase names no month"
+        }
+      },
+      "day_of_month": {
+        "type": "choice",
+        "instructions": "Which day of the month does `phrase` name?",
+        "criteria": {
+          "1": null,
+          "2": null,
+          "3": null,
+          "4": null,
+          "5": null,
+          "6": null,
+          "7": null,
+          "8": null,
+          "9": null,
+          "10": null,
+          "11": null,
+          "12": null,
+          "13": null,
+          "14": null,
+          "15": null,
+          "16": null,
+          "17": null,
+          "18": null,
+          "19": null,
+          "20": null,
+          "21": null,
+          "22": null,
+          "23": null,
+          "24": null,
+          "25": null,
+          "26": null,
+          "27": null,
+          "28": null,
+          "29": null,
+          "30": null,
+          "31": null,
+          "none": "The phrase names no day of the month"
         }
       },
       "modifier": {
@@ -189,6 +247,7 @@
           "day_after_tomorrow": 0,
           "day_before_yesterday": 0,
           "weekday": 0.99,
+          "date": 0,
           "none": 0.01
         }
       },
@@ -205,6 +264,65 @@
           "saturday": 0,
           "sunday": 0,
           "none": 0
+        }
+      },
+      "month": {
+        "type": "choice",
+        "choice": "none",
+        "confidence": 1,
+        "probabilities": {
+          "january": 0,
+          "february": 0,
+          "march": 0,
+          "april": 0,
+          "may": 0,
+          "june": 0,
+          "july": 0,
+          "august": 0,
+          "september": 0,
+          "october": 0,
+          "november": 0,
+          "december": 0,
+          "none": 1
+        }
+      },
+      "day_of_month": {
+        "type": "choice",
+        "choice": "none",
+        "confidence": 0.98,
+        "probabilities": {
+          "1": 0,
+          "2": 0,
+          "3": 0,
+          "4": 0,
+          "5": 0.02,
+          "6": 0,
+          "7": 0,
+          "8": 0,
+          "9": 0,
+          "10": 0,
+          "11": 0,
+          "12": 0,
+          "13": 0,
+          "14": 0,
+          "15": 0,
+          "16": 0,
+          "17": 0,
+          "18": 0,
+          "19": 0,
+          "20": 0,
+          "21": 0,
+          "22": 0,
+          "23": 0,
+          "24": 0,
+          "25": 0,
+          "26": 0,
+          "27": 0,
+          "28": 0,
+          "29": 0,
+          "30": 0,
+          "31": 0,
+          "none": 0.98
         }
       },
       "modifier": {
@@ -256,8 +374,8 @@
       }
     },
     "usage": {
-      "input_tokens": 1454,
-      "output_tokens": 362
+      "input_tokens": 1876,
+      "output_tokens": 752
     }
   }
 }

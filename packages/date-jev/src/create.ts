@@ -22,7 +22,7 @@ export async function createJevParser(options: CreateJevParserOptions): Promise<
       const split = splitRange(input);
       const { answers, model } = await options.client.systemOne({
         state: split ? { phrase: input, ...split } : { phrase: input },
-        questions: split ? { ...dateQuestions(), ...rangeQuestions() } : dateQuestions(),
+        questions: split ? { ...dateQuestions("phrase", input), ...rangeQuestions(split) } : dateQuestions("phrase", input),
       });
       const reading = readAnswers(answers, split !== null);
       const value = reading ? resolveDateSlice(reading.slice, resolved.referenceDate, Temporal, resolved, lookups) : null;

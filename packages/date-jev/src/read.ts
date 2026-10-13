@@ -2,6 +2,7 @@ import { boundaryToExpression } from "./core/parser/expression/from-slice";
 import type { DateSlice } from "./core/parser/expression/types";
 import type { BoundarySlice, RelativeExpressionSlice } from "./core/parser/slice/types";
 import type { DurationUnit, RelationDirection, RelativeDateValue, RelativeModifier } from "./core/parser/types";
+import type { RangeSplit } from "./split";
 
 const DayOptions = {
   today: "The current day",
@@ -10,6 +11,7 @@ const DayOptions = {
   day_after_tomorrow: "Two days after today, as in `the day after tomorrow`",
   day_before_yesterday: "Two days before today, as in `the day before yesterday`",
   weekday: "A named day of the week, such as Tuesday",
+  date: "A date on the calendar, named by its month and day, as in `june 5` or `5th nov`",
   none: "Some other day, or no day at all",
 } as const;
 
@@ -38,6 +40,32 @@ const WeekdayOptions = {
   ...nullOptions(Weekdays),
   none: "The phrase names no day of the week",
 };
+
+const Months = {
+  january: 1,
+  february: 2,
+  march: 3,
+  april: 4,
+  may: 5,
+  june: 6,
+  july: 7,
+  august: 8,
+  september: 9,
+  october: 10,
+  november: 11,
+  december: 12,
+} as const;
+
+const MonthOptions = {
+  ...nullOptions(Months),
+  none: "The phrase names no month",
+};
+
+// The day of the month as a Choice from 1 to 31, as in TypeSafe's date extraction cookbook.
+const DayOfMonthOptions = {
+  ...Object.fromEntries(Array.from({ length: 31 }, (_, index) => [String(index + 1), null])),
+  none: "The phrase names no day of the month",
+} as Record<`${number}` | "none", string | null>;
 
 const ModifierOptions = {
   this: "This week's, as in `this friday`",
@@ -112,6 +140,8 @@ const PeriodModifiers = {
 
 type DayOption = keyof typeof DayOptions;
 type WeekdayOption = keyof typeof WeekdayOptions;
+type MonthOption = keyof typeof MonthOptions;
+type DayOfMonthOption = keyof typeof DayOfMonthOptions;
 type ModifierOption = keyof typeof ModifierOptions;
 type ShiftOption = keyof typeof ShiftOptions;
 type PeriodOption = keyof typeof PeriodOptions;
@@ -121,18 +151,34 @@ type Answer = { confidence: number };
 export type DateAnswers = {
   day: { choice: DayOption; confidence: number };
   weekday: { choice: WeekdayOption; confidence: number };
+  month: { choice: MonthOption; confidence: number };
+  day_of_month: { choice: DayOfMonthOption; confidence: number };
+  /** One of the numbers written in the text, or `none`. Absent when the text has no numbers. */
+  year?: { choice: string; confidence: number };
   modifier: { choice: ModifierOption; confidence: number };
   shift: { choice: ShiftOption; confidence: number };
   period: { choice: PeriodOption; confidence: number };
   period_modifier: { choice: PeriodModifierOption; confidence: number };
 };
 
+export const AnswerNames = [
+  "day",
+  "weekday",
+  "month",
+  "day_of_month",
+  "year",
+  "modifier",
+  "shift",
+  "period",
+  "period_modifier",
+] as const satisfies ReadonlyArray<keyof DateAnswers>;
+
 /** A text field of the state Jev reads: the whole phrase, or one end of a range. */
 export type Field = "phrase" | "start" | "end";
 
-// Example: `dateQuestions("start")` asks Jev which day or calendar period `state.start` names,
-// under keys prefixed `start_`. The whole phrase keeps unprefixed keys.
-export function dateQuestions(field: Field = "phrase") {
+// Example: `dateQuestions("start", "june 5 2027")` asks Jev which day or calendar period
+// `state.start` names, under keys prefixed `start_`. The whole phrase keeps unprefixed keys.
+export function dateQuestions(field: Field, text: string) {
   const prefix = field === "phrase" ? "" : `${field}_`;
   return {
     [`${prefix}day`]: {
@@ -145,6 +191,17 @@ export function dateQuestions(field: Field = "phrase") {
       instructions: `Which day of the week does \`${field}\` name?`,
       criteria: WeekdayOptions,
     },
+    [`${prefix}month`]: {
+      type: "choice" as const,
+      instructions: `Which month does \`${field}\` name?`,
+      criteria: MonthOptions,
+    },
+    [`${prefix}day_of_month`]: {
+      type: "choice" as const,
+      instructions: `Which day of the month does \`${field}\` name?`,
+      criteria: DayOfMonthOptions,
+    },
+    ...yearQuestion(field, text),
     [`${prefix}modifier`]: {
       type: "choice" as const,
       instructions: `Which word in \`${field}\` picks out which occurrence of the day of the week?`,
@@ -171,11 +228,30 @@ export function dateQuestions(field: Field = "phrase") {
   };
 }
 
-// Example: `rangeQuestions()` asks about each end of a split phrase, and whether it is a range at all.
-export function rangeQuestions() {
+// Example: `yearQuestion("phrase", "march 15 2020")` asks whether `15` or `2020` is the year. Code finds
+// the numbers and Jev picks one, as TypeSafe's date extraction cookbook suggests, so a written `27`
+// reaches date-core's math as written and becomes 2027 there. Text without numbers asks nothing.
+function yearQuestion(field: Field, text: string) {
+  const numbers = [...new Set(text.match(/\d+/g))];
+  if (numbers.length === 0) {
+    return {};
+  }
+
+  const prefix = field === "phrase" ? "" : `${field}_`;
   return {
-    ...dateQuestions("start"),
-    ...dateQuestions("end"),
+    [`${prefix}year`]: {
+      type: "choice" as const,
+      instructions: `Which of these numbers in \`${field}\` is the year?`,
+      criteria: { ...Object.fromEntries(numbers.map((number) => [number, null])), none: "None of them is a year" },
+    },
+  };
+}
+
+// Example: `rangeQuestions(split)` asks about each end of a split phrase, and whether it is a range at all.
+export function rangeQuestions(split: RangeSplit) {
+  return {
+    ...dateQuestions("start", split.start),
+    ...dateQuestions("end", split.end),
     is_range: {
       type: "noul" as const,
       instructions: "Does `phrase` name a stretch of days that runs from `start` to `end`?",
@@ -206,8 +282,7 @@ export function readAnswers(answers: Readonly<Record<string, unknown>>, split: b
 // from this module's own options.
 function answersFor(answers: Readonly<Record<string, unknown>>, field: Field): DateAnswers {
   const prefix = field === "phrase" ? "" : `${field}_`;
-  const names = ["day", "weekday", "modifier", "shift", "period", "period_modifier"] as const;
-  return Object.fromEntries(names.map((name) => [name, answers[`${prefix}${name}`]])) as DateAnswers;
+  return Object.fromEntries(AnswerNames.map((name) => [name, answers[`${prefix}${name}`]])) as DateAnswers;
 }
 
 // Example: `treeFromAnswers({ day: { choice: "tomorrow", confidence: 1 }, ... })` reads `tomorrow` with confidence 1.
@@ -303,6 +378,10 @@ function dayBoundary(answers: DateAnswers): { boundary: BoundarySlice; used: Ans
     return { boundary: relative({ kind: "modifier", modifier: Modifiers[modifier], target }), used };
   }
 
+  if (day === "date") {
+    return calendarDateBoundary(answers);
+  }
+
   if (day === "day_after_tomorrow" || day === "day_before_yesterday") {
     const { from, ...shift } = TwoDayPhrases[day];
     return {
@@ -312,6 +391,30 @@ function dayBoundary(answers: DateAnswers): { boundary: BoundarySlice; used: Ans
   }
 
   return { boundary: relative({ kind: "bare", value: day }), used: [answers.day] };
+}
+
+// Example: `calendarDateBoundary(answers)` returns `jul 1` as day 1 of July this year, the tree
+// date-core builds for `1st of july`. A written year stays as written; date-core's math expands `27`.
+function calendarDateBoundary(answers: DateAnswers): { boundary: BoundarySlice; used: Answer[] } | null {
+  const month = answers.month.choice;
+  const dayOfMonth = answers.day_of_month.choice;
+  if (month === "none" || dayOfMonth === "none") {
+    return null;
+  }
+
+  const year = answers.year;
+  return {
+    boundary: {
+      kind: "ordinal-day-in-range",
+      day: Number(dayOfMonth),
+      range: {
+        kind: "month-range",
+        month: Months[month],
+        year: !year || year.choice === "none" ? { kind: "anchor" } : { kind: "explicit", year: Number(year.choice) },
+      },
+    },
+    used: [answers.day, answers.month, answers.day_of_month, ...(year ? [year] : [])],
+  };
 }
 
 function relative(expression: RelativeExpressionSlice): BoundarySlice {
