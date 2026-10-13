@@ -159,23 +159,6 @@ export function resolveBoundary(
       );
       return date ? { kind: "single", date } : null;
     }
-    case "duration-from-anchor": {
-      const start = resolveBoundaryAsEndpoint(
-        boundary.anchor,
-        "start",
-        anchorDate,
-        Temporal,
-        context,
-        lookups,
-      );
-      return start
-        ? {
-            kind: "range",
-            start,
-            end: shiftDateByDuration(start, boundary.amount, boundary.unit),
-          }
-        : null;
-    }
     case "duration-near-boundary": {
       const direction = boundary.direction === "before" || boundary.direction === "preceding" ? -1 : 1;
       const boundarySide = direction < 0 ? "start" : "end";

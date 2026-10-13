@@ -32,12 +32,6 @@ export type BoundarySlice =
   | { kind: "week-range"; week: number; year: YearReferenceSlice }
   | { kind: "relative"; expression: RelativeExpressionSlice }
   | {
-      kind: "duration-from-anchor";
-      amount: number;
-      unit: DurationUnit;
-      anchor: BoundarySlice;
-    }
-  | {
       kind: "duration-near-boundary";
       amount: number;
       unit: DurationUnit;

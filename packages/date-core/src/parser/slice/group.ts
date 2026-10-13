@@ -240,7 +240,6 @@ function isImplicitScopedSamplerBoundary(boundary: BoundarySlice): boolean {
   switch (boundary.kind) {
     case "atom":
     case "shifted-anchor":
-    case "duration-from-anchor":
     case "duration-near-boundary":
     case "ordinal-unit-from-anchor":
     case "ordinal-weekday-from-anchor":
@@ -442,24 +441,14 @@ function sliceUpperBoundRange(
     return null;
   }
 
+  // A whole week, month, or year before `until` starts the range at its beginning, as the user
+  // decided; a written side, as in `end of next week`, wins.
   const startChunks = trimCommandAndArticle(split.leftChunks);
-  const start = startEndpoint(chunkText(startChunks), boundarySideFromChunks(startChunks), lookups);
+  const start = parseTypedBoundaryEndpoint(chunkText(startChunks), lookups, boundarySideFromChunks(startChunks) ?? "start", {
+    preferDay: true,
+  });
   const end = parseBoundaryEndpoint(split.rightChunks, lookups);
   return start && end ? createSlice({ kind: "range", start, end }, exclusions, null, null, transforms) : null;
-}
-
-// Example: `startEndpoint("next week", undefined, lookups)` starts at the beginning of next week, as
-// the user decided, while `startEndpoint("25 days from tomorrow", undefined, lookups)` starts 25 days
-// out: a count names the day it reaches. A written side, as in `end of next week`, wins.
-function startEndpoint(
-  input: string,
-  side: BoundaryEndpointSide | undefined,
-  lookups: DateVocabularyLookups,
-): BoundaryEndpointSlice {
-  const endpoint = parseTypedBoundaryEndpoint(input, lookups, side ?? "start", { preferDay: true });
-  return !side && endpoint.kind === "boundary" && endpoint.boundary.kind === "duration-from-anchor"
-    ? { ...endpoint, side: "end" }
-    : endpoint;
 }
 
 // Example: `sliceScopedSamplerUpperBound(chunksFor("mondays from tomorrow up to march"), [], [], lookups)` samples a bounded range.

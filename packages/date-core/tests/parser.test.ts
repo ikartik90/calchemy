@@ -116,7 +116,9 @@ describe("parseDate", () => {
     // (from today, inclusive), not a span of working weeks.
     ["next 10 weekdays", { kind: "multiple", dates: ["2026-05-27", "2026-05-28", "2026-05-29", "2026-06-01", "2026-06-02", "2026-06-03", "2026-06-04", "2026-06-05", "2026-06-08", "2026-06-09"] }],
     ["future 2 weeks", { kind: "range", start: "2026-05-27", end: "2026-06-09" }],
-    ["25 days from tomorrow", { kind: "range", start: "2026-05-28", end: "2026-06-22" }],
+    // Decided by the user: `N units from <a day>` is one day, the same as `N units after <a day>`.
+    ["25 days from tomorrow", { kind: "single", date: "2026-06-22" }],
+    ["three weeks from today", { kind: "single", date: "2026-06-17" }], // = `three weeks from now`
     ["three weeks from today until aug 15", { kind: "range", start: "2026-06-17", end: "2026-08-15" }],
     ["25 days from tomorrow until the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
     ["25 days from tomorrow till the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
@@ -140,7 +142,7 @@ describe("parseDate", () => {
     ["third quarter from christmas this year", { kind: "range", start: "2027-07-01", end: "2027-09-30" }],
     ["second year from today", { kind: "range", start: "2028-01-01", end: "2028-12-31" }],
     ["second year from jul 1, 27", { kind: "range", start: "2029-01-01", end: "2029-12-31" }],
-    ["12 weeks from 6 mar, 27", { kind: "range", start: "2027-03-06", end: "2027-05-29" }],
+    ["12 weeks from 6 mar, 27", { kind: "single", date: "2027-05-29" }], // one day, decided by the user
     ["12 weeks from 6 mar, 27 until end of q3 27", { kind: "range", start: "2027-05-29", end: "2027-09-30" }],
     ["first 10 days of next month", { kind: "range", start: "2026-06-01", end: "2026-06-10" }],
     ["last 20 days of the next month", { kind: "range", start: "2026-06-11", end: "2026-06-30" }],
@@ -2440,11 +2442,11 @@ describe("parseDate", () => {
 
   test.each([
     [
-      "12 weeks from 3/6/26",
+      "12 weeks from 3/6/26", // each reading is one day 12 weeks out, decided by the user
       [
-        { kind: "range", start: "2026-06-03", end: "2026-08-26" },
-        { kind: "range", start: "2026-03-06", end: "2026-05-29" },
-        { kind: "range", start: "2003-06-26", end: "2003-09-18" },
+        { kind: "single", date: "2026-08-26" },
+        { kind: "single", date: "2026-05-29" },
+        { kind: "single", date: "2003-09-18" },
       ],
     ],
     [
@@ -2609,28 +2611,15 @@ describe("parseDate", () => {
       }
     }
 
+    // `12 weeks from tomorrow` is one day, like `12 weeks from now`, decided by the user.
     expect(fromAnchorResult.status).toBe("valid");
     if (fromAnchorResult.status === "valid") {
-      expect(calchemy.toJSON(fromAnchorResult.value)).toEqual({
-        kind: "range",
-        start: "2026-05-28",
-        end: "2026-08-20",
-      });
+      expect(calchemy.toJSON(fromAnchorResult.value)).toEqual({ kind: "single", date: "2026-08-20" });
 
-      const expectedRangeResult = resolveExpectedDateValue(fromAnchorResult, "range");
-      expect(expectedRangeResult.status).toBe("valid");
-      if (expectedRangeResult.status === "valid") {
-        expect(calchemy.toJSON(expectedRangeResult.value)).toEqual({
-          kind: "range",
-          start: "2026-05-28",
-          end: "2026-08-20",
-        });
-      }
-
-      const expectedSingleResult = resolveExpectedDateValue(fromAnchorResult, "single");
-      expect(expectedSingleResult.status).toBe("valid");
-      if (expectedSingleResult.status === "valid") {
-        expect(calchemy.toJSON(expectedSingleResult.value)).toEqual({ kind: "single", date: "2026-08-20" });
+      const rangeResult = resolveExpectedDateValue(fromAnchorResult, "range");
+      expect(rangeResult.status).toBe("invalid");
+      if (rangeResult.status === "invalid") {
+        expect(rangeResult.errors[0]?.code).toBe("unexpected-value-kind");
       }
     }
 
