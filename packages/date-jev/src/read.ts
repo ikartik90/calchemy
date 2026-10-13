@@ -154,7 +154,10 @@ const CountedOptions = {
     what: "One day that many days, weeks, months, or years after today",
     examples: ["in 10 days", "3 weeks from now"],
   },
-  none: { what: "No number of days, weeks, months, or years", examples: ["next week", "next month", "tomorrow", "friday", "june 5"] },
+  none: {
+    what: "No count: a single day, or one whole calendar week, month, quarter, or year",
+    examples: ["next week", "next month", "previous quarter", "this year", "tomorrow", "friday", "june 5"],
+  },
 };
 
 // date-core reads `last`, `past`, and `previous` alike for a count, and `next`, `upcoming`, and `future` alike.
@@ -196,8 +199,8 @@ export type DateAnswers = {
   period_modifier: { choice: PeriodModifierOption; confidence: number };
   counted: { choice: CountedOption; confidence: number };
   unit: { choice: UnitOption; confidence: number };
-  /** One of the numbers written in the text, or `none`. Absent when the text has no numbers. */
-  count?: { choice: string; confidence: number };
+  /** A number from 1 to 100, a larger number written in digits, or `none`. */
+  count: { choice: string; confidence: number };
 };
 
 export const AnswerNames = [
@@ -243,10 +246,7 @@ export function dateQuestions(field: Field, text: string) {
       instructions: `Which day of the month does \`${field}\` name?`,
       criteria: DayOfMonthOptions,
     },
-    ...numberQuestion(field, text, "year", {
-      instructions: `Which of these numbers in \`${field}\` is the year?`,
-      none: "None of them is a year",
-    }),
+    ...yearQuestion(field, text),
     [`${prefix}modifier`]: {
       type: "choice" as const,
       instructions: `Which word in \`${field}\` picks out which occurrence of the day of the week?`,
@@ -280,36 +280,46 @@ export function dateQuestions(field: Field, text: string) {
       instructions: `What does \`${field}\` count?`,
       criteria: UnitOptions,
     },
-    ...numberQuestion(field, text, "count", {
-      instructions: `Which of these numbers in \`${field}\` is the count of days, weeks, months, or years?`,
-      none: "None of them is a count",
-    }),
+    [`${prefix}count`]: {
+      type: "choice" as const,
+      instructions: {
+        question: `How many days, weeks, months, or years does \`${field}\` count?`,
+        note: "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, and `90 days` is 90.",
+      },
+      criteria: countOptions(text),
+    },
   };
 }
 
-// Example: `numberQuestion("phrase", "march 15 2020", "year", ...)` asks whether `15` or `2020` is the
-// year. Code finds the numbers and Jev picks one, as TypeSafe's date extraction cookbook suggests, so
-// a written `27` reaches date-core's math as written and becomes 2027 there. Text without numbers
-// asks nothing.
-function numberQuestion(
-  field: Field,
-  text: string,
-  name: "year" | "count",
-  { instructions, none }: { instructions: string; none: string },
-) {
-  const numbers = [...new Set(text.match(/\d+/g))];
+// Example: `yearQuestion("phrase", "march 15 2020")` asks whether `15` or `2020` is the year. Code
+// finds the numbers and Jev picks one, as TypeSafe's date extraction cookbook suggests, so a written
+// `27` reaches date-core's math as written and becomes 2027 there. Text without numbers asks nothing.
+function yearQuestion(field: Field, text: string) {
+  const numbers = writtenNumbers(text);
   if (numbers.length === 0) {
     return {};
   }
 
   const prefix = field === "phrase" ? "" : `${field}_`;
   return {
-    [`${prefix}${name}`]: {
+    [`${prefix}year`]: {
       type: "choice" as const,
-      instructions,
-      criteria: { ...Object.fromEntries(numbers.map((number) => [number, null])), none },
+      instructions: `Which of these numbers in \`${field}\` is the year?`,
+      criteria: { ...Object.fromEntries(numbers.map((number) => [number, null])), none: "None of them is a year" },
     },
   };
+}
+
+// Example: `countOptions("last 365 days")` offers 1 to 100 and `365`. A Choice from 1 to 100, like the
+// cookbook's day of the month, lets Jev read `two weeks` and `a week`; a larger count written in
+// digits joins the list.
+function countOptions(text: string): Record<string, string | null> {
+  const numbers = new Set([...Array.from({ length: 100 }, (_, index) => String(index + 1)), ...writtenNumbers(text)]);
+  return { ...Object.fromEntries([...numbers].map((number) => [number, null])), none: "It counts nothing" };
+}
+
+function writtenNumbers(text: string): string[] {
+  return [...new Set(text.match(/\d+/g))];
 }
 
 // Example: `rangeQuestions(split)` asks about each end of a split phrase, and whether it is a range at all.
@@ -504,7 +514,7 @@ function countedBoundary(answers: DateAnswers): { boundary: BoundarySlice; used:
   const counted = answers.counted.choice;
   const unit = answers.unit.choice;
   const count = answers.count;
-  if (counted === "none" || unit === "none" || !count || count.choice === "none") {
+  if (counted === "none" || unit === "none" || count.choice === "none") {
     return null;
   }
 
