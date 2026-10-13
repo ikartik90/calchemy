@@ -58,7 +58,7 @@ Agents MUST consult official documentation before implementing APIs or framework
 - `packages/date-core` owns parser semantics, candidate ranking, ambiguity modeling, Temporal value creation, expected-value helpers, and JSON/form serialization.
 - Parser behavior belongs in `date-core` or `date-jev`, never in demos or scripts.
 - `scripts/parse-date.mjs` is for parser CLI checks and developer workflows. Keep reusable parsing behavior in `date-core`.
-- `packages/date-core/README.md` is the README npm publishes; the root `README.md` only points to it.
+- Each package's `README.md` is the README npm publishes; the root `README.md` only points to them.
 - Future optional workspaces such as holiday providers, docs, or examples should live under their own package or top-level directory and consume `date-core` through public exports. `date-jev` is the exception: it stands alone.
 
 # Build and Test Commands
