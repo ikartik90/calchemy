@@ -46,6 +46,8 @@ describe("parseDate", () => {
     // before the upcoming monday, so the range ends on the friday after it.
     ["monday through friday", { kind: "range", start: "2026-06-01", end: "2026-06-05" }],
     ["dec 20 until jan 3", { kind: "range", start: "2026-12-20", end: "2027-01-03" }],
+    ["tomorrow until march", { kind: "range", start: "2026-05-28", end: "2027-03-31" }],
+    ["tomorrow until the 5th", { kind: "range", start: "2026-05-28", end: "2026-06-05" }],
     ["aug 10-14", { kind: "range", start: "2026-08-10", end: "2026-08-14" }],
     // The 3rd before the 28th has no month of its own, so it counts forward from the start.
     ["dec 28-3", { kind: "range", start: "2026-12-28", end: "2027-01-03" }],
