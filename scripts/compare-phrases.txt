@@ -91,3 +91,17 @@ dec 28-3
 tomorrow until march
 tomorrow until the 5th
 monday until friday
+
+# Counted ranges
+last 90 days
+next 10 days
+within 2 weeks
+past 2 weeks
+last 3 months
+the last 7 days
+over the next 30 days
+in the past 6 months
+next 2 years
+next two weeks
+in 10 days
+2 months ago
