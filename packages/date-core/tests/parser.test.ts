@@ -312,6 +312,21 @@ describe("parseDate", () => {
     }
   });
 
+  // Decided by the user: a whole week, month, or year before `until` starts the range at its
+  // beginning. A count such as `25 days from tomorrow until …` still starts 25 days out.
+  test.each<[string, DateValueJSON]>([
+    ["this week until friday", { kind: "range", start: "2026-05-24", end: "2026-05-29" }],
+    ["next week until march", { kind: "range", start: "2026-05-31", end: "2027-03-31" }],
+    ["jan 2025 until march", { kind: "range", start: "2025-01-01", end: "2025-03-31" }],
+  ])("starts %s at the beginning of its first period", (input, expected) => {
+    const result = calchemy.parseDate(input, context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual(expected);
+    }
+  });
+
   // Every Monday from Mon 1 June 2026 to Mon 29 March 2027: 301 days apart, so 44 Mondays.
   test("counts a floating end forward inside a sampled range", () => {
     const result = calchemy.parseDate("Every monday from tomorrow up to the end of march", context);
