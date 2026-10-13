@@ -293,7 +293,8 @@
             "what": "Weeks",
             "examples": [
               "next 2 weeks",
-              "3 weeks from now"
+              "3 weeks from now",
+              "in a fortnight"
             ]
           },
           "month": {
@@ -301,6 +302,13 @@
             "examples": [
               "last 3 months",
               "2 months ago"
+            ]
+          },
+          "quarter": {
+            "what": "Quarters of a year",
+            "examples": [
+              "3 quarters from now",
+              "last 2 quarters"
             ]
           },
           "year": {
@@ -323,7 +331,7 @@
         "type": "choice",
         "instructions": {
           "question": "How many days, weeks, months, or years does `phrase` count?",
-          "note": "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, and `90 days` is 90."
+          "note": "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, `90 days` is 90, and `a fortnight` is 2 weeks."
         },
         "criteria": {
           "1": null,
@@ -527,13 +535,13 @@
       "modifier": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.46,
+        "confidence": 0.45,
         "probabilities": {
-          "this": 0.12,
-          "next": 0.31,
+          "this": 0.11,
+          "next": 0.33,
           "after_next": 0,
           "last": 0,
-          "none": 0.5700000000000001
+          "none": 0.56
         }
       },
       "shift": {
@@ -586,21 +594,22 @@
       "unit": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.85,
+        "confidence": 0.76,
         "probabilities": {
-          "day": 0.12,
+          "day": 0.2,
           "week": 0,
           "month": 0,
+          "quarter": 0,
           "year": 0,
-          "none": 0.88
+          "none": 0.8
         }
       },
       "count": {
         "type": "choice",
         "choice": "1",
-        "confidence": 0.74,
+        "confidence": 0.75,
         "probabilities": {
-          "1": 0.74,
+          "1": 0.75,
           "2": 0,
           "3": 0,
           "4": 0,
@@ -696,17 +705,17 @@
           "94": 0,
           "95": 0,
           "96": 0,
-          "97": 0,
+          "97": 0.01,
           "98": 0.01,
           "99": 0.01,
           "100": 0,
-          "none": 0.24000000000000002
+          "none": 0.22
         }
       }
     },
     "usage": {
-      "input_tokens": 3231,
-      "output_tokens": 1670
+      "input_tokens": 3293,
+      "output_tokens": 1677
     }
   }
 }

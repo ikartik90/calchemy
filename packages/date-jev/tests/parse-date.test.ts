@@ -46,6 +46,8 @@ describe("parseDate", () => {
     ["next two weeks", { kind: "range", start: "2026-05-27", end: "2026-06-09" }], // = `next 2 weeks`
     ["three weeks from now", { kind: "single", date: "2026-06-17" }],
     ["in a week", { kind: "single", date: "2026-06-03" }], // = `in 1 week`
+    ["in a fortnight", { kind: "single", date: "2026-06-10" }], // = `2 weeks from now`
+    ["3 quarters from now", { kind: "single", date: "2027-02-27" }],
     // Two-ended ranges: each end is a pinned single day (`today`, `this friday` = the coming friday).
     ["today until friday", { kind: "range", start: "2026-05-27", end: "2026-05-29" }],
     ["tomorrow to next friday", { kind: "range", start: "2026-05-28", end: "2026-06-05" }],

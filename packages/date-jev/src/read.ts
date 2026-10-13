@@ -168,8 +168,9 @@ const CountedModifiers = {
 
 const UnitOptions = {
   day: { what: "Days", examples: ["last 90 days", "in 10 days"] },
-  week: { what: "Weeks", examples: ["next 2 weeks", "3 weeks from now"] },
+  week: { what: "Weeks", examples: ["next 2 weeks", "3 weeks from now", "in a fortnight"] },
   month: { what: "Months", examples: ["last 3 months", "2 months ago"] },
+  quarter: { what: "Quarters of a year", examples: ["3 quarters from now", "last 2 quarters"] },
   year: { what: "Years", examples: ["next 2 years"] },
   none: { what: "It counts nothing", examples: ["tomorrow", "next friday", "june 5"] },
 };
@@ -284,7 +285,7 @@ export function dateQuestions(field: Field, text: string) {
       type: "choice" as const,
       instructions: {
         question: `How many days, weeks, months, or years does \`${field}\` count?`,
-        note: "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, and `90 days` is 90.",
+        note: "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, `90 days` is 90, and `a fortnight` is 2 weeks.",
       },
       criteria: countOptions(text),
     },

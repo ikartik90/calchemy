@@ -293,7 +293,8 @@
             "what": "Weeks",
             "examples": [
               "next 2 weeks",
-              "3 weeks from now"
+              "3 weeks from now",
+              "in a fortnight"
             ]
           },
           "month": {
@@ -301,6 +302,13 @@
             "examples": [
               "last 3 months",
               "2 months ago"
+            ]
+          },
+          "quarter": {
+            "what": "Quarters of a year",
+            "examples": [
+              "3 quarters from now",
+              "last 2 quarters"
             ]
           },
           "year": {
@@ -323,7 +331,7 @@
         "type": "choice",
         "instructions": {
           "question": "How many days, weeks, months, or years does `phrase` count?",
-          "note": "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, and `90 days` is 90."
+          "note": "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, `90 days` is 90, and `a fortnight` is 2 weeks."
         },
         "criteria": {
           "1": null,
@@ -488,13 +496,13 @@
       "day_of_month": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.88,
+        "confidence": 0.9,
         "probabilities": {
           "1": 0,
           "2": 0,
           "3": 0,
-          "4": 0.01,
-          "5": 0.05,
+          "4": 0,
+          "5": 0.04,
           "6": 0.02,
           "7": 0.01,
           "8": 0.01,
@@ -521,43 +529,43 @@
           "29": 0,
           "30": 0,
           "31": 0,
-          "none": 0.88
+          "none": 0.9
         }
       },
       "modifier": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.7,
+        "confidence": 0.68,
         "probabilities": {
           "this": 0.07,
-          "next": 0.17,
+          "next": 0.19,
           "after_next": 0,
           "last": 0,
-          "none": 0.76
+          "none": 0.74
         }
       },
       "shift": {
         "type": "choice",
         "choice": "week_later",
-        "confidence": 0.95,
+        "confidence": 0.96,
         "probabilities": {
-          "none": 0.04,
+          "none": 0.03,
           "day_later": 0,
           "day_earlier": 0,
-          "week_later": 0.96,
+          "week_later": 0.97,
           "week_earlier": 0
         }
       },
       "period": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.4,
+        "confidence": 0.44,
         "probabilities": {
-          "week": 0.48,
+          "week": 0.45,
           "month": 0,
           "quarter": 0,
           "year": 0,
-          "none": 0.52
+          "none": 0.55
         }
       },
       "period_modifier": {
@@ -574,33 +582,34 @@
       "counted": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.68,
+        "confidence": 0.71,
         "probabilities": {
-          "span_back": 0.01,
-          "span_forward": 0.08,
+          "span_back": 0.02,
+          "span_forward": 0.07,
           "day_back": 0.02,
-          "day_forward": 0.15,
-          "none": 0.74
+          "day_forward": 0.12,
+          "none": 0.77
         }
       },
       "unit": {
         "type": "choice",
         "choice": "week",
-        "confidence": 0.66,
+        "confidence": 0.64,
         "probabilities": {
-          "day": 0.13,
-          "week": 0.73,
+          "day": 0.17,
+          "week": 0.7,
           "month": 0,
+          "quarter": 0,
           "year": 0,
-          "none": 0.14
+          "none": 0.13
         }
       },
       "count": {
         "type": "choice",
         "choice": "1",
-        "confidence": 0.98,
+        "confidence": 0.99,
         "probabilities": {
-          "1": 0.98,
+          "1": 0.99,
           "2": 0,
           "3": 0,
           "4": 0,
@@ -700,13 +709,13 @@
           "98": 0,
           "99": 0,
           "100": 0,
-          "none": 0.02
+          "none": 0.01
         }
       }
     },
     "usage": {
-      "input_tokens": 3232,
-      "output_tokens": 1671
+      "input_tokens": 3294,
+      "output_tokens": 1678
     }
   }
 }

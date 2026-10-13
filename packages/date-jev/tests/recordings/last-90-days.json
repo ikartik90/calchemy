@@ -301,7 +301,8 @@
             "what": "Weeks",
             "examples": [
               "next 2 weeks",
-              "3 weeks from now"
+              "3 weeks from now",
+              "in a fortnight"
             ]
           },
           "month": {
@@ -309,6 +310,13 @@
             "examples": [
               "last 3 months",
               "2 months ago"
+            ]
+          },
+          "quarter": {
+            "what": "Quarters of a year",
+            "examples": [
+              "3 quarters from now",
+              "last 2 quarters"
             ]
           },
           "year": {
@@ -331,7 +339,7 @@
         "type": "choice",
         "instructions": {
           "question": "How many days, weeks, months, or years does `phrase` count?",
-          "note": "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, and `90 days` is 90."
+          "note": "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, `90 days` is 90, and `a fortnight` is 2 weeks."
         },
         "criteria": {
           "1": null,
@@ -544,37 +552,37 @@
       "modifier": {
         "type": "choice",
         "choice": "last",
-        "confidence": 0.82,
+        "confidence": 0.79,
         "probabilities": {
           "this": 0,
           "next": 0,
           "after_next": 0,
-          "last": 0.86,
-          "none": 0.14
+          "last": 0.83,
+          "none": 0.17
         }
       },
       "shift": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.91,
+        "confidence": 0.89,
         "probabilities": {
-          "none": 0.93,
+          "none": 0.91,
           "day_later": 0,
           "day_earlier": 0.01,
-          "week_later": 0.01,
-          "week_earlier": 0.04
+          "week_later": 0.02,
+          "week_earlier": 0.06
         }
       },
       "period": {
         "type": "choice",
         "choice": "quarter",
-        "confidence": 0.73,
+        "confidence": 0.74,
         "probabilities": {
           "week": 0,
           "month": 0,
-          "quarter": 0.78,
+          "quarter": 0.79,
           "year": 0,
-          "none": 0.22
+          "none": 0.21
         }
       },
       "period_modifier": {
@@ -603,11 +611,12 @@
       "unit": {
         "type": "choice",
         "choice": "day",
-        "confidence": 1,
+        "confidence": 0.98,
         "probabilities": {
-          "day": 1,
+          "day": 0.98,
           "week": 0,
-          "month": 0,
+          "month": 0.01,
+          "quarter": 0.01,
           "year": 0,
           "none": 0
         }
@@ -722,8 +731,8 @@
       }
     },
     "usage": {
-      "input_tokens": 3286,
-      "output_tokens": 1699
+      "input_tokens": 3348,
+      "output_tokens": 1706
     }
   }
 }

@@ -304,7 +304,8 @@
             "what": "Weeks",
             "examples": [
               "next 2 weeks",
-              "3 weeks from now"
+              "3 weeks from now",
+              "in a fortnight"
             ]
           },
           "month": {
@@ -312,6 +313,13 @@
             "examples": [
               "last 3 months",
               "2 months ago"
+            ]
+          },
+          "quarter": {
+            "what": "Quarters of a year",
+            "examples": [
+              "3 quarters from now",
+              "last 2 quarters"
             ]
           },
           "year": {
@@ -334,7 +342,7 @@
         "type": "choice",
         "instructions": {
           "question": "How many days, weeks, months, or years does `phrase` count?",
-          "note": "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, and `90 days` is 90."
+          "note": "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, `90 days` is 90, and `a fortnight` is 2 weeks."
         },
         "criteria": {
           "1": null,
@@ -735,7 +743,8 @@
             "what": "Weeks",
             "examples": [
               "next 2 weeks",
-              "3 weeks from now"
+              "3 weeks from now",
+              "in a fortnight"
             ]
           },
           "month": {
@@ -743,6 +752,13 @@
             "examples": [
               "last 3 months",
               "2 months ago"
+            ]
+          },
+          "quarter": {
+            "what": "Quarters of a year",
+            "examples": [
+              "3 quarters from now",
+              "last 2 quarters"
             ]
           },
           "year": {
@@ -765,7 +781,7 @@
         "type": "choice",
         "instructions": {
           "question": "How many days, weeks, months, or years does `start` count?",
-          "note": "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, and `90 days` is 90."
+          "note": "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, `90 days` is 90, and `a fortnight` is 2 weeks."
         },
         "criteria": {
           "1": null,
@@ -1166,7 +1182,8 @@
             "what": "Weeks",
             "examples": [
               "next 2 weeks",
-              "3 weeks from now"
+              "3 weeks from now",
+              "in a fortnight"
             ]
           },
           "month": {
@@ -1174,6 +1191,13 @@
             "examples": [
               "last 3 months",
               "2 months ago"
+            ]
+          },
+          "quarter": {
+            "what": "Quarters of a year",
+            "examples": [
+              "3 quarters from now",
+              "last 2 quarters"
             ]
           },
           "year": {
@@ -1196,7 +1220,7 @@
         "type": "choice",
         "instructions": {
           "question": "How many days, weeks, months, or years does `end` count?",
-          "note": "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, and `90 days` is 90."
+          "note": "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, `90 days` is 90, and `a fortnight` is 2 weeks."
         },
         "criteria": {
           "1": null,
@@ -1319,7 +1343,7 @@
       "day": {
         "type": "choice",
         "choice": "date",
-        "confidence": 0.75,
+        "confidence": 0.82,
         "probabilities": {
           "today": 0,
           "tomorrow": 0,
@@ -1327,8 +1351,8 @@
           "day_after_tomorrow": 0,
           "day_before_yesterday": 0,
           "weekday": 0,
-          "date": 0.78,
-          "none": 0.22
+          "date": 0.84,
+          "none": 0.16
         }
       },
       "weekday": {
@@ -1369,7 +1393,7 @@
       "day_of_month": {
         "type": "choice",
         "choice": "10",
-        "confidence": 0.54,
+        "confidence": 0.59,
         "probabilities": {
           "1": 0,
           "2": 0,
@@ -1380,11 +1404,11 @@
           "7": 0,
           "8": 0,
           "9": 0,
-          "10": 0.55,
+          "10": 0.6,
           "11": 0,
           "12": 0,
           "13": 0,
-          "14": 0.38,
+          "14": 0.33,
           "15": 0,
           "16": 0,
           "17": 0,
@@ -1402,7 +1426,7 @@
           "29": 0,
           "30": 0,
           "31": 0,
-          "none": 0.06
+          "none": 0.060000000000000005
         }
       },
       "year": {
@@ -1442,13 +1466,13 @@
       "period": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.86,
+        "confidence": 0.82,
         "probabilities": {
-          "week": 0.1,
+          "week": 0.13,
           "month": 0.01,
           "quarter": 0,
           "year": 0,
-          "none": 0.89
+          "none": 0.86
         }
       },
       "period_modifier": {
@@ -1477,25 +1501,26 @@
       "unit": {
         "type": "choice",
         "choice": "day",
-        "confidence": 0.64,
+        "confidence": 0.77,
         "probabilities": {
-          "day": 0.71,
-          "week": 0.04,
+          "day": 0.81,
+          "week": 0.06,
           "month": 0,
+          "quarter": 0,
           "year": 0,
-          "none": 0.25
+          "none": 0.13
         }
       },
       "count": {
         "type": "choice",
         "choice": "5",
-        "confidence": 0.56,
+        "confidence": 0.58,
         "probabilities": {
           "1": 0,
           "2": 0,
           "3": 0,
-          "4": 0.02,
-          "5": 0.56,
+          "4": 0.03,
+          "5": 0.58,
           "6": 0.02,
           "7": 0,
           "8": 0,
@@ -1504,7 +1529,7 @@
           "11": 0,
           "12": 0,
           "13": 0,
-          "14": 0.060000000000000005,
+          "14": 0.08,
           "15": 0,
           "16": 0,
           "17": 0,
@@ -1512,7 +1537,7 @@
           "19": 0,
           "20": 0,
           "21": 0,
-          "22": 0,
+          "22": 0.02,
           "23": 0,
           "24": 0,
           "25": 0,
@@ -1588,10 +1613,10 @@
           "95": 0,
           "96": 0,
           "97": 0,
-          "98": 0.01,
+          "98": 0,
           "99": 0.01,
           "100": 0,
-          "none": 0.31
+          "none": 0.26
         }
       },
       "start_day": {
@@ -1719,65 +1744,66 @@
       "start_period": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.91,
+        "confidence": 0.89,
         "probabilities": {
           "week": 0,
-          "month": 0.07,
+          "month": 0.09,
           "quarter": 0,
           "year": 0,
-          "none": 0.93
+          "none": 0.91
         }
       },
       "start_period_modifier": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.97,
+        "confidence": 0.96,
         "probabilities": {
-          "this": 0.02,
+          "this": 0.03,
           "next": 0,
           "last": 0,
-          "none": 0.98
+          "none": 0.97
         }
       },
       "start_counted": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.99,
+        "confidence": 0.97,
         "probabilities": {
           "span_back": 0,
           "span_forward": 0.01,
           "day_back": 0,
-          "day_forward": 0,
-          "none": 0.99
+          "day_forward": 0.01,
+          "none": 0.98
         }
       },
       "start_unit": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.71,
+        "confidence": 0.58,
         "probabilities": {
-          "day": 0.19,
+          "day": 0.29,
           "week": 0,
-          "month": 0.04,
+          "month": 0.06,
+          "quarter": 0,
           "year": 0,
-          "none": 0.77
+          "none": 0.65
         }
       },
       "start_count": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.66,
+        "confidence": 0.63,
         "probabilities": {
           "1": 0.02,
           "2": 0,
           "3": 0,
-          "4": 0,
-          "5": 0.06999999999999999,
+          "4": 0.02,
+          "5": 0.12,
           "6": 0.02,
           "7": 0,
           "8": 0,
           "9": 0,
-          "10": 0.17,
+          "10": 0.13,
           "11": 0,
           "12": 0,
           "13": 0,
@@ -1868,7 +1894,7 @@
           "98": 0.01,
           "99": 0.01,
           "100": 0,
-          "none": 0.66
+          "none": 0.63
         }
       },
       "end_day": {
@@ -1889,22 +1915,22 @@
       "end_weekday": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.67,
+        "confidence": 0.77,
         "probabilities": {
-          "monday": 0.03,
-          "tuesday": 0.05,
-          "wednesday": 0.03,
-          "thursday": 0.04,
-          "friday": 0.07,
-          "saturday": 0.04,
-          "sunday": 0.03,
-          "none": 0.71
+          "monday": 0.02,
+          "tuesday": 0.03,
+          "wednesday": 0.02,
+          "thursday": 0.03,
+          "friday": 0.05,
+          "saturday": 0.03,
+          "sunday": 0.02,
+          "none": 0.8
         }
       },
       "end_month": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.86,
+        "confidence": 0.85,
         "probabilities": {
           "january": 0,
           "february": 0,
@@ -1913,12 +1939,12 @@
           "may": 0,
           "june": 0,
           "july": 0,
-          "august": 0.13,
+          "august": 0.14,
           "september": 0,
           "october": 0,
           "november": 0,
           "december": 0,
-          "none": 0.87
+          "none": 0.86
         }
       },
       "end_day_of_month": {
@@ -1996,24 +2022,24 @@
       "end_period": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.97,
+        "confidence": 1,
         "probabilities": {
-          "week": 0.01,
-          "month": 0.01,
+          "week": 0,
+          "month": 0,
           "quarter": 0,
           "year": 0,
-          "none": 0.98
+          "none": 1
         }
       },
       "end_period_modifier": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.96,
+        "confidence": 0.93,
         "probabilities": {
-          "this": 0.03,
+          "this": 0.05,
           "next": 0,
           "last": 0,
-          "none": 0.97
+          "none": 0.95
         }
       },
       "end_counted": {
@@ -2031,19 +2057,20 @@
       "end_unit": {
         "type": "choice",
         "choice": "day",
-        "confidence": 0.71,
+        "confidence": 0.76,
         "probabilities": {
-          "day": 0.77,
+          "day": 0.8,
           "week": 0,
           "month": 0,
+          "quarter": 0,
           "year": 0,
-          "none": 0.23
+          "none": 0.2
         }
       },
       "end_count": {
         "type": "choice",
         "choice": "14",
-        "confidence": 0.8,
+        "confidence": 0.79,
         "probabilities": {
           "1": 0,
           "2": 0,
@@ -2058,7 +2085,7 @@
           "11": 0,
           "12": 0,
           "13": 0,
-          "14": 0.8,
+          "14": 0.79,
           "15": 0,
           "16": 0,
           "17": 0,
@@ -2143,19 +2170,19 @@
           "96": 0,
           "97": 0,
           "98": 0,
-          "99": 0,
+          "99": 0.01,
           "100": 0,
           "none": 0.14
         }
       },
       "is_range": {
         "type": "noul",
-        "noul": 0.9
+        "noul": 0.91
       }
     },
     "usage": {
-      "input_tokens": 9417,
-      "output_tokens": 5145
+      "input_tokens": 9603,
+      "output_tokens": 5166
     }
   }
 }
