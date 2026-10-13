@@ -26,11 +26,14 @@
       "import": "./dist/index.js"
     }
   },
+  "bin": {
+    "date-jev": "./dist/cli.js"
+  },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm --sourcemap --clean --tsconfig tsconfig.build.json --external @js-temporal/polyfill && tsc -p tsconfig.build.json --emitDeclarationOnly",
+    "build": "tsup src/index.ts src/cli.ts --format esm --sourcemap --clean --tsconfig tsconfig.build.json --external @js-temporal/polyfill && tsc -p tsconfig.build.json --emitDeclarationOnly",
     "test": "vitest run --root ../.. --config vitest.config.ts packages/date-jev/tests",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "clean": "rm -rf dist tsconfig.tsbuildinfo"
