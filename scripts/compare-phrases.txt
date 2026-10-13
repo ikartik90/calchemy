@@ -104,6 +104,12 @@ dec 28-3
 tomorrow until march
 tomorrow until the 5th
 monday until friday
+apr 1 until the 20th
+this week until friday
+next week until march
+jan 2025 until march
+next month until christmas
+25 days from tomorrow until the end of june
 
 # Counted ranges
 last 90 days
