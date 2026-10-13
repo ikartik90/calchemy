@@ -28,6 +28,7 @@ describe("parseDate", () => {
     ["6 mar 27", { kind: "single", date: "2027-03-06" }], // a written 27 is the year nearest the reference date
     ["the 15th", { kind: "single", date: "2026-05-15" }], // the 15th of this month, even though it has passed
     ["feb 30", { kind: "range", start: "2030-02-01", end: "2030-02-28" }], // no February 30th, so 30 is the year, decided by the user
+    ["june 27th", { kind: "single", date: "2026-06-27" }], // an ordinal always names a day, decided by the user
     ["april", { kind: "range", start: "2026-04-01", end: "2026-04-30" }], // = `this april`
     ["august 2020", { kind: "range", start: "2020-08-01", end: "2020-08-31" }],
     ["next april", { kind: "range", start: "2027-04-01", end: "2027-04-30" }], // = `april next year`
