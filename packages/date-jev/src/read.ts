@@ -84,37 +84,29 @@ const Modifiers = {
   none: "upcoming",
 } as const satisfies Record<Exclude<ModifierOption, "after_next">, RelativeModifier>;
 
-// Jev answers each question on its own, so the examples spell out that a day named directly,
-// such as `tomorrow` or `next friday`, is not a shift.
+// Whether the phrase counts away from the day written in it. Jev answers each question on its own,
+// so the examples spell out that a day written by itself, such as `tomorrow` or `next friday`, is
+// not counted from. How far comes from the count and unit questions.
 const ShiftOptions = {
   none: {
-    what: "No extra shift: the phrase names its day directly",
-    examples: [
-      "today",
-      "tomorrow",
-      "the day after tomorrow",
-      "the day before yesterday",
-      "friday",
-      "next friday",
-      "last friday",
-    ],
+    what: "Nothing is counted from the day written",
+    examples: ["today", "tomorrow", "the day after tomorrow", "friday", "next friday", "the friday after next", "june 5", "previous quarter"],
   },
-  day_later: { what: "One day after the day it names", examples: ["the day after friday", "the day after next monday"] },
-  day_earlier: { what: "One day before the day it names", examples: ["the day before friday", "the day before next monday"] },
-  week_later: { what: "One week after the day it names", examples: ["a week on friday", "a week from tuesday"] },
-  week_earlier: { what: "One week before the day it names", examples: ["a week before friday"] },
+  later: {
+    what: "Some days, weeks, months, or years after the day written",
+    examples: ["the day after friday", "a week on friday", "two weeks after tomorrow", "25 days from tomorrow", "10 days after june 5"],
+  },
+  earlier: {
+    what: "Some days, weeks, months, or years before the day written",
+    examples: ["the day before friday", "3 days before next friday", "a week before june 5"],
+  },
 };
 
 // Each shift becomes date-core's `<amount> <unit> before/after <day>` boundary.
-const Shifts = {
-  day_later: { amount: 1, unit: "day", direction: "after" },
-  day_earlier: { amount: 1, unit: "day", direction: "before" },
-  week_later: { amount: 1, unit: "week", direction: "after" },
-  week_earlier: { amount: 1, unit: "week", direction: "before" },
-} as const satisfies Record<
-  Exclude<ShiftOption, "none">,
-  { amount: number; unit: DurationUnit; direction: RelationDirection }
->;
+const ShiftDirections = {
+  later: "after",
+  earlier: "before",
+} as const satisfies Record<Exclude<ShiftOption, "none">, RelationDirection>;
 
 const PeriodOptions = {
   week: { what: "A whole calendar week", examples: ["this week", "next week", "last week"] },
@@ -167,7 +159,7 @@ const CountedModifiers = {
 } as const satisfies Partial<Record<CountedOption, RelativeModifier>>;
 
 const UnitOptions = {
-  day: { what: "Days", examples: ["last 90 days", "in 10 days"] },
+  day: { what: "Days", examples: ["last 90 days", "in 10 days", "the day after friday"] },
   week: { what: "Weeks", examples: ["next 2 weeks", "3 weeks from now", "in a fortnight"] },
   month: { what: "Months", examples: ["last 3 months", "2 months ago"] },
   quarter: { what: "Quarters of a year", examples: ["3 quarters from now", "last 2 quarters"] },
@@ -227,24 +219,37 @@ export type Field = "phrase" | "start" | "end";
 export function dateQuestions(field: Field, text: string) {
   const prefix = field === "phrase" ? "" : `${field}_`;
   return {
+    // Each asks for the day as written: Jev reads, and code counts from it.
     [`${prefix}day`]: {
       type: "choice" as const,
-      instructions: `Which day does \`${field}\` name?`,
+      instructions: {
+        question: `Which day is written in \`${field}\`?`,
+        note: "Answer with the day as written, not a day counted from it: in `two weeks after tomorrow` it is tomorrow, and in `the day after friday` it is a weekday. `the day after tomorrow` and `the day before yesterday` are written days of their own.",
+      },
       criteria: DayOptions,
     },
     [`${prefix}weekday`]: {
       type: "choice" as const,
-      instructions: `Which day of the week does \`${field}\` name?`,
+      instructions: {
+        question: `Which day of the week is written in \`${field}\`?`,
+        note: "As written, not counted from: `the day after friday` and `3 days before next friday` are both friday.",
+      },
       criteria: WeekdayOptions,
     },
     [`${prefix}month`]: {
       type: "choice" as const,
-      instructions: `Which month does \`${field}\` name?`,
+      instructions: {
+        question: `Which month is written in \`${field}\`?`,
+        note: "As written, not counted from: `a week after june 28` is june.",
+      },
       criteria: MonthOptions,
     },
     [`${prefix}day_of_month`]: {
       type: "choice" as const,
-      instructions: `Which day of the month does \`${field}\` name?`,
+      instructions: {
+        question: `Which day of the month is written in \`${field}\`?`,
+        note: "As written, not counted from: `10 days after june 5` is 5. A year is not a day of the month: `august 2020` names none.",
+      },
       criteria: DayOfMonthOptions,
     },
     ...yearQuestion(field, text),
@@ -256,8 +261,8 @@ export function dateQuestions(field: Field, text: string) {
     [`${prefix}shift`]: {
       type: "choice" as const,
       instructions: {
-        question: `Does \`${field}\` shift its day by an extra amount, on top of the day it names?`,
-        note: "Words that name a day by themselves are not a shift: today, tomorrow, yesterday, the day after tomorrow, the day before yesterday, a weekday, and a weekday with this, next, or last.",
+        question: `Does \`${field}\` count some days, weeks, months, or years after or before the day written in it?`,
+        note: "A day written by itself is not counted from: today, tomorrow, yesterday, the day after tomorrow, the day before yesterday, a weekday, a weekday with this, next, last, or after next (as in `the friday after next`), a date such as june 5, and a whole week, month, quarter, or year (as in `previous quarter`).",
       },
       criteria: ShiftOptions,
     },
@@ -285,7 +290,7 @@ export function dateQuestions(field: Field, text: string) {
       type: "choice" as const,
       instructions: {
         question: `How many days, weeks, months, or years does \`${field}\` count?`,
-        note: "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, `90 days` is 90, and `a fortnight` is 2 weeks.",
+        note: "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, `the day after friday` is 1, `90 days` is 90, and `a fortnight` is 2 weeks.",
       },
       criteria: countOptions(text),
     },
@@ -472,10 +477,7 @@ function withMonthOf(piece: DateAnswers, other: DateAnswers): DateAnswers {
 function boundaryFromAnswers(answers: DateAnswers): { boundary: BoundarySlice; used: Answer[] } | null {
   const day = dayBoundary(answers);
   if (day) {
-    const shift = answers.shift.choice;
-    const boundary: BoundarySlice =
-      shift === "none" ? day.boundary : { kind: "duration-near-boundary", ...Shifts[shift], anchor: day.boundary };
-    return { boundary, used: [...day.used, answers.shift] };
+    return shiftedBoundary(day, answers);
   }
 
   if (answers.counted.choice !== "none") {
@@ -485,14 +487,46 @@ function boundaryFromAnswers(answers: DateAnswers): { boundary: BoundarySlice; u
   return monthBoundary(answers) ?? periodBoundary(answers);
 }
 
+// Example: `shiftedBoundary(friday, answers)` returns `two weeks after friday` as date-core's
+// `2 weeks after <friday>`. A count date-jev cannot measure makes the phrase unreadable rather than
+// dropping it.
+function shiftedBoundary(
+  day: { boundary: BoundarySlice; used: Answer[] },
+  answers: DateAnswers,
+): { boundary: BoundarySlice; used: Answer[] } | null {
+  const shift = answers.shift.choice;
+  if (shift === "none") {
+    return { boundary: day.boundary, used: [...day.used, answers.shift] };
+  }
+
+  const unit = answers.unit.choice;
+  const count = answers.count.choice;
+  if (unit === "none" || count === "none") {
+    return null;
+  }
+
+  return {
+    boundary: {
+      kind: "duration-near-boundary",
+      amount: Number(count),
+      unit,
+      direction: ShiftDirections[shift],
+      anchor: day.boundary,
+    },
+    used: [...day.used, answers.shift, answers.unit, answers.count],
+  };
+}
+
 // Example: `monthBoundary(answers)` returns `april` as the whole of April this year, `august 2020` as
 // August 2020, and `next april` as date-core's relative month, the coming April after this one.
-// date-core reads `this april` the same as `april`. Jev's day answer decides that no day is named:
-// for `august 2020` it also offers the 20th of `2020` as a day of the month.
+// date-core reads `this april` the same as `april`. It is read only after no calendar date could
+// be: Jev may call `august 2020` a date yet find no day of the month in it, or find the 20th of
+// `2020` yet say no day is written.
 function monthBoundary(answers: DateAnswers): { boundary: BoundarySlice; used: Answer[] } | null {
   const month = answers.month.choice;
   const modifier = answers.period_modifier.choice;
-  if (month === "none" || answers.day.choice !== "none") {
+  const day = answers.day.choice;
+  if (month === "none" || (day !== "none" && day !== "date")) {
     return null;
   }
 

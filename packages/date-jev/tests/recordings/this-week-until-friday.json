@@ -10,7 +10,10 @@
     "questions": {
       "day": {
         "type": "choice",
-        "instructions": "Which day does `phrase` name?",
+        "instructions": {
+          "question": "Which day is written in `phrase`?",
+          "note": "Answer with the day as written, not a day counted from it: in `two weeks after tomorrow` it is tomorrow, and in `the day after friday` it is a weekday. `the day after tomorrow` and `the day before yesterday` are written days of their own."
+        },
         "criteria": {
           "today": "The current day",
           "tomorrow": "The day after today",
@@ -24,7 +27,10 @@
       },
       "weekday": {
         "type": "choice",
-        "instructions": "Which day of the week does `phrase` name?",
+        "instructions": {
+          "question": "Which day of the week is written in `phrase`?",
+          "note": "As written, not counted from: `the day after friday` and `3 days before next friday` are both friday."
+        },
         "criteria": {
           "monday": null,
           "tuesday": null,
@@ -38,7 +44,10 @@
       },
       "month": {
         "type": "choice",
-        "instructions": "Which month does `phrase` name?",
+        "instructions": {
+          "question": "Which month is written in `phrase`?",
+          "note": "As written, not counted from: `a week after june 28` is june."
+        },
         "criteria": {
           "january": null,
           "february": null,
@@ -57,7 +66,10 @@
       },
       "day_of_month": {
         "type": "choice",
-        "instructions": "Which day of the month does `phrase` name?",
+        "instructions": {
+          "question": "Which day of the month is written in `phrase`?",
+          "note": "As written, not counted from: `10 days after june 5` is 5. A year is not a day of the month: `august 2020` names none."
+        },
         "criteria": {
           "1": null,
           "2": null,
@@ -107,47 +119,39 @@
       "shift": {
         "type": "choice",
         "instructions": {
-          "question": "Does `phrase` shift its day by an extra amount, on top of the day it names?",
-          "note": "Words that name a day by themselves are not a shift: today, tomorrow, yesterday, the day after tomorrow, the day before yesterday, a weekday, and a weekday with this, next, or last."
+          "question": "Does `phrase` count some days, weeks, months, or years after or before the day written in it?",
+          "note": "A day written by itself is not counted from: today, tomorrow, yesterday, the day after tomorrow, the day before yesterday, a weekday, a weekday with this, next, last, or after next (as in `the friday after next`), a date such as june 5, and a whole week, month, quarter, or year (as in `previous quarter`)."
         },
         "criteria": {
           "none": {
-            "what": "No extra shift: the phrase names its day directly",
+            "what": "Nothing is counted from the day written",
             "examples": [
               "today",
               "tomorrow",
               "the day after tomorrow",
-              "the day before yesterday",
               "friday",
               "next friday",
-              "last friday"
+              "the friday after next",
+              "june 5",
+              "previous quarter"
             ]
           },
-          "day_later": {
-            "what": "One day after the day it names",
+          "later": {
+            "what": "Some days, weeks, months, or years after the day written",
             "examples": [
               "the day after friday",
-              "the day after next monday"
+              "a week on friday",
+              "two weeks after tomorrow",
+              "25 days from tomorrow",
+              "10 days after june 5"
             ]
           },
-          "day_earlier": {
-            "what": "One day before the day it names",
+          "earlier": {
+            "what": "Some days, weeks, months, or years before the day written",
             "examples": [
               "the day before friday",
-              "the day before next monday"
-            ]
-          },
-          "week_later": {
-            "what": "One week after the day it names",
-            "examples": [
-              "a week on friday",
-              "a week from tuesday"
-            ]
-          },
-          "week_earlier": {
-            "what": "One week before the day it names",
-            "examples": [
-              "a week before friday"
+              "3 days before next friday",
+              "a week before june 5"
             ]
           }
         }
@@ -288,7 +292,8 @@
             "what": "Days",
             "examples": [
               "last 90 days",
-              "in 10 days"
+              "in 10 days",
+              "the day after friday"
             ]
           },
           "week": {
@@ -333,7 +338,7 @@
         "type": "choice",
         "instructions": {
           "question": "How many days, weeks, months, or years does `phrase` count?",
-          "note": "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, `90 days` is 90, and `a fortnight` is 2 weeks."
+          "note": "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, `the day after friday` is 1, `90 days` is 90, and `a fortnight` is 2 weeks."
         },
         "criteria": {
           "1": null,
@@ -441,7 +446,10 @@
       },
       "start_day": {
         "type": "choice",
-        "instructions": "Which day does `start` name?",
+        "instructions": {
+          "question": "Which day is written in `start`?",
+          "note": "Answer with the day as written, not a day counted from it: in `two weeks after tomorrow` it is tomorrow, and in `the day after friday` it is a weekday. `the day after tomorrow` and `the day before yesterday` are written days of their own."
+        },
         "criteria": {
           "today": "The current day",
           "tomorrow": "The day after today",
@@ -455,7 +463,10 @@
       },
       "start_weekday": {
         "type": "choice",
-        "instructions": "Which day of the week does `start` name?",
+        "instructions": {
+          "question": "Which day of the week is written in `start`?",
+          "note": "As written, not counted from: `the day after friday` and `3 days before next friday` are both friday."
+        },
         "criteria": {
           "monday": null,
           "tuesday": null,
@@ -469,7 +480,10 @@
       },
       "start_month": {
         "type": "choice",
-        "instructions": "Which month does `start` name?",
+        "instructions": {
+          "question": "Which month is written in `start`?",
+          "note": "As written, not counted from: `a week after june 28` is june."
+        },
         "criteria": {
           "january": null,
           "february": null,
@@ -488,7 +502,10 @@
       },
       "start_day_of_month": {
         "type": "choice",
-        "instructions": "Which day of the month does `start` name?",
+        "instructions": {
+          "question": "Which day of the month is written in `start`?",
+          "note": "As written, not counted from: `10 days after june 5` is 5. A year is not a day of the month: `august 2020` names none."
+        },
         "criteria": {
           "1": null,
           "2": null,
@@ -538,47 +555,39 @@
       "start_shift": {
         "type": "choice",
         "instructions": {
-          "question": "Does `start` shift its day by an extra amount, on top of the day it names?",
-          "note": "Words that name a day by themselves are not a shift: today, tomorrow, yesterday, the day after tomorrow, the day before yesterday, a weekday, and a weekday with this, next, or last."
+          "question": "Does `start` count some days, weeks, months, or years after or before the day written in it?",
+          "note": "A day written by itself is not counted from: today, tomorrow, yesterday, the day after tomorrow, the day before yesterday, a weekday, a weekday with this, next, last, or after next (as in `the friday after next`), a date such as june 5, and a whole week, month, quarter, or year (as in `previous quarter`)."
         },
         "criteria": {
           "none": {
-            "what": "No extra shift: the phrase names its day directly",
+            "what": "Nothing is counted from the day written",
             "examples": [
               "today",
               "tomorrow",
               "the day after tomorrow",
-              "the day before yesterday",
               "friday",
               "next friday",
-              "last friday"
+              "the friday after next",
+              "june 5",
+              "previous quarter"
             ]
           },
-          "day_later": {
-            "what": "One day after the day it names",
+          "later": {
+            "what": "Some days, weeks, months, or years after the day written",
             "examples": [
               "the day after friday",
-              "the day after next monday"
+              "a week on friday",
+              "two weeks after tomorrow",
+              "25 days from tomorrow",
+              "10 days after june 5"
             ]
           },
-          "day_earlier": {
-            "what": "One day before the day it names",
+          "earlier": {
+            "what": "Some days, weeks, months, or years before the day written",
             "examples": [
               "the day before friday",
-              "the day before next monday"
-            ]
-          },
-          "week_later": {
-            "what": "One week after the day it names",
-            "examples": [
-              "a week on friday",
-              "a week from tuesday"
-            ]
-          },
-          "week_earlier": {
-            "what": "One week before the day it names",
-            "examples": [
-              "a week before friday"
+              "3 days before next friday",
+              "a week before june 5"
             ]
           }
         }
@@ -719,7 +728,8 @@
             "what": "Days",
             "examples": [
               "last 90 days",
-              "in 10 days"
+              "in 10 days",
+              "the day after friday"
             ]
           },
           "week": {
@@ -764,7 +774,7 @@
         "type": "choice",
         "instructions": {
           "question": "How many days, weeks, months, or years does `start` count?",
-          "note": "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, `90 days` is 90, and `a fortnight` is 2 weeks."
+          "note": "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, `the day after friday` is 1, `90 days` is 90, and `a fortnight` is 2 weeks."
         },
         "criteria": {
           "1": null,
@@ -872,7 +882,10 @@
       },
       "end_day": {
         "type": "choice",
-        "instructions": "Which day does `end` name?",
+        "instructions": {
+          "question": "Which day is written in `end`?",
+          "note": "Answer with the day as written, not a day counted from it: in `two weeks after tomorrow` it is tomorrow, and in `the day after friday` it is a weekday. `the day after tomorrow` and `the day before yesterday` are written days of their own."
+        },
         "criteria": {
           "today": "The current day",
           "tomorrow": "The day after today",
@@ -886,7 +899,10 @@
       },
       "end_weekday": {
         "type": "choice",
-        "instructions": "Which day of the week does `end` name?",
+        "instructions": {
+          "question": "Which day of the week is written in `end`?",
+          "note": "As written, not counted from: `the day after friday` and `3 days before next friday` are both friday."
+        },
         "criteria": {
           "monday": null,
           "tuesday": null,
@@ -900,7 +916,10 @@
       },
       "end_month": {
         "type": "choice",
-        "instructions": "Which month does `end` name?",
+        "instructions": {
+          "question": "Which month is written in `end`?",
+          "note": "As written, not counted from: `a week after june 28` is june."
+        },
         "criteria": {
           "january": null,
           "february": null,
@@ -919,7 +938,10 @@
       },
       "end_day_of_month": {
         "type": "choice",
-        "instructions": "Which day of the month does `end` name?",
+        "instructions": {
+          "question": "Which day of the month is written in `end`?",
+          "note": "As written, not counted from: `10 days after june 5` is 5. A year is not a day of the month: `august 2020` names none."
+        },
         "criteria": {
           "1": null,
           "2": null,
@@ -969,47 +991,39 @@
       "end_shift": {
         "type": "choice",
         "instructions": {
-          "question": "Does `end` shift its day by an extra amount, on top of the day it names?",
-          "note": "Words that name a day by themselves are not a shift: today, tomorrow, yesterday, the day after tomorrow, the day before yesterday, a weekday, and a weekday with this, next, or last."
+          "question": "Does `end` count some days, weeks, months, or years after or before the day written in it?",
+          "note": "A day written by itself is not counted from: today, tomorrow, yesterday, the day after tomorrow, the day before yesterday, a weekday, a weekday with this, next, last, or after next (as in `the friday after next`), a date such as june 5, and a whole week, month, quarter, or year (as in `previous quarter`)."
         },
         "criteria": {
           "none": {
-            "what": "No extra shift: the phrase names its day directly",
+            "what": "Nothing is counted from the day written",
             "examples": [
               "today",
               "tomorrow",
               "the day after tomorrow",
-              "the day before yesterday",
               "friday",
               "next friday",
-              "last friday"
+              "the friday after next",
+              "june 5",
+              "previous quarter"
             ]
           },
-          "day_later": {
-            "what": "One day after the day it names",
+          "later": {
+            "what": "Some days, weeks, months, or years after the day written",
             "examples": [
               "the day after friday",
-              "the day after next monday"
+              "a week on friday",
+              "two weeks after tomorrow",
+              "25 days from tomorrow",
+              "10 days after june 5"
             ]
           },
-          "day_earlier": {
-            "what": "One day before the day it names",
+          "earlier": {
+            "what": "Some days, weeks, months, or years before the day written",
             "examples": [
               "the day before friday",
-              "the day before next monday"
-            ]
-          },
-          "week_later": {
-            "what": "One week after the day it names",
-            "examples": [
-              "a week on friday",
-              "a week from tuesday"
-            ]
-          },
-          "week_earlier": {
-            "what": "One week before the day it names",
-            "examples": [
-              "a week before friday"
+              "3 days before next friday",
+              "a week before june 5"
             ]
           }
         }
@@ -1150,7 +1164,8 @@
             "what": "Days",
             "examples": [
               "last 90 days",
-              "in 10 days"
+              "in 10 days",
+              "the day after friday"
             ]
           },
           "week": {
@@ -1195,7 +1210,7 @@
         "type": "choice",
         "instructions": {
           "question": "How many days, weeks, months, or years does `end` count?",
-          "note": "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, `90 days` is 90, and `a fortnight` is 2 weeks."
+          "note": "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, `the day after friday` is 1, `90 days` is 90, and `a fortnight` is 2 weeks."
         },
         "criteria": {
           "1": null,
@@ -1318,31 +1333,31 @@
       "day": {
         "type": "choice",
         "choice": "weekday",
-        "confidence": 0.49,
+        "confidence": 0.99,
         "probabilities": {
-          "today": 0.02,
+          "today": 0,
           "tomorrow": 0,
           "yesterday": 0,
-          "day_after_tomorrow": 0.01,
+          "day_after_tomorrow": 0,
           "day_before_yesterday": 0,
-          "weekday": 0.55,
+          "weekday": 0.99,
           "date": 0,
-          "none": 0.42
+          "none": 0.01
         }
       },
       "weekday": {
         "type": "choice",
         "choice": "friday",
-        "confidence": 0.93,
+        "confidence": 1,
         "probabilities": {
           "monday": 0,
           "tuesday": 0,
           "wednesday": 0,
           "thursday": 0,
-          "friday": 0.9400000000000001,
+          "friday": 1,
           "saturday": 0,
           "sunday": 0,
-          "none": 0.06
+          "none": 0
         }
       },
       "month": {
@@ -1407,37 +1422,35 @@
       "modifier": {
         "type": "choice",
         "choice": "this",
-        "confidence": 0.97,
+        "confidence": 0.94,
         "probabilities": {
-          "this": 0.98,
+          "this": 0.95,
           "next": 0,
           "after_next": 0,
           "last": 0,
-          "none": 0.02
+          "none": 0.05
         }
       },
       "shift": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.99,
+        "confidence": 0.94,
         "probabilities": {
-          "none": 0.99,
-          "day_later": 0,
-          "day_earlier": 0.01,
-          "week_later": 0,
-          "week_earlier": 0
+          "none": 0.96,
+          "later": 0.01,
+          "earlier": 0.03
         }
       },
       "period": {
         "type": "choice",
-        "choice": "week",
-        "confidence": 0.4,
+        "choice": "none",
+        "confidence": 0.47,
         "probabilities": {
-          "week": 0.52,
+          "week": 0.42,
           "month": 0,
           "quarter": 0,
           "year": 0,
-          "none": 0.48
+          "none": 0.58
         }
       },
       "period_modifier": {
@@ -1454,40 +1467,40 @@
       "counted": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.7,
+        "confidence": 0.8,
         "probabilities": {
           "span_back": 0,
-          "span_forward": 0.23,
+          "span_forward": 0.15,
           "day_back": 0,
           "day_forward": 0.01,
-          "none": 0.76
+          "none": 0.84
         }
       },
       "unit": {
         "type": "choice",
         "choice": "day",
-        "confidence": 0.24,
+        "confidence": 0.42,
         "probabilities": {
-          "day": 0.37,
-          "week": 0.33,
+          "day": 0.52,
+          "week": 0.28,
           "month": 0,
           "quarter": 0,
           "year": 0,
-          "none": 0.3
+          "none": 0.2
         }
       },
       "count": {
         "type": "choice",
-        "choice": "none",
+        "choice": "1",
         "confidence": 0.51,
         "probabilities": {
-          "1": 0.4,
+          "1": 0.51,
           "2": 0,
           "3": 0,
           "4": 0,
-          "5": 0.02,
+          "5": 0.04,
           "6": 0.02,
-          "7": 0.02,
+          "7": 0.03,
           "8": 0,
           "9": 0,
           "10": 0,
@@ -1575,43 +1588,43 @@
           "92": 0,
           "93": 0,
           "94": 0,
-          "95": 0,
-          "96": 0,
-          "97": 0,
+          "95": 0.01,
+          "96": 0.01,
+          "97": 0.01,
           "98": 0.01,
           "99": 0.01,
           "100": 0,
-          "none": 0.51
+          "none": 0.34
         }
       },
       "start_day": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.91,
+        "confidence": 0.98,
         "probabilities": {
-          "today": 0.08,
+          "today": 0.02,
           "tomorrow": 0,
           "yesterday": 0,
           "day_after_tomorrow": 0,
           "day_before_yesterday": 0,
           "weekday": 0,
           "date": 0,
-          "none": 0.92
+          "none": 0.98
         }
       },
       "start_weekday": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.94,
+        "confidence": 1,
         "probabilities": {
-          "monday": 0.03,
+          "monday": 0,
           "tuesday": 0,
           "wednesday": 0,
           "thursday": 0,
           "friday": 0,
           "saturday": 0,
-          "sunday": 0.02,
-          "none": 0.95
+          "sunday": 0,
+          "none": 1
         }
       },
       "start_month": {
@@ -1676,25 +1689,23 @@
       "start_modifier": {
         "type": "choice",
         "choice": "this",
-        "confidence": 0.94,
+        "confidence": 0.91,
         "probabilities": {
-          "this": 0.95,
+          "this": 0.93,
           "next": 0,
           "after_next": 0,
           "last": 0,
-          "none": 0.05
+          "none": 0.07
         }
       },
       "start_shift": {
         "type": "choice",
         "choice": "none",
-        "confidence": 1,
+        "confidence": 0.98,
         "probabilities": {
-          "none": 1,
-          "day_later": 0,
-          "day_earlier": 0,
-          "week_later": 0,
-          "week_earlier": 0
+          "none": 0.99,
+          "later": 0.01,
+          "earlier": 0
         }
       },
       "start_period": {
@@ -1735,22 +1746,22 @@
       "start_unit": {
         "type": "choice",
         "choice": "week",
-        "confidence": 0.87,
+        "confidence": 0.92,
         "probabilities": {
           "day": 0.02,
-          "week": 0.89,
+          "week": 0.93,
           "month": 0,
           "quarter": 0,
           "year": 0,
-          "none": 0.09
+          "none": 0.05
         }
       },
       "start_count": {
         "type": "choice",
         "choice": "1",
-        "confidence": 0.76,
+        "confidence": 0.81,
         "probabilities": {
-          "1": 0.76,
+          "1": 0.81,
           "2": 0,
           "3": 0,
           "4": 0,
@@ -1850,7 +1861,7 @@
           "98": 0.01,
           "99": 0.01,
           "100": 0,
-          "none": 0.22
+          "none": 0.16
         }
       },
       "end_day": {
@@ -1906,13 +1917,13 @@
       "end_day_of_month": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.99,
+        "confidence": 1,
         "probabilities": {
           "1": 0,
           "2": 0,
           "3": 0,
           "4": 0,
-          "5": 0.01,
+          "5": 0,
           "6": 0,
           "7": 0,
           "8": 0,
@@ -1939,19 +1950,19 @@
           "29": 0,
           "30": 0,
           "31": 0,
-          "none": 0.99
+          "none": 1
         }
       },
       "end_modifier": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.79,
+        "confidence": 0.84,
         "probabilities": {
-          "this": 0.17,
+          "this": 0.13,
           "next": 0,
           "after_next": 0,
           "last": 0,
-          "none": 0.83
+          "none": 0.87
         }
       },
       "end_shift": {
@@ -1960,10 +1971,8 @@
         "confidence": 1,
         "probabilities": {
           "none": 1,
-          "day_later": 0,
-          "day_earlier": 0,
-          "week_later": 0,
-          "week_earlier": 0
+          "later": 0,
+          "earlier": 0
         }
       },
       "end_period": {
@@ -2003,23 +2012,23 @@
       },
       "end_unit": {
         "type": "choice",
-        "choice": "none",
-        "confidence": 0.56,
+        "choice": "day",
+        "confidence": 0.47,
         "probabilities": {
-          "day": 0.37,
+          "day": 0.56,
           "week": 0,
           "month": 0,
           "quarter": 0,
           "year": 0,
-          "none": 0.63
+          "none": 0.44
         }
       },
       "end_count": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.86,
+        "confidence": 0.74,
         "probabilities": {
-          "1": 0.11,
+          "1": 0.22,
           "2": 0,
           "3": 0,
           "4": 0,
@@ -2114,22 +2123,22 @@
           "93": 0,
           "94": 0,
           "95": 0,
-          "96": 0,
+          "96": 0.01,
           "97": 0.01,
           "98": 0.01,
           "99": 0.01,
           "100": 0,
-          "none": 0.86
+          "none": 0.74
         }
       },
       "is_range": {
         "type": "noul",
-        "noul": 0.9
+        "noul": 0.91
       }
     },
     "usage": {
-      "input_tokens": 9432,
-      "output_tokens": 5065
+      "input_tokens": 10068,
+      "output_tokens": 4996
     }
   }
 }

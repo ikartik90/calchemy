@@ -18,12 +18,12 @@ describe("treeFromAnswers", () => {
       month: { choice: "none", confidence: 1 },
       day_of_month: { choice: "none", confidence: 1 },
       modifier: { choice: "none", confidence: 0.76 },
-      shift: { choice: "week_later", confidence: 0.96 },
+      shift: { choice: "later", confidence: 0.96 },
       period: { choice: "none", confidence: 1 },
       period_modifier: { choice: "none", confidence: 1 },
       counted: { choice: "none", confidence: 1 },
-      unit: { choice: "none", confidence: 1 },
-      count: { choice: "none", confidence: 1 },
+      unit: { choice: "week", confidence: 0.88 },
+      count: { choice: "1", confidence: 0.91 },
     };
 
     expect(treeFromAnswers(answers)?.confidence).toBe(0.76);

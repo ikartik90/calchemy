@@ -130,3 +130,13 @@ next ninety days
 3 quarters from now
 2 yrs from now
 a fortnight from now
+
+# Counts from another day
+two weeks after tomorrow
+25 days from tomorrow
+three weeks from today
+two weeks after friday
+10 days after june 5
+3 days before next friday
+the day after friday
+a week before june 5

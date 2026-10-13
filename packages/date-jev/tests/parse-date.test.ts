@@ -22,6 +22,9 @@ describe("parseDate", () => {
     ["a week on friday", { kind: "single", date: "2026-06-05" }], // this friday plus a week, decided by the user
     ["day after tomorrow", { kind: "single", date: "2026-05-29" }],
     ["day before yesterday", { kind: "single", date: "2026-05-25" }],
+    ["two weeks after tomorrow", { kind: "single", date: "2026-06-11" }],
+    ["25 days from tomorrow", { kind: "single", date: "2026-06-22" }], // one day, decided by the user
+    ["the day after friday", { kind: "single", date: "2026-05-30" }], // this friday plus a day, like `a week on friday`
     ["jul 1", { kind: "single", date: "2026-07-01" }],
     ["jan 5", { kind: "single", date: "2026-01-05" }], // this year, even though it has passed
     ["march 15 2020", { kind: "single", date: "2020-03-15" }],
