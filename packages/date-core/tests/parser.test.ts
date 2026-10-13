@@ -292,10 +292,35 @@ describe("parseDate", () => {
     }
   });
 
-  test("keeps floating range endpoints invalid when they resolve before the start", () => {
-    const result = calchemy.parseDate("12 weeks from tomorrow until the end of Q2", context);
+  // Decided by the user: an end with no year, month, or week of its own counts forward from the
+  // start, so it lands on the first matching day, month, or quarter on or after it.
+  test.each<[string, DateValueJSON]>([
+    ["12 weeks from tomorrow until the end of Q2", { kind: "range", start: "2026-08-20", end: "2027-06-30" }],
+    ["tomorrow until march", { kind: "range", start: "2026-05-28", end: "2027-03-31" }],
+    ["dec 20 until jan 3", { kind: "range", start: "2026-12-20", end: "2027-01-03" }],
+    ["from dec 20 to jan 3", { kind: "range", start: "2026-12-20", end: "2027-01-03" }],
+    ["tomorrow until the 5th", { kind: "range", start: "2026-05-28", end: "2026-06-05" }],
+  ])("counts the floating end of %s forward from its start", (input, expected) => {
+    const result = calchemy.parseDate(input, context);
 
-    expect(result.status).toBe("invalid");
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual(expected);
+    }
+  });
+
+  // Every Monday from Mon 1 June 2026 to Mon 29 March 2027: 301 days apart, so 44 Mondays.
+  test("counts a floating end forward inside a sampled range", () => {
+    const result = calchemy.parseDate("Every monday from tomorrow up to the end of march", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      const value = calchemy.toJSON(result.value);
+      expect(value.kind).toBe("multiple");
+      if (value.kind === "multiple") {
+        expect([value.dates[0], value.dates.at(-1), value.dates.length]).toEqual(["2026-06-01", "2027-03-29", 44]);
+      }
+    }
   });
 
   test.each([
@@ -570,12 +595,6 @@ describe("parseDate", () => {
         ],
       });
     }
-  });
-
-  test("keeps sampled ranges invalid when floating upper-bound endpoints resolve before the start", () => {
-    const result = calchemy.parseDate("Every monday from tomorrow up to the end of march", context);
-
-    expect(result.status).toBe("invalid");
   });
 
   test("selects weekdays from an explicit start through an explicit-year upper-bound endpoint", () => {
@@ -2802,19 +2821,10 @@ describe("inline completions", () => {
     });
   });
 
-  test("suggests an explicit next calendar cycle for invalid floating range endpoints", () => {
-    const input = "12 weeks from tomorrow until the end of Q2";
-
-    expect(calchemy.getInlineCompletion(input, context)).toEqual({
-      value: "12 weeks from tomorrow until the end of Q2 2027",
-      suffix: " 2027",
-      sourceId: "calendar-cycle",
-    });
-    expect(calchemy.getInlineCompletion("Every monday from tomorrow up to the end of march", context)).toEqual({
-      value: "Every monday from tomorrow up to the end of march 2027",
-      suffix: " 2027",
-      sourceId: "calendar-cycle",
-    });
+  // A floating end counts forward from the start, so these phrases read as written and need no year.
+  test("offers no year for a floating range end", () => {
+    expect(calchemy.getInlineCompletion("12 weeks from tomorrow until the end of Q2", context)).toBeNull();
+    expect(calchemy.getInlineCompletion("Every monday from tomorrow up to the end of march", context)).toBeNull();
     expect(calchemy.getInlineCompletion("12 weeks from tomorrow until the end of Q2 2027", context)).toBeNull();
   });
 });

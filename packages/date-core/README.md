@@ -44,9 +44,11 @@ A sample of accepted phrasings, each pinned by the test corpus. The reference da
 | `all weekdays in october excluding holidays`, `next week except tomorrow` | multiple dates with exclusions |
 | `2020 august`, `august all days`, `august mondays` | the same as `august 2020`, `all days in august`, `mondays in august`; a year or a day pattern may sit on either side of its range |
 | `board meeting`, `board meeting in q3`, `holidays in december` | the dates of a configured named set; only those inside the period when one is given |
+| `tomorrow until march`, `dec 20 until jan 3`, `tomorrow until the 5th` | a range whose end, written without a year or month, is the first one on or after the start: March 2027, January 3, 2027, and June 5 |
 | `m13`, `q5`, `week 60` | a month, quarter, or week number past the calendar rolls into the next year (`m13` is January 2027); written with a year, as in `m13 2026`, it is an error |
 | `29 feb 2027` | an `impossible-date` error suggesting `2027-02-28` and `2028-02-29` |
 | `03/04/25` | an `ambiguous` result with one candidate per date order |
+| `apr 15`, `june 27` | an `ambiguous` result: that day this year, or all of April 2015 or June 2027 |
 
 ## Configuring calchemy options
 
@@ -125,7 +127,7 @@ When a phrase cannot be read, the result is `{ status: "invalid", errors: [...] 
 | You type | `code` | `message` |
 | --- | --- | --- |
 | `nxt week` | `unsupported-expression` | Calchemy does not understand "nxt". Did you mean "next"? |
-| `tomorrow until march` (in May 2026) | `unsupported-expression` | This range ends before it starts: it runs from 2026-05-28 to 2026-03-31. Add a year to the end, for example "tomorrow until march 2027". |
+| `tomorrow until yesterday` (in May 2026) | `unsupported-expression` | This range ends before it starts: it runs from 2026-05-28 to 2026-05-26. Swap the two ends. |
 | `mondays in` | `unsupported-expression` | "in" needs a period after it, for example "mondays in june". |
 | `in 3` | `unsupported-expression` | "3" needs a unit such as days, weeks, or months, for example "in 3 days". |
 | `the 32nd` | `unsupported-expression` | There is no 32nd day in any month. Days run from 1st to 31st. |
@@ -138,7 +140,7 @@ An error may also carry:
 
 - `token` — where in the input the problem is (`start`/`end` offsets and the `raw` text), for underlining.
 - `suggestions` — real ISO dates to offer when the phrase names a date that does not exist, as for `29 feb 2027`.
-- `suggestedInput` — a rewritten phrase that parses, such as `tomorrow until march 2027` or `2020-03-15`, for a one-click fix.
+- `suggestedInput` — a rewritten phrase that parses, such as `every other day in june` or `2020-03-15`, for a one-click fix.
 
 ## Form and JSON values
 
