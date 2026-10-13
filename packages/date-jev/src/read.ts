@@ -190,7 +190,7 @@ export type DateAnswers = {
   month: { choice: MonthOption; confidence: number };
   day_of_month: { choice: DayOfMonthOption; confidence: number };
   /** One of the numbers written in the text, or `none`. Absent when the text has no numbers. */
-  year?: { choice: string; confidence: number };
+  year?: { choice: string; confidence: number; probabilities?: Readonly<Record<string, number>> };
   modifier: { choice: ModifierOption; confidence: number };
   shift: { choice: ShiftOption; confidence: number };
   period: { choice: PeriodOption; confidence: number };
@@ -333,15 +333,56 @@ export function rangeQuestions(split: RangeSplit) {
 export type Reading = {
   slice: DateSlice;
   confidence: number;
+  /** Set on each of several competing readings: its candidate id, and how strongly Jev leans to it. */
+  alternative?: { id: string; weight: number };
 };
 
 // A split phrase that Jev confirms as a stretch of days reads as a range of its two ends. Without
-// a split, or when Jev says it is not a range, the phrase reads whole.
-export function readAnswers(answers: Readonly<Record<string, unknown>>, split: boolean): Reading | null {
+// a split, or when Jev says it is not a range, the phrase reads whole, sometimes two ways at once.
+// An empty list means date-jev cannot read the phrase.
+export function readAnswers(answers: Readonly<Record<string, unknown>>, input: string, split: boolean): Reading[] {
   const isRange = split ? (answers.is_range as { noul: number }).noul : 0;
-  return isRange >= 0.5
-    ? rangeFromAnswers(answersFor(answers, "start"), answersFor(answers, "end"), isRange)
-    : treeFromAnswers(answersFor(answers, "phrase"));
+  if (isRange >= 0.5) {
+    const range = rangeFromAnswers(answersFor(answers, "start"), answersFor(answers, "end"), isRange);
+    return range ? [range] : [];
+  }
+
+  const whole = answersFor(answers, "phrase");
+  const tree = treeFromAnswers(whole);
+  return dayOrYearReadings(whole, input) ?? (tree ? [tree] : []);
+}
+
+// Example: `dayOrYearReadings(answers, "june 27")` returns June 27 this year and all of June 2027.
+// A month followed by a two-digit number from 13 to 31 reads as either, as in date-core and decided
+// by the user; the caller keeps whichever names a real date, so `feb 30` is February 2030. Jev's
+// year answer says how strongly it leans to each. Its day answer plays no part: Jev doubts that
+// `feb 30` names a day at all.
+function dayOrYearReadings(answers: DateAnswers, input: string): Reading[] | null {
+  const written = /\s(\d{2})$/.exec(input.trim())?.[1];
+  const month = answers.month.choice;
+  const dayOfMonth = answers.day_of_month.choice;
+  const year = answers.year?.choice ?? "none";
+  // The number must be the only day or year named: `6 mar 27` is March 6, 2027.
+  const numberIsDayOrYear =
+    (dayOfMonth === written && (year === "none" || year === written)) || (dayOfMonth === "none" && year === written);
+  const twoDigitDay = Number(written) >= 13 && Number(written) <= 31;
+  if (!written || !twoDigitDay || month === "none" || !numberIsDayOrYear || answers.shift.choice !== "none") {
+    return null;
+  }
+
+  const used = [answers.month, answers.shift];
+  const probabilities = answers.year?.probabilities ?? {};
+  const range = { kind: "month-range", month: Months[month], year: { kind: "anchor" } } as const;
+  return [
+    {
+      ...reading({ kind: "ordinal-day-in-range", day: Number(written), range }, used),
+      alternative: { id: "month-day", weight: probabilities.none ?? 0 },
+    },
+    {
+      ...reading({ ...range, year: { kind: "explicit", year: Number(written) } }, used),
+      alternative: { id: "month-year", weight: probabilities[written] ?? 0 },
+    },
+  ];
 }
 
 // The SDK cannot type answers under computed keys; each one is an answer to a question built
@@ -360,8 +401,9 @@ export function treeFromAnswers(answers: DateAnswers): Reading | null {
 // Example: `rangeFromAnswers(today, friday, 0.98)` reads `today until friday` from its two ends.
 // The range is only as sure as Jev's answer that it is one, and as each end.
 export function rangeFromAnswers(start: DateAnswers, end: DateAnswers, isRange: number): Reading | null {
-  const from = boundaryFromAnswers(start);
-  const to = boundaryFromAnswers(withStartMonth(end, start));
+  const pieces = shareMonth(start, end);
+  const from = pieces && boundaryFromAnswers(pieces.start);
+  const to = pieces && boundaryFromAnswers(pieces.end);
   if (!from || !to) {
     return null;
   }
@@ -377,26 +419,40 @@ export function rangeFromAnswers(start: DateAnswers, end: DateAnswers, isRange: 
 }
 
 // Example: in `aug 10-14` the end names only the 14th, so it takes August, and any year, from the
-// start. An earlier day keeps no month and counts forward from the start, so `dec 28-3` ends on
-// January 3. An end with its own year, as in `aug 10-14 2027`, keeps no month and is unreadable.
-function withStartMonth(end: DateAnswers, start: DateAnswers): DateAnswers {
-  const endDay = end.day_of_month.choice;
-  const startDay = start.day_of_month.choice;
-  const borrows =
-    end.day.choice === "date" &&
-    end.month.choice === "none" &&
-    (end.year?.choice ?? "none") === "none" &&
-    start.month.choice !== "none" &&
-    endDay !== "none" &&
-    startDay !== "none" &&
-    Number(endDay) >= Number(startDay);
-
-  if (!borrows) {
-    return end;
+// start; in `10-14 aug` the start takes them from the end. An earlier end day keeps no month and
+// counts forward from the start, so `dec 28-3` ends on January 3. A later start day, as in
+// `28-3 jan`, has no month to take, so the range is unreadable. A piece with its own year, as in
+// `aug 10-14 2027`, keeps no month and is unreadable.
+function shareMonth(start: DateAnswers, end: DateAnswers): { start: DateAnswers; end: DateAnswers } | null {
+  if (namesOnlyADay(end) && start.month.choice !== "none" && dayNumber(end) >= dayNumber(start)) {
+    return { start, end: withMonthOf(end, start) };
   }
 
-  const startYear = start.year?.choice === "none" ? undefined : start.year;
-  return { ...end, month: start.month, ...(startYear ? { year: startYear } : {}) };
+  if (namesOnlyADay(start) && end.month.choice !== "none") {
+    return dayNumber(start) <= dayNumber(end) ? { start: withMonthOf(start, end), end } : null;
+  }
+
+  return { start, end };
+}
+
+// A piece such as `14` or `the 14th`: a day of the month with no month or year.
+function namesOnlyADay(answers: DateAnswers): boolean {
+  return (
+    answers.day.choice === "date" &&
+    answers.month.choice === "none" &&
+    answers.day_of_month.choice !== "none" &&
+    (answers.year?.choice ?? "none") === "none"
+  );
+}
+
+// NaN when the piece names no day of the month, so every comparison with it is false.
+function dayNumber(answers: DateAnswers): number {
+  return Number(answers.day_of_month.choice);
+}
+
+function withMonthOf(piece: DateAnswers, other: DateAnswers): DateAnswers {
+  const year = other.year?.choice === "none" ? undefined : other.year;
+  return { ...piece, month: other.month, ...(year ? { year } : {}) };
 }
 
 // A piece is read as a day when Jev names one, then as a count from today, then as a named month,

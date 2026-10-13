@@ -55,7 +55,24 @@ describe("treeFromAnswers", () => {
       unit: { choice: "week", confidence: 1 },
     });
 
-    expect(readAnswers(answers, false)).toBeNull();
+    expect(readAnswers(answers, "next two weeks", false)).toEqual([]);
+  });
+
+  test("a start that names a later day than its end takes no month from it", () => {
+    // `28-3 jan`: the 28th cannot be in January before the 3rd, and nothing else names its month.
+    const date = { choice: "date", confidence: 1 } as const;
+    const answers = {
+      ...answersFor("", {}),
+      ...answersFor("start_", { day: date, day_of_month: { choice: "28", confidence: 1 } }),
+      ...answersFor("end_", {
+        day: date,
+        month: { choice: "january", confidence: 1 },
+        day_of_month: { choice: "3", confidence: 1 },
+      }),
+      is_range: { type: "noul", noul: 0.9 },
+    };
+
+    expect(readAnswers(answers, "28-3 jan", true)).toEqual([]);
   });
 
   test("a range whose end cannot be read is unreadable, not read whole", () => {
@@ -68,6 +85,6 @@ describe("treeFromAnswers", () => {
       is_range: { type: "noul", noul: 0.95 },
     };
 
-    expect(readAnswers(answers, true)).toBeNull();
+    expect(readAnswers(answers, "today until friday", true)).toEqual([]);
   });
 });
