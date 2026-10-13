@@ -1,0 +1,142 @@
+# Phrases for `pnpm compare-engines`, one per line. Lines starting with # are comments.
+# Grow this list as date-jev learns new shapes; disagreements are leads, not answers.
+
+# Pinned in date-core's corpus
+today
+tomorrow
+tuesday
+this friday
+next friday
+last friday
+previous friday
+
+# The same days, worded differently
+yesterday
+the day after tomorrow
+the day before yesterday
+tmrw
+tommorow
+wensday
+thrusday
+fri
+nxt friday
+coming friday
+this coming friday
+friday next week
+the friday after next
+a week on friday
+friday week
+next monday
+monday next week
+monday of next week
+sunday just gone
+
+# Inside a sentence
+can we meet next tuesday?
+by friday
+due friday
+
+# Not a single day
+next month
+excluding holidays
+banana
+
+# Calendar periods
+this week
+next week
+last week
+last month
+next quarter
+this year
+
+# Two-ended ranges
+today until friday
+tomorrow to next friday
+from today till next month
+monday through friday
+from next monday to next friday
+tomorrow until end of next month
+
+# Calendar dates
+jul 1
+jan 5
+march 15 2020
+6 mar 27
+5th nov
+nov 5th
+the 5th of november
+november fifth
+3rd of jan 2027
+15 march, 2020
+sept 3
+feburary 14
+novmber 5
+june 27
+feb 30
+jan 15
+nov 30
+june 31
+27 june
+june 27th
+the 15th
+
+# Months on their own
+april
+august 2020
+next april
+last june
+this april
+can we meet on june 5?
+
+# Calendar date ranges
+june 5 to june 10
+aug 15 to sep 30
+from dec 20 until jan 3
+aug 10-14
+june 5-10
+aug 10 - 14
+aug 31-sep 2
+monday-friday
+10-14 aug
+dec 28-3
+
+# Floating range ends, counted forward from the start
+tomorrow until march
+tomorrow until the 5th
+monday until friday
+apr 1 until the 20th
+this week until friday
+next week until march
+jan 2025 until march
+next month until christmas
+25 days from tomorrow until the end of june
+
+# Counted ranges
+last 90 days
+next 10 days
+within 2 weeks
+past 2 weeks
+last 3 months
+the last 7 days
+over the next 30 days
+in the past 6 months
+next 2 years
+next two weeks
+in 10 days
+2 months ago
+in a week
+three weeks from now
+next ninety days
+3 quarters from now
+2 yrs from now
+a fortnight from now
+
+# Counts from another day
+two weeks after tomorrow
+25 days from tomorrow
+three weeks from today
+two weeks after friday
+10 days after june 5
+3 days before next friday
+the day after friday
+a week before june 5

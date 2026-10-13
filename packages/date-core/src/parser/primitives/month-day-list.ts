@@ -33,7 +33,7 @@ export function findNestedPastMonthDayYear(
     return null;
   }
 
-  const monthDayPattern = `\\b(${monthNames.join("|")}) (\\d{1,2})(?:st|nd|rd|th)?\\b`;
+  const monthDayPattern = `\\b(${monthNames.join("|")}) (\\d{1,2})(st|nd|rd|th)?\\b`;
 
   // A phrase with two or more `<month> <day>` expressions is a concrete date range or list
   // (e.g. `between aug 15 and sep 30`), so the numbers are calendar days rather than a
@@ -44,7 +44,8 @@ export function findNestedPastMonthDayYear(
 
   const pattern = new RegExp(monthDayPattern);
   const match = pattern.exec(input);
-  if (!match?.[1] || !match[2]) {
+  // Only bare digits can be a two-digit year: `apr 15th` names a day, as the user decided.
+  if (!match?.[1] || !match[2] || match[3]) {
     return null;
   }
 
@@ -87,7 +88,7 @@ export function parseMonthDayYearResult(
   const { month, day } = parsed;
   const anchorYear = context.referenceDate.year;
   const expandedYear = expandTwoDigitYear(day, anchorYear);
-  if (day <= 12 || day > 31 || expandedYear >= anchorYear) {
+  if (day <= 12 || day > 31) {
     return null;
   }
 
@@ -173,6 +174,11 @@ function parseSingleMonthDayExpression(
   }
 
   if (dayChunk?.kind !== "number" && dayChunk?.kind !== "ordinal") {
+    return null;
+  }
+
+  // Only bare digits can be a two-digit year: `june 27th` names a day, as the user decided.
+  if (!/^\d+$/.test(dayChunk.token.raw)) {
     return null;
   }
 

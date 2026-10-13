@@ -39,7 +39,6 @@ function collectAtomInputs(boundary: BoundarySlice): string[] {
       return collectAtomInputsFromEndpoint(boundary.end);
     case "boundary-side":
       return collectAtomInputs(boundary.boundary);
-    case "duration-from-anchor":
     case "duration-near-boundary":
     case "ordinal-unit-from-anchor":
     case "ordinal-weekday-from-anchor":

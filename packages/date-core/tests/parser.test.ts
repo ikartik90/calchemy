@@ -97,8 +97,8 @@ describe("parseDate", () => {
     ["last day of next month", { kind: "single", date: "2026-06-30" }],
     ["third sunday of the next month", { kind: "single", date: "2026-06-21" }],
     ["third monday next quarter", { kind: "single", date: "2026-07-20" }],
-    ["first monday from this monday", { kind: "single", date: "2026-06-01" }],
-    ["third monday from this monday", { kind: "single", date: "2026-06-15" }],
+    ["first monday from this monday", { kind: "single", date: "2026-05-25" }], // `this monday` = monday of this week; the anchor counts as the first
+    ["third monday from this monday", { kind: "single", date: "2026-06-08" }],
     ["3rd monday from tomorrow", { kind: "single", date: "2026-06-15" }],
     ["three mondays from last monday until jun 25", { kind: "range", start: "2026-06-08", end: "2026-06-25" }],
     ["three mondays before last friday until jun 25", { kind: "range", start: "2026-05-04", end: "2026-06-25" }],
@@ -116,7 +116,9 @@ describe("parseDate", () => {
     // (from today, inclusive), not a span of working weeks.
     ["next 10 weekdays", { kind: "multiple", dates: ["2026-05-27", "2026-05-28", "2026-05-29", "2026-06-01", "2026-06-02", "2026-06-03", "2026-06-04", "2026-06-05", "2026-06-08", "2026-06-09"] }],
     ["future 2 weeks", { kind: "range", start: "2026-05-27", end: "2026-06-09" }],
-    ["25 days from tomorrow", { kind: "range", start: "2026-05-28", end: "2026-06-22" }],
+    // Decided by the user: `N units from <a day>` is one day, the same as `N units after <a day>`.
+    ["25 days from tomorrow", { kind: "single", date: "2026-06-22" }],
+    ["three weeks from today", { kind: "single", date: "2026-06-17" }], // = `three weeks from now`
     ["three weeks from today until aug 15", { kind: "range", start: "2026-06-17", end: "2026-08-15" }],
     ["25 days from tomorrow until the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
     ["25 days from tomorrow till the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
@@ -124,6 +126,8 @@ describe("parseDate", () => {
     ["25 days from tomorrow upto the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
     ["25 days from tomorrow to the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
     ["tomorrow until end of next month", { kind: "range", start: "2026-05-28", end: "2026-06-30" }],
+    ["today until next month", { kind: "range", start: "2026-05-27", end: "2026-06-30" }],
+    ["tomorrow until aug 15", { kind: "range", start: "2026-05-28", end: "2026-08-15" }],
     // Mondays from 28 Dec 2026 to Easter Sunday 28 Mar 2027.
     ["mondays between christmas this year and easter next year", { kind: "multiple", dates: ["2026-12-28", "2027-01-04", "2027-01-11", "2027-01-18", "2027-01-25", "2027-02-01", "2027-02-08", "2027-02-15", "2027-02-22", "2027-03-01", "2027-03-08", "2027-03-15", "2027-03-22"] }],
     ["3rd quarter until the end of the year.", { kind: "range", start: "2026-07-01", end: "2026-12-31" }],
@@ -140,7 +144,7 @@ describe("parseDate", () => {
     ["third quarter from christmas this year", { kind: "range", start: "2027-07-01", end: "2027-09-30" }],
     ["second year from today", { kind: "range", start: "2028-01-01", end: "2028-12-31" }],
     ["second year from jul 1, 27", { kind: "range", start: "2029-01-01", end: "2029-12-31" }],
-    ["12 weeks from 6 mar, 27", { kind: "range", start: "2027-03-06", end: "2027-05-29" }],
+    ["12 weeks from 6 mar, 27", { kind: "single", date: "2027-05-29" }], // one day, decided by the user
     ["12 weeks from 6 mar, 27 until end of q3 27", { kind: "range", start: "2027-05-29", end: "2027-09-30" }],
     ["first 10 days of next month", { kind: "range", start: "2026-06-01", end: "2026-06-10" }],
     ["last 20 days of the next month", { kind: "range", start: "2026-06-11", end: "2026-06-30" }],
@@ -155,6 +159,8 @@ describe("parseDate", () => {
     ["between christmas and jul 1 2027", { kind: "range", start: "2026-12-25", end: "2027-07-01" }],
     ["between aug 15 and sep 30", { kind: "range", start: "2026-08-15", end: "2026-09-30" }],
     ["from aug 15 to sep 30", { kind: "range", start: "2026-08-15", end: "2026-09-30" }],
+    // `from` names where the range begins, so a whole month starts on its first day.
+    ["from june to august", { kind: "range", start: "2026-06-01", end: "2026-08-31" }],
     ["Q1", { kind: "range", start: "2026-01-01", end: "2026-03-31" }],
     ["q2", { kind: "range", start: "2026-04-01", end: "2026-06-30" }],
     ["Q3 2027", { kind: "range", start: "2027-07-01", end: "2027-09-30" }],
@@ -183,7 +189,6 @@ describe("parseDate", () => {
     ["m8-m12", { kind: "range", start: "2026-08-01", end: "2026-12-31" }],
     ["q1-q3", { kind: "range", start: "2026-01-01", end: "2026-09-30" }],
     ["Q3 27", { kind: "range", start: "2027-07-01", end: "2027-09-30" }],
-    ["june 27", { kind: "range", start: "2027-06-01", end: "2027-06-30" }],
     ["start of q3", { kind: "single", date: "2026-07-01" }],
     ["end of q3", { kind: "single", date: "2026-09-30" }],
     ["end of june 27", { kind: "single", date: "2027-06-30" }],
@@ -293,10 +298,53 @@ describe("parseDate", () => {
     }
   });
 
-  test("keeps floating range endpoints invalid when they resolve before the start", () => {
-    const result = calchemy.parseDate("12 weeks from tomorrow until the end of Q2", context);
+  // Decided by the user: an end with no year, month, or week of its own counts forward from the
+  // start, so it is the first matching day, month, or quarter on or after it.
+  test.each<[string, DateValueJSON]>([
+    ["12 weeks from tomorrow until the end of Q2", { kind: "range", start: "2026-08-20", end: "2027-06-30" }],
+    ["tomorrow until march", { kind: "range", start: "2026-05-28", end: "2027-03-31" }],
+    ["dec 20 until jan 3", { kind: "range", start: "2026-12-20", end: "2027-01-03" }],
+    ["from dec 20 to jan 3", { kind: "range", start: "2026-12-20", end: "2027-01-03" }],
+    ["tomorrow until the 5th", { kind: "range", start: "2026-05-28", end: "2026-06-05" }],
+    // The first match on or after the start, even when today's would also come after it.
+    ["apr 1 until the 20th", { kind: "range", start: "2026-04-01", end: "2026-04-20" }],
+    ["from jan 2025 to march", { kind: "range", start: "2025-01-01", end: "2025-03-31" }],
+  ])("counts the floating end of %s forward from its start", (input, expected) => {
+    const result = calchemy.parseDate(input, context);
 
-    expect(result.status).toBe("invalid");
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual(expected);
+    }
+  });
+
+  // Decided by the user: a whole week, month, or year before `until` starts the range at its
+  // beginning. A count such as `25 days from tomorrow until …` still starts 25 days out.
+  test.each<[string, DateValueJSON]>([
+    ["this week until friday", { kind: "range", start: "2026-05-24", end: "2026-05-29" }],
+    ["next week until march", { kind: "range", start: "2026-05-31", end: "2027-03-31" }],
+    ["jan 2025 until march", { kind: "range", start: "2025-01-01", end: "2025-03-31" }],
+  ])("starts %s at the beginning of its first period", (input, expected) => {
+    const result = calchemy.parseDate(input, context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual(expected);
+    }
+  });
+
+  // Every Monday from Mon 1 June 2026 to Mon 29 March 2027: 301 days apart, so 44 Mondays.
+  test("counts a floating end forward inside a sampled range", () => {
+    const result = calchemy.parseDate("Every monday from tomorrow up to the end of march", context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      const value = calchemy.toJSON(result.value);
+      expect(value.kind).toBe("multiple");
+      if (value.kind === "multiple") {
+        expect([value.dates[0], value.dates.at(-1), value.dates.length]).toEqual(["2026-06-01", "2027-03-29", 44]);
+      }
+    }
   });
 
   test.each([
@@ -306,12 +354,31 @@ describe("parseDate", () => {
     ["previous friday", { kind: "single", date: "2026-05-22" }],
     ["this wednesday", { kind: "single", date: "2026-05-27" }],
     ["next wednesday", { kind: "single", date: "2026-06-03" }],
+    ["this monday", { kind: "single", date: "2026-05-25" }], // monday of this week, even when it has passed
+    ["next monday", { kind: "single", date: "2026-06-01" }], // = `monday of next week`
+    ["this sunday", { kind: "single", date: "2026-05-24" }], // weeks start on sunday here, so this week's sunday has passed
+    ["next sunday", { kind: "single", date: "2026-05-31" }],
     ["this day", { kind: "single", date: "2026-05-27" }],
     ["next day", { kind: "single", date: "2026-05-28" }],
     ["last day", { kind: "single", date: "2026-05-26" }],
     ["previous day", { kind: "single", date: "2026-05-26" }],
   ] satisfies Array<[string, DateValueJSON]>)("parses relative weekday %s", (input, expected) => {
     const result = calchemy.parseDate(input, context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual(expected);
+    }
+  });
+
+  // With monday-start weeks, this week runs May 25 to 31, so its sunday is still ahead.
+  test.each([
+    ["this sunday", { kind: "single", date: "2026-05-31" }],
+    ["next sunday", { kind: "single", date: "2026-06-07" }],
+    ["this monday", { kind: "single", date: "2026-05-25" }],
+    ["next monday", { kind: "single", date: "2026-06-01" }],
+  ] satisfies Array<[string, DateValueJSON]>)("reads %s in the week the context starts on monday", (input, expected) => {
+    const result = calchemy.parseDate(input, { ...context, weekStartsOn: 1 });
 
     expect(result.status).toBe("valid");
     if (result.status === "valid") {
@@ -552,12 +619,6 @@ describe("parseDate", () => {
         ],
       });
     }
-  });
-
-  test("keeps sampled ranges invalid when floating upper-bound endpoints resolve before the start", () => {
-    const result = calchemy.parseDate("Every monday from tomorrow up to the end of march", context);
-
-    expect(result.status).toBe("invalid");
   });
 
   test("selects weekdays from an explicit start through an explicit-year upper-bound endpoint", () => {
@@ -2290,6 +2351,35 @@ describe("parseDate", () => {
     }
   });
 
+  // Decided by the user: a coming year is as ambiguous as a past one. `june 27` could be the 27th
+  // or all of June 2027. Only a day the month lacks, as in `feb 30`, leaves the year reading alone.
+  test("returns ambiguity for month day shorthands that could be a coming two-digit year", () => {
+    const result = calchemy.parseDate("june 27", context);
+
+    expect(result.status).toBe("ambiguous");
+    if (result.status === "ambiguous") {
+      expect(result.ambiguityGroups[0]?.kind).toBe("month-day-year");
+      expect(result.candidates.map((candidate) => calchemy.toJSON(candidate.value))).toEqual([
+        { kind: "single", date: "2026-06-27" },
+        { kind: "range", start: "2027-06-01", end: "2027-06-30" },
+      ]);
+    }
+  });
+
+  // Decided by the user: an ordinal such as `27th` always names a day, so only bare digits can be a year.
+  test.each([
+    ["june 27th", "2026-06-27"],
+    ["june the 27th", "2026-06-27"],
+    ["apr 15th", "2026-04-15"],
+  ])("reads %s as the day alone", (input, date) => {
+    const result = calchemy.parseDate(input, context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({ kind: "single", date });
+    }
+  });
+
   test("returns ambiguity for scoped sampler ranges with a past two-digit year shorthand", () => {
     const result = calchemy.parseDate("second tuesday from apr 15 until end of june", context);
 
@@ -2304,10 +2394,11 @@ describe("parseDate", () => {
         end: "2026-06-30",
       });
       expect(monthYear?.id).toBe("nested-month-year");
+      // The end counts forward from the start, decided by the user: the first June after April 2015.
       expect(monthYear && calchemy.toJSON(monthYear.value)).toEqual({
         kind: "range",
         start: "2015-04-14",
-        end: "2026-06-30",
+        end: "2015-06-30",
       });
     }
   });
@@ -2355,11 +2446,11 @@ describe("parseDate", () => {
 
   test.each([
     [
-      "12 weeks from 3/6/26",
+      "12 weeks from 3/6/26", // each reading is one day 12 weeks out, decided by the user
       [
-        { kind: "range", start: "2026-06-03", end: "2026-08-26" },
-        { kind: "range", start: "2026-03-06", end: "2026-05-29" },
-        { kind: "range", start: "2003-06-26", end: "2003-09-18" },
+        { kind: "single", date: "2026-08-26" },
+        { kind: "single", date: "2026-05-29" },
+        { kind: "single", date: "2003-09-18" },
       ],
     ],
     [
@@ -2374,7 +2465,7 @@ describe("parseDate", () => {
       [
         { kind: "range", start: "2026-06-03", end: "2026-09-30" },
         { kind: "range", start: "2026-03-06", end: "2026-09-30" },
-        { kind: "range", start: "2003-06-26", end: "2026-09-30" },
+        { kind: "range", start: "2003-06-26", end: "2003-09-30" }, // the first q3 after the start, decided by the user
       ],
     ],
   ])("returns ambiguity for nested numeric dates: %s", (input, expected) => {
@@ -2524,28 +2615,15 @@ describe("parseDate", () => {
       }
     }
 
+    // `12 weeks from tomorrow` is one day, like `12 weeks from now`, decided by the user.
     expect(fromAnchorResult.status).toBe("valid");
     if (fromAnchorResult.status === "valid") {
-      expect(calchemy.toJSON(fromAnchorResult.value)).toEqual({
-        kind: "range",
-        start: "2026-05-28",
-        end: "2026-08-20",
-      });
+      expect(calchemy.toJSON(fromAnchorResult.value)).toEqual({ kind: "single", date: "2026-08-20" });
 
-      const expectedRangeResult = resolveExpectedDateValue(fromAnchorResult, "range");
-      expect(expectedRangeResult.status).toBe("valid");
-      if (expectedRangeResult.status === "valid") {
-        expect(calchemy.toJSON(expectedRangeResult.value)).toEqual({
-          kind: "range",
-          start: "2026-05-28",
-          end: "2026-08-20",
-        });
-      }
-
-      const expectedSingleResult = resolveExpectedDateValue(fromAnchorResult, "single");
-      expect(expectedSingleResult.status).toBe("valid");
-      if (expectedSingleResult.status === "valid") {
-        expect(calchemy.toJSON(expectedSingleResult.value)).toEqual({ kind: "single", date: "2026-08-20" });
+      const rangeResult = resolveExpectedDateValue(fromAnchorResult, "range");
+      expect(rangeResult.status).toBe("invalid");
+      if (rangeResult.status === "invalid") {
+        expect(rangeResult.errors[0]?.code).toBe("unexpected-value-kind");
       }
     }
 
@@ -2769,19 +2847,10 @@ describe("inline completions", () => {
     });
   });
 
-  test("suggests an explicit next calendar cycle for invalid floating range endpoints", () => {
-    const input = "12 weeks from tomorrow until the end of Q2";
-
-    expect(calchemy.getInlineCompletion(input, context)).toEqual({
-      value: "12 weeks from tomorrow until the end of Q2 2027",
-      suffix: " 2027",
-      sourceId: "calendar-cycle",
-    });
-    expect(calchemy.getInlineCompletion("Every monday from tomorrow up to the end of march", context)).toEqual({
-      value: "Every monday from tomorrow up to the end of march 2027",
-      suffix: " 2027",
-      sourceId: "calendar-cycle",
-    });
+  // A floating end counts forward from the start, so these phrases read as written and need no year.
+  test("offers no year for a floating range end", () => {
+    expect(calchemy.getInlineCompletion("12 weeks from tomorrow until the end of Q2", context)).toBeNull();
+    expect(calchemy.getInlineCompletion("Every monday from tomorrow up to the end of march", context)).toBeNull();
     expect(calchemy.getInlineCompletion("12 weeks from tomorrow until the end of Q2 2027", context)).toBeNull();
   });
 });
@@ -2871,6 +2940,12 @@ describe("phrasing variants", () => {
     ["fortnight from now", { kind: "single", date: "2026-06-10" }], // = `2 weeks from now`
     ["in a fortnight", { kind: "single", date: "2026-06-10" }],
     ["in 2 business days", { kind: "single", date: "2026-05-29" }], // = `2 weekdays from now`
+    ["from today till next month", { kind: "range", start: "2026-05-27", end: "2026-06-30" }], // = `today until next month`
+    ["from today until next month", { kind: "range", start: "2026-05-27", end: "2026-06-30" }],
+    ["from june until august", { kind: "range", start: "2026-06-01", end: "2026-08-31" }], // = `from june to august`
+    ["from today to next month", { kind: "range", start: "2026-05-27", end: "2026-06-30" }], // = `today until next month`
+    // The example the `from tomorrow` error message suggests.
+    ["from tomorrow until aug 15", { kind: "range", start: "2026-05-28", end: "2026-08-15" }], // = `tomorrow until aug 15`
     // Reversed word orders: the same known words, with the year or the sampler
     // on the other side of the range.
     ["2020 august", { kind: "range", start: "2020-08-01", end: "2020-08-31" }], // = `august 2020`

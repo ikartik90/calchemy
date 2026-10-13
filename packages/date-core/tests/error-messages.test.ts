@@ -53,32 +53,8 @@ describe("error messages", () => {
     ["from tomorrow", { code: "unsupported-expression", message: '"from tomorrow" needs an end, for example "from tomorrow until aug 15".' }],
     ["of next month", { code: "unsupported-expression", message: '"of" needs something to pick before it, for example "15th of next month".' }],
 
-    // A range that ends before it starts, with the concrete dates. A floating end
-    // gets the year that would make it work; a relative end cannot, so swap.
-    [
-      "tomorrow until march",
-      {
-        code: "unsupported-expression",
-        message: 'This range ends before it starts: it runs from 2026-05-28 to 2026-03-31. Add a year to the end, for example "tomorrow until march 2027".',
-        suggestedInput: "tomorrow until march 2027",
-      },
-    ],
-    [
-      "Every monday from tomorrow up to the end of march",
-      {
-        code: "unsupported-expression",
-        message: 'This range ends before it starts: it runs from 2026-05-28 to 2026-03-31. Add a year to the end, for example "Every monday from tomorrow up to the end of march 2027".',
-        suggestedInput: "Every monday from tomorrow up to the end of march 2027",
-      },
-    ],
-    [
-      "12 weeks from tomorrow until the end of q2",
-      {
-        code: "unsupported-expression",
-        message: 'This range ends before it starts: it runs from 2026-08-20 to 2026-06-30. Add a year to the end, for example "12 weeks from tomorrow until the end of q2 2027".',
-        suggestedInput: "12 weeks from tomorrow until the end of q2 2027",
-      },
-    ],
+    // A range whose end is fixed before its start, with the concrete dates. An end with no year
+    // of its own counts forward from the start instead (`tests/parser.test.ts`).
     [
       "tomorrow until yesterday",
       {
@@ -170,7 +146,7 @@ describe("error messages", () => {
   });
 
   test("a suggested input parses", () => {
-    for (const input of ["tomorrow until march", "2020 03 15"]) {
+    for (const input of ["every other day", "2020 03 15"]) {
       const result = calchemy.parseDate(input, context);
       expect(result.status).toBe("invalid");
       if (result.status === "invalid") {

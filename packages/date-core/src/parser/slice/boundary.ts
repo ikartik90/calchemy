@@ -253,7 +253,8 @@ function parseMonthDayBoundary(
     return null;
   }
 
-  // Keep `june 27` as a month+year shorthand unless an endpoint explicitly prefers a calendar day.
+  // Inside a longer phrase, keep `june 27` as a month+year shorthand (`end of june 27`) unless an
+  // endpoint prefers a calendar day. On its own, `june 27` is ambiguous before it reaches here.
   if (day > 12 && !options?.preferDay) {
     return null;
   }
@@ -437,7 +438,9 @@ function parseStructuralShorthandUnit(letter: string): DurationUnit | null {
   }
 }
 
-// Example: `parseDurationFromAnchorBoundary("12 weeks from 3/6/26", lookups)` returns duration-plus-anchor intent.
+// Example: `parseDurationFromAnchorBoundary("12 weeks from 3/6/26", lookups)` returns the day 12 weeks
+// after March 6, 2026. `N units from <a day>` is one day, the same as `N units after <a day>`, as the
+// user decided.
 function parseDurationFromAnchorBoundary(input: string, lookups: DateVocabularyLookups): BoundarySlice | null {
   const match = /^(.+) ([a-z]+) from (.+)$/.exec(input);
   if (!match?.[1] || !match[2] || !match[3] || match[3] === "now") {
@@ -446,7 +449,9 @@ function parseDurationFromAnchorBoundary(input: string, lookups: DateVocabularyL
 
   const amount = parseAmount(match[1]);
   const unit = parseDurationUnit(match[2], lookups);
-  return amount && unit ? { kind: "duration-from-anchor", amount, unit, anchor: parseBoundary(match[3], lookups) } : null;
+  return amount && unit
+    ? { kind: "duration-near-boundary", amount, unit, direction: "after", anchor: parseBoundary(match[3], lookups) }
+    : null;
 }
 
 // Example: `parseDurationNearBoundary("3 days before christmas", lookups)` returns offset intent.

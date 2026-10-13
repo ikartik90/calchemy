@@ -4,6 +4,8 @@ Natural language date parsing with Temporal values: `8 weeks from now`, `christm
 
 The package lives in [`packages/date-core`](packages/date-core) — see its [README](packages/date-core/README.md) for usage.
 
+[`packages/date-jev`](packages/date-jev) (not yet published) reads date phrases with TypeSafe's Jev model, including wording date-core rejects; see its [README](packages/date-jev/README.md).
+
 ```bash
 pnpm add @calchemy/date-core
 ```
