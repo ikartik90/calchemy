@@ -88,21 +88,47 @@ const Shifts = {
   { amount: number; unit: DurationUnit; direction: RelationDirection }
 >;
 
+const PeriodOptions = {
+  week: { what: "A whole calendar week", examples: ["this week", "next week", "last week"] },
+  month: { what: "A whole calendar month", examples: ["this month", "next month", "last month"] },
+  quarter: { what: "A quarter of the year", examples: ["this quarter", "next quarter", "last quarter"] },
+  year: { what: "A whole calendar year", examples: ["this year", "next year", "last year"] },
+  none: { what: "No whole period: a single day, or not a date", examples: ["tomorrow", "next friday", "banana"] },
+};
+
+const PeriodModifierOptions = {
+  this: { what: "The current one", examples: ["this month", "this year"] },
+  next: { what: "The following one", examples: ["next month", "next year"] },
+  last: { what: "The one before", examples: ["last month", "previous year"] },
+  none: { what: "No word picks which one", examples: ["month", "a year"] },
+};
+
+// date-core reads `last` and `previous` the same for whole periods.
+const PeriodModifiers = {
+  this: "this",
+  next: "next",
+  last: "last",
+} as const satisfies Record<Exclude<PeriodModifierOption, "none">, RelativeModifier>;
+
 type DayOption = keyof typeof DayOptions;
 type WeekdayOption = keyof typeof WeekdayOptions;
 type ModifierOption = keyof typeof ModifierOptions;
 type ShiftOption = keyof typeof ShiftOptions;
+type PeriodOption = keyof typeof PeriodOptions;
+type PeriodModifierOption = keyof typeof PeriodModifierOptions;
 type Answer = { confidence: number };
 
-export type DayAnswers = {
+export type DateAnswers = {
   day: { choice: DayOption; confidence: number };
   weekday: { choice: WeekdayOption; confidence: number };
   modifier: { choice: ModifierOption; confidence: number };
   shift: { choice: ShiftOption; confidence: number };
+  period: { choice: PeriodOption; confidence: number };
+  period_modifier: { choice: PeriodModifierOption; confidence: number };
 };
 
-// Example: `dayQuestions()` asks Jev which single day the phrase in `state.phrase` names.
-export function dayQuestions() {
+// Example: `dateQuestions()` asks Jev which day or calendar period the phrase in `state.phrase` names.
+export function dateQuestions() {
   return {
     day: {
       type: "choice",
@@ -127,6 +153,16 @@ export function dayQuestions() {
       },
       criteria: ShiftOptions,
     },
+    period: {
+      type: "choice",
+      instructions: "Which whole calendar period does `phrase` name?",
+      criteria: PeriodOptions,
+    },
+    period_modifier: {
+      type: "choice",
+      instructions: "Which word in `phrase` picks out which calendar period?",
+      criteria: PeriodModifierOptions,
+    },
   } as const;
 }
 
@@ -137,25 +173,50 @@ export type Reading = {
 };
 
 // Example: `treeFromAnswers({ day: { choice: "tomorrow", confidence: 1 }, ... })` reads `tomorrow` with confidence 1.
-export function treeFromAnswers(answers: DayAnswers): Reading | null {
+// A phrase is read as a day when Jev names one, and as a calendar period otherwise.
+export function treeFromAnswers(answers: DateAnswers): Reading | null {
   const day = dayBoundary(answers);
-  if (!day) {
+  if (day) {
+    const shift = answers.shift.choice;
+    const boundary: BoundarySlice =
+      shift === "none" ? day.boundary : { kind: "duration-near-boundary", ...Shifts[shift], anchor: day.boundary };
+    return reading(boundary, [...day.used, answers.shift]);
+  }
+
+  const period = periodBoundary(answers);
+  return period ? reading(period.boundary, period.used) : null;
+}
+
+function reading(boundary: BoundarySlice, used: readonly Answer[]): Reading {
+  return {
+    slice: { expression: boundaryToExpression(boundary), exclusions: [], transforms: [] },
+    confidence: Math.min(...used.map((answer) => answer.confidence)),
+  };
+}
+
+// Example: `periodBoundary(answers)` returns the `next month` boundary and the answers that chose it.
+// A shift on a period is not something date-jev can read yet, so it makes the phrase unreadable
+// rather than being dropped.
+function periodBoundary(answers: DateAnswers): { boundary: BoundarySlice; used: Answer[] } | null {
+  const period = answers.period.choice;
+  const modifier = answers.period_modifier.choice;
+  if (answers.day.choice !== "none" || period === "none" || modifier === "none" || answers.shift.choice !== "none") {
     return null;
   }
 
-  const shift = answers.shift.choice;
-  const boundary: BoundarySlice =
-    shift === "none" ? day.boundary : { kind: "duration-near-boundary", ...Shifts[shift], anchor: day.boundary };
-
   return {
-    slice: { expression: boundaryToExpression(boundary), exclusions: [], transforms: [] },
-    confidence: Math.min(...[...day.used, answers.shift].map((answer) => answer.confidence)),
+    boundary: relative({
+      kind: "modifier",
+      modifier: PeriodModifiers[modifier],
+      target: { kind: "calendar-unit", unit: period },
+    }),
+    used: [answers.day, answers.period, answers.period_modifier, answers.shift],
   };
 }
 
 // Example: `dayBoundary(answers)` returns the `upcoming friday` boundary and the answers that chose it.
 // Only the answers a reading uses count toward its confidence: `tomorrow` ignores the modifier answer.
-function dayBoundary(answers: DayAnswers): { boundary: BoundarySlice; used: Answer[] } | null {
+function dayBoundary(answers: DateAnswers): { boundary: BoundarySlice; used: Answer[] } | null {
   const day = answers.day.choice;
   if (day === "none") {
     return null;

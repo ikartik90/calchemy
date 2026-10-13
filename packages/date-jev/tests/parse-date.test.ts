@@ -22,6 +22,7 @@ describe("parseDate", () => {
     ["a week on friday", { kind: "single", date: "2026-06-05" }], // this friday plus a week, decided by the user
     ["day after tomorrow", { kind: "single", date: "2026-05-29" }],
     ["day before yesterday", { kind: "single", date: "2026-05-25" }],
+    ["next month", { kind: "range", start: "2026-06-01", end: "2026-06-30" }],
   ])("%s", async (input, expected) => {
     const jev = await createJevParser({ client: replayClient(input) });
     const result = await jev.parseDate(input, context);

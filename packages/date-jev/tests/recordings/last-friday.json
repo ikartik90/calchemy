@@ -1,6 +1,6 @@
 {
   "phrase": "last friday",
-  "recordedAt": "2026-10-12",
+  "recordedAt": "2026-10-13",
   "request": {
     "state": {
       "phrase": "last friday"
@@ -91,6 +91,86 @@
             ]
           }
         }
+      },
+      "period": {
+        "type": "choice",
+        "instructions": "Which whole calendar period does `phrase` name?",
+        "criteria": {
+          "week": {
+            "what": "A whole calendar week",
+            "examples": [
+              "this week",
+              "next week",
+              "last week"
+            ]
+          },
+          "month": {
+            "what": "A whole calendar month",
+            "examples": [
+              "this month",
+              "next month",
+              "last month"
+            ]
+          },
+          "quarter": {
+            "what": "A quarter of the year",
+            "examples": [
+              "this quarter",
+              "next quarter",
+              "last quarter"
+            ]
+          },
+          "year": {
+            "what": "A whole calendar year",
+            "examples": [
+              "this year",
+              "next year",
+              "last year"
+            ]
+          },
+          "none": {
+            "what": "No whole period: a single day, or not a date",
+            "examples": [
+              "tomorrow",
+              "next friday",
+              "banana"
+            ]
+          }
+        }
+      },
+      "period_modifier": {
+        "type": "choice",
+        "instructions": "Which word in `phrase` picks out which calendar period?",
+        "criteria": {
+          "this": {
+            "what": "The current one",
+            "examples": [
+              "this month",
+              "this year"
+            ]
+          },
+          "next": {
+            "what": "The following one",
+            "examples": [
+              "next month",
+              "next year"
+            ]
+          },
+          "last": {
+            "what": "The one before",
+            "examples": [
+              "last month",
+              "previous year"
+            ]
+          },
+          "none": {
+            "what": "No word picks which one",
+            "examples": [
+              "month",
+              "a year"
+            ]
+          }
+        }
       }
     },
     "model": "jev-latest"
@@ -150,11 +230,34 @@
           "week_later": 0,
           "week_earlier": 0
         }
+      },
+      "period": {
+        "type": "choice",
+        "choice": "none",
+        "confidence": 0.99,
+        "probabilities": {
+          "week": 0.01,
+          "month": 0,
+          "quarter": 0,
+          "year": 0,
+          "none": 0.99
+        }
+      },
+      "period_modifier": {
+        "type": "choice",
+        "choice": "last",
+        "confidence": 1,
+        "probabilities": {
+          "this": 0,
+          "next": 0,
+          "last": 1,
+          "none": 0
+        }
       }
     },
     "usage": {
-      "input_tokens": 1034,
-      "output_tokens": 270
+      "input_tokens": 1454,
+      "output_tokens": 362
     }
   }
 }
