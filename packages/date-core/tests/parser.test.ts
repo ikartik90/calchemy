@@ -183,7 +183,6 @@ describe("parseDate", () => {
     ["m8-m12", { kind: "range", start: "2026-08-01", end: "2026-12-31" }],
     ["q1-q3", { kind: "range", start: "2026-01-01", end: "2026-09-30" }],
     ["Q3 27", { kind: "range", start: "2027-07-01", end: "2027-09-30" }],
-    ["june 27", { kind: "range", start: "2027-06-01", end: "2027-06-30" }],
     ["start of q3", { kind: "single", date: "2026-07-01" }],
     ["end of q3", { kind: "single", date: "2026-09-30" }],
     ["end of june 27", { kind: "single", date: "2027-06-30" }],
@@ -2305,6 +2304,21 @@ describe("parseDate", () => {
       expect(result.candidates.map((candidate) => calchemy.toJSON(candidate.value))).toEqual([
         { kind: "single", date: "2026-04-15" },
         { kind: "range", start: "2015-04-01", end: "2015-04-30" },
+      ]);
+    }
+  });
+
+  // Decided by the user: a coming year is as ambiguous as a past one. `june 27` could be the 27th
+  // or all of June 2027. Only a day the month lacks, as in `feb 30`, leaves the year reading alone.
+  test("returns ambiguity for month day shorthands that could be a coming two-digit year", () => {
+    const result = calchemy.parseDate("june 27", context);
+
+    expect(result.status).toBe("ambiguous");
+    if (result.status === "ambiguous") {
+      expect(result.ambiguityGroups[0]?.kind).toBe("month-day-year");
+      expect(result.candidates.map((candidate) => calchemy.toJSON(candidate.value))).toEqual([
+        { kind: "single", date: "2026-06-27" },
+        { kind: "range", start: "2027-06-01", end: "2027-06-30" },
       ]);
     }
   });

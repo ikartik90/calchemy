@@ -253,7 +253,8 @@ function parseMonthDayBoundary(
     return null;
   }
 
-  // Keep `june 27` as a month+year shorthand unless an endpoint explicitly prefers a calendar day.
+  // Inside a longer phrase, keep `june 27` as a month+year shorthand (`end of june 27`) unless an
+  // endpoint prefers a calendar day. On its own, `june 27` is ambiguous before it reaches here.
   if (day > 12 && !options?.preferDay) {
     return null;
   }
