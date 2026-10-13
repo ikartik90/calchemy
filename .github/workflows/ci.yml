@@ -1,0 +1,159 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# A new push supersedes the run it interrupted. That run is testing a commit
+# nobody will merge, so finishing it would only burn minutes.
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # pnpm 11 needs Node 22.13 or later, and `22` resolves to the newest 22.x.
+  NODE_VERSION: "22"
+
+# The three jobs run side by side. Each takes seconds once dependencies are
+# installed, so gating one on another would only delay the result.
+jobs:
+  types:
+    name: Types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Node before pnpm: pnpm 11 runs on Node. No `cache` here, because
+      # setup-node's pnpm cache looks for pnpm before it is installed;
+      # pnpm/action-setup caches the store instead.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # No `version`: it reads `packageManager` from package.json, so CI runs
+      # the same pnpm as every developer.
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+
+      - run: pnpm install --frozen-lockfile
+
+      # `pnpm lint` runs this same command today. Add a lint step here when
+      # `lint` gets a linter of its own.
+      - name: Type check
+        run: pnpm typecheck
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+
+      - run: pnpm install --frozen-lockfile
+
+      # Every suite fixes its reference date and runs offline, so this job
+      # needs no secrets. A test that only passes in one time zone fails here,
+      # because the runner's clock is UTC.
+      - name: Run Vitest
+        run: pnpm test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+
+      - run: pnpm install --frozen-lockfile
+
+      # tsup bundles each package and tsc writes its type declarations from
+      # tsconfig.build.json, which leaves out the tests `Types` checks. dist/
+      # is what npm publishes, so a green build here keeps main releasable.
+      - name: Build
+        run: pnpm build
+
+  report-failure:
+    name: Report failure
+    needs: [types, tests, build]
+    # `failure()` alone would stay silent when a job is cancelled out from under
+    # a genuine failure elsewhere in the run.
+    if: ${{ failure() }}
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Comment the failing checks on the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          TYPES: ${{ needs.types.result }}
+          TESTS: ${{ needs.tests.result }}
+          BUILD: ${{ needs.build.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          icon() {
+            case "$1" in
+              success) echo "✅ passed" ;;
+              failure) echo "❌ failed" ;;
+              cancelled) echo "⚪ cancelled" ;;
+              skipped) echo "⏭️ skipped (an earlier job failed)" ;;
+              *) echo "❔ $1" ;;
+            esac
+          }
+
+          marker="<!-- ci-failure-report -->"
+          body=$(cat <<EOF
+          $marker
+          ### ❌ CI failed: this pull request will not auto-merge
+
+          | Check | Result |
+          | --- | --- |
+          | Types | $(icon "$TYPES") |
+          | Tests | $(icon "$TESTS") |
+          | Build | $(icon "$BUILD") |
+
+          [Inspect the run]($RUN_URL)
+
+          Push a fix to this branch and the whole gate re-runs.
+          EOF
+          )
+
+          # Edit the existing report in place so a branch that fails repeatedly
+          # does not bury its own diff under a column of comments.
+          # --slurp folds the paginated pages into one array of pages, so `add`
+          # gives a single flat comment list; without it jq would run per page
+          # and could emit more than one id.
+          existing=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate --slurp \
+            | jq -r --arg marker "$marker" \
+                '(add // []) | map(select(.body | contains($marker))) | .[0].id // empty')
+
+          if [ -n "$existing" ]; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" \
+              -f body="$body" >/dev/null
+            echo "Updated the existing failure report."
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+              -f body="$body" >/dev/null
+            echo "Posted a failure report."
+          fi
