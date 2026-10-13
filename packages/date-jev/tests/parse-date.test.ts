@@ -58,6 +58,7 @@ describe("parseDate", () => {
     ["tomorrow until march", { kind: "range", start: "2026-05-28", end: "2027-03-31" }],
     ["tomorrow until the 5th", { kind: "range", start: "2026-05-28", end: "2026-06-05" }],
     ["apr 1 until the 20th", { kind: "range", start: "2026-04-01", end: "2026-04-20" }], // the first 20th after the start
+    ["this week until friday", { kind: "range", start: "2026-05-24", end: "2026-05-29" }], // starts at the week's beginning
     ["aug 10-14", { kind: "range", start: "2026-08-10", end: "2026-08-14" }],
     ["10-14 aug", { kind: "range", start: "2026-08-10", end: "2026-08-14" }], // = `aug 10-14`
     // The 3rd before the 28th has no month of its own, so it counts forward from the start.
