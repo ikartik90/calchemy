@@ -87,7 +87,7 @@ export function parseMonthDayYearResult(
   const { month, day } = parsed;
   const anchorYear = context.referenceDate.year;
   const expandedYear = expandTwoDigitYear(day, anchorYear);
-  if (day <= 12 || day > 31 || expandedYear >= anchorYear) {
+  if (day <= 12 || day > 31) {
     return null;
   }
 

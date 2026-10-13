@@ -361,22 +361,21 @@ function resolveAtomBoundary(
   return numericCandidates[0]?.value ?? null;
 }
 
+// Days from the reference date for each word that names a day by itself.
+const BareDateAnchorDays = new Map([
+  ["now", 0],
+  ["today", 0],
+  ["tomorrow", 1],
+  ["yesterday", -1],
+]);
+
 // Example: `resolveBareDateAnchor("tomorrow", anchor)` returns the next calendar date.
 function resolveBareDateAnchor(
   input: string,
   anchorDate: PlainDate,
 ): PlainDate | null {
-  switch (input) {
-    case "now":
-    case "today":
-      return anchorDate;
-    case "tomorrow":
-      return anchorDate.add({ days: 1 });
-    case "yesterday":
-      return anchorDate.subtract({ days: 1 });
-    default:
-      return null;
-  }
+  const days = BareDateAnchorDays.get(input);
+  return days === undefined ? null : anchorDate.add({ days });
 }
 
 /**
@@ -429,7 +428,11 @@ function resolveBoundaryEndpoint(
   );
 }
 
-// Example: `resolveRangeEndEndpoint(endOfMarch, MayStart, anchor, ...)` resolves the written endpoint as-is.
+// Example: `resolveRangeEndEndpoint(endOfMarch, MayStart, anchor, ...)` returns the end of the
+// first March on or after the start. An end with no year, month, or week of its own counts forward
+// from the start: `monday until friday` ends on the friday after that monday, `tomorrow until the
+// 5th` on the next 5th, and `dec 20 until jan 3` in the following year. An end fixed to the
+// reference date, such as `yesterday`, does not.
 function resolveRangeEndEndpoint(
   endpoint: BoundaryEndpointSlice,
   start: PlainDate,
@@ -449,7 +452,56 @@ function resolveRangeEndEndpoint(
     return end;
   }
 
+  if (!floatsFromStart(endpoint.boundary)) {
+    return null;
+  }
+
+  for (const anchor of [start, start.add({ months: 1 }), start.add({ years: 1 })]) {
+    const floated = resolveBoundaryEndpoint(endpoint, anchor, Temporal, context, lookups);
+    if (floated && comparePlainDate(start, floated) <= 0) {
+      return floated;
+    }
+  }
+
   return null;
+}
+
+// Example: `floatsFromStart(fridayBoundary)` is true: a bare weekday, a day of the month such as
+// `the 5th`, or a date, month, quarter, or week written without a year takes its week, month, or
+// year from the range's start.
+function floatsFromStart(boundary: BoundarySlice): boolean {
+  switch (boundary.kind) {
+    case "relative":
+      return (
+        boundary.expression.kind === "modifier" &&
+        boundary.expression.modifier === "upcoming" &&
+        boundary.expression.target.kind === "weekday"
+      );
+    case "atom":
+      return !BareDateAnchorDays.has(boundary.input);
+    case "month-range":
+    case "quarter-range":
+    case "week-range":
+      return boundary.year.kind === "anchor";
+    case "named-month-range":
+    case "month-day-list":
+    case "month-day-range":
+    case "day-of-month":
+      return true;
+    case "boundary-side":
+      return floatsFromStart(boundary.boundary);
+    case "ordinal-day-in-range":
+    case "half-of-range":
+    case "unique-weekday-in-range":
+    case "ordinal-weekday-in-range":
+    case "ordinal-day-group-in-range":
+    case "edge-count-unit-in-range":
+    case "ordinal-calendar-unit":
+    case "ordinal-calendar-unit-span":
+      return floatsFromStart(boundary.range);
+    default:
+      return false;
+  }
 }
 
 // Example: `resolveBoundaryAsEndpoint(monthBoundary, "end", anchor, Temporal, context, lookups)` returns the month end.

@@ -79,6 +79,32 @@ describe("resolveExpression", () => {
   });
 });
 
+describe("range ends", () => {
+  // Decided by the user: a bare weekday end counts forward from the start. On Friday 26 June the
+  // upcoming friday is today, before the upcoming monday, so `monday through friday` ends on 3 July.
+  test("a bare weekday end counts forward from the start", () => {
+    const upcoming = (weekday: number) =>
+      ({
+        kind: "relative",
+        expression: { kind: "modifier", modifier: "upcoming", target: { kind: "weekday", weekday } },
+      }) as const;
+    const expression: DateExpression = {
+      kind: "scope",
+      boundary: {
+        kind: "range",
+        start: { kind: "boundary", boundary: upcoming(1), side: "start" },
+        end: { kind: "boundary", boundary: upcoming(5), side: "end" },
+      },
+    };
+
+    expect(toJSON(resolveExpression(expression, anchorDate, Temporal, context, lookups)!)).toEqual({
+      kind: "range",
+      start: "2026-06-29",
+      end: "2026-07-03",
+    });
+  });
+});
+
 describe("composition nested inside a leaf boundary", () => {
   // `start of last 2 weeks of next quarter` parses as a boundary-side leaf whose
   // child is compositional. The boundary resolver must hand that child to the
