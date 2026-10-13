@@ -138,6 +138,40 @@ const PeriodModifiers = {
   last: "last",
 } as const satisfies Record<Exclude<PeriodModifierOption, "none">, RelativeModifier>;
 
+// A count of days, weeks, months, or years from today: a stretch, or one day that far away.
+// The single-day shapes are listed so Jev can tell `in 10 days` from `next 10 days`; date-jev
+// reads only the stretches so far.
+const CountedOptions = {
+  span_back: {
+    what: "A number of days, weeks, months, or years counted back to today",
+    examples: ["last 90 days", "past 2 weeks", "previous 3 months"],
+  },
+  span_forward: {
+    what: "A number of days, weeks, months, or years counted forward from today",
+    examples: ["next 10 days", "within 2 weeks", "upcoming 3 months"],
+  },
+  day_back: { what: "One day that many days, weeks, months, or years before today", examples: ["2 months ago", "3 days ago"] },
+  day_forward: {
+    what: "One day that many days, weeks, months, or years after today",
+    examples: ["in 10 days", "3 weeks from now"],
+  },
+  none: { what: "No number of days, weeks, months, or years", examples: ["next week", "next month", "tomorrow", "friday", "june 5"] },
+};
+
+// date-core reads `last`, `past`, and `previous` alike for a count, and `next`, `upcoming`, and `future` alike.
+const CountedModifiers = {
+  span_back: "last",
+  span_forward: "next",
+} as const satisfies Partial<Record<CountedOption, RelativeModifier>>;
+
+const UnitOptions = {
+  day: { what: "Days", examples: ["last 90 days", "in 10 days"] },
+  week: { what: "Weeks", examples: ["next 2 weeks", "3 weeks from now"] },
+  month: { what: "Months", examples: ["last 3 months", "2 months ago"] },
+  year: { what: "Years", examples: ["next 2 years"] },
+  none: { what: "It counts nothing", examples: ["tomorrow", "next friday", "june 5"] },
+};
+
 type DayOption = keyof typeof DayOptions;
 type WeekdayOption = keyof typeof WeekdayOptions;
 type MonthOption = keyof typeof MonthOptions;
@@ -146,6 +180,8 @@ type ModifierOption = keyof typeof ModifierOptions;
 type ShiftOption = keyof typeof ShiftOptions;
 type PeriodOption = keyof typeof PeriodOptions;
 type PeriodModifierOption = keyof typeof PeriodModifierOptions;
+type CountedOption = keyof typeof CountedOptions;
+type UnitOption = keyof typeof UnitOptions;
 type Answer = { confidence: number };
 
 export type DateAnswers = {
@@ -159,6 +195,10 @@ export type DateAnswers = {
   shift: { choice: ShiftOption; confidence: number };
   period: { choice: PeriodOption; confidence: number };
   period_modifier: { choice: PeriodModifierOption; confidence: number };
+  counted: { choice: CountedOption; confidence: number };
+  unit: { choice: UnitOption; confidence: number };
+  /** One of the numbers written in the text, or `none`. Absent when the text has no numbers. */
+  count?: { choice: string; confidence: number };
 };
 
 export const AnswerNames = [
@@ -171,6 +211,9 @@ export const AnswerNames = [
   "shift",
   "period",
   "period_modifier",
+  "counted",
+  "unit",
+  "count",
 ] as const satisfies ReadonlyArray<keyof DateAnswers>;
 
 /** A text field of the state Jev reads: the whole phrase, or one end of a range. */
@@ -201,7 +244,10 @@ export function dateQuestions(field: Field, text: string) {
       instructions: `Which day of the month does \`${field}\` name?`,
       criteria: DayOfMonthOptions,
     },
-    ...yearQuestion(field, text),
+    ...numberQuestion(field, text, "year", {
+      instructions: `Which of these numbers in \`${field}\` is the year?`,
+      none: "None of them is a year",
+    }),
     [`${prefix}modifier`]: {
       type: "choice" as const,
       instructions: `Which word in \`${field}\` picks out which occurrence of the day of the week?`,
@@ -225,13 +271,33 @@ export function dateQuestions(field: Field, text: string) {
       instructions: `Which word in \`${field}\` picks out which calendar period?`,
       criteria: PeriodModifierOptions,
     },
+    [`${prefix}counted`]: {
+      type: "choice" as const,
+      instructions: `Does \`${field}\` count a number of days, weeks, months, or years from today?`,
+      criteria: CountedOptions,
+    },
+    [`${prefix}unit`]: {
+      type: "choice" as const,
+      instructions: `What does \`${field}\` count?`,
+      criteria: UnitOptions,
+    },
+    ...numberQuestion(field, text, "count", {
+      instructions: `Which of these numbers in \`${field}\` is the count of days, weeks, months, or years?`,
+      none: "None of them is a count",
+    }),
   };
 }
 
-// Example: `yearQuestion("phrase", "march 15 2020")` asks whether `15` or `2020` is the year. Code finds
-// the numbers and Jev picks one, as TypeSafe's date extraction cookbook suggests, so a written `27`
-// reaches date-core's math as written and becomes 2027 there. Text without numbers asks nothing.
-function yearQuestion(field: Field, text: string) {
+// Example: `numberQuestion("phrase", "march 15 2020", "year", ...)` asks whether `15` or `2020` is the
+// year. Code finds the numbers and Jev picks one, as TypeSafe's date extraction cookbook suggests, so
+// a written `27` reaches date-core's math as written and becomes 2027 there. Text without numbers
+// asks nothing.
+function numberQuestion(
+  field: Field,
+  text: string,
+  name: "year" | "count",
+  { instructions, none }: { instructions: string; none: string },
+) {
   const numbers = [...new Set(text.match(/\d+/g))];
   if (numbers.length === 0) {
     return {};
@@ -239,10 +305,10 @@ function yearQuestion(field: Field, text: string) {
 
   const prefix = field === "phrase" ? "" : `${field}_`;
   return {
-    [`${prefix}year`]: {
+    [`${prefix}${name}`]: {
       type: "choice" as const,
-      instructions: `Which of these numbers in \`${field}\` is the year?`,
-      criteria: { ...Object.fromEntries(numbers.map((number) => [number, null])), none: "None of them is a year" },
+      instructions,
+      criteria: { ...Object.fromEntries(numbers.map((number) => [number, null])), none },
     },
   };
 }
@@ -333,7 +399,9 @@ function withStartMonth(end: DateAnswers, start: DateAnswers): DateAnswers {
   return { ...end, month: start.month, ...(startYear ? { year: startYear } : {}) };
 }
 
-// A piece is read as a day when Jev names one, and as a calendar period otherwise.
+// A piece is read as a day when Jev names one, then as a count from today, then as a calendar period.
+// A count date-jev cannot read makes the piece unreadable rather than falling through: `next 2 weeks`
+// must not read as `next week`.
 function boundaryFromAnswers(answers: DateAnswers): { boundary: BoundarySlice; used: Answer[] } | null {
   const day = dayBoundary(answers);
   if (day) {
@@ -343,7 +411,30 @@ function boundaryFromAnswers(answers: DateAnswers): { boundary: BoundarySlice; u
     return { boundary, used: [...day.used, answers.shift] };
   }
 
+  if (answers.counted.choice !== "none") {
+    return countedBoundary(answers);
+  }
+
   return periodBoundary(answers);
+}
+
+// Example: `countedBoundary(answers)` returns `last 90 days` as date-core's `last` with a count of 90 days.
+function countedBoundary(answers: DateAnswers): { boundary: BoundarySlice; used: Answer[] } | null {
+  const counted = answers.counted.choice;
+  const unit = answers.unit.choice;
+  const count = answers.count;
+  if ((counted !== "span_back" && counted !== "span_forward") || unit === "none" || !count || count.choice === "none") {
+    return null;
+  }
+
+  return {
+    boundary: relative({
+      kind: "modifier",
+      modifier: CountedModifiers[counted],
+      target: { kind: "counted-duration", count: Number(count.choice), unit },
+    }),
+    used: [answers.day, answers.counted, answers.unit, count],
+  };
 }
 
 function reading(boundary: BoundarySlice, used: readonly Answer[]): Reading {

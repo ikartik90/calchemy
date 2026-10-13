@@ -238,6 +238,102 @@
             ]
           }
         }
+      },
+      "counted": {
+        "type": "choice",
+        "instructions": "Does `phrase` count a number of days, weeks, months, or years from today?",
+        "criteria": {
+          "span_back": {
+            "what": "A number of days, weeks, months, or years counted back to today",
+            "examples": [
+              "last 90 days",
+              "past 2 weeks",
+              "previous 3 months"
+            ]
+          },
+          "span_forward": {
+            "what": "A number of days, weeks, months, or years counted forward from today",
+            "examples": [
+              "next 10 days",
+              "within 2 weeks",
+              "upcoming 3 months"
+            ]
+          },
+          "day_back": {
+            "what": "One day that many days, weeks, months, or years before today",
+            "examples": [
+              "2 months ago",
+              "3 days ago"
+            ]
+          },
+          "day_forward": {
+            "what": "One day that many days, weeks, months, or years after today",
+            "examples": [
+              "in 10 days",
+              "3 weeks from now"
+            ]
+          },
+          "none": {
+            "what": "No number of days, weeks, months, or years",
+            "examples": [
+              "next week",
+              "next month",
+              "tomorrow",
+              "friday",
+              "june 5"
+            ]
+          }
+        }
+      },
+      "unit": {
+        "type": "choice",
+        "instructions": "What does `phrase` count?",
+        "criteria": {
+          "day": {
+            "what": "Days",
+            "examples": [
+              "last 90 days",
+              "in 10 days"
+            ]
+          },
+          "week": {
+            "what": "Weeks",
+            "examples": [
+              "next 2 weeks",
+              "3 weeks from now"
+            ]
+          },
+          "month": {
+            "what": "Months",
+            "examples": [
+              "last 3 months",
+              "2 months ago"
+            ]
+          },
+          "year": {
+            "what": "Years",
+            "examples": [
+              "next 2 years"
+            ]
+          },
+          "none": {
+            "what": "It counts nothing",
+            "examples": [
+              "tomorrow",
+              "next friday",
+              "june 5"
+            ]
+          }
+        }
+      },
+      "count": {
+        "type": "choice",
+        "instructions": "Which of these numbers in `phrase` is the count of days, weeks, months, or years?",
+        "criteria": {
+          "15": null,
+          "2020": null,
+          "none": "None of them is a count"
+        }
       }
     },
     "model": "jev-latest"
@@ -248,7 +344,7 @@
       "day": {
         "type": "choice",
         "choice": "date",
-        "confidence": 0.97,
+        "confidence": 0.95,
         "probabilities": {
           "today": 0,
           "tomorrow": 0,
@@ -256,23 +352,23 @@
           "day_after_tomorrow": 0,
           "day_before_yesterday": 0,
           "weekday": 0.01,
-          "date": 0.97,
-          "none": 0.02
+          "date": 0.96,
+          "none": 0.03
         }
       },
       "weekday": {
         "type": "choice",
-        "choice": "tuesday",
+        "choice": "none",
         "confidence": 0.03,
         "probabilities": {
-          "monday": 0.11,
+          "monday": 0.1,
           "tuesday": 0.14,
-          "wednesday": 0.15000000000000002,
+          "wednesday": 0.14,
           "thursday": 0.11,
-          "friday": 0.14,
+          "friday": 0.13,
           "saturday": 0.13,
           "sunday": 0.1,
-          "none": 0.12
+          "none": 0.15
         }
       },
       "month": {
@@ -390,11 +486,45 @@
           "last": 0,
           "none": 0.99
         }
+      },
+      "counted": {
+        "type": "choice",
+        "choice": "none",
+        "confidence": 0.94,
+        "probabilities": {
+          "span_back": 0.01,
+          "span_forward": 0,
+          "day_back": 0.04,
+          "day_forward": 0,
+          "none": 0.95
+        }
+      },
+      "unit": {
+        "type": "choice",
+        "choice": "none",
+        "confidence": 0.9,
+        "probabilities": {
+          "day": 0.08,
+          "week": 0,
+          "month": 0,
+          "year": 0,
+          "none": 0.92
+        }
+      },
+      "count": {
+        "type": "choice",
+        "choice": "15",
+        "confidence": 0.74,
+        "probabilities": {
+          "15": 0.83,
+          "2020": 0.02,
+          "none": 0.15
+        }
       }
     },
     "usage": {
-      "input_tokens": 1946,
-      "output_tokens": 797
+      "input_tokens": 2557,
+      "output_tokens": 939
     }
   }
 }

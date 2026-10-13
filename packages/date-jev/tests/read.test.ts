@@ -21,6 +21,8 @@ describe("treeFromAnswers", () => {
       shift: { choice: "week_later", confidence: 0.96 },
       period: { choice: "none", confidence: 1 },
       period_modifier: { choice: "none", confidence: 1 },
+      counted: { choice: "none", confidence: 1 },
+      unit: { choice: "none", confidence: 1 },
     };
 
     expect(treeFromAnswers(answers)?.confidence).toBe(0.76);
@@ -37,9 +39,23 @@ describe("treeFromAnswers", () => {
       shift: { choice: "none", confidence: 1 },
       period: { choice: "none", confidence: 1 },
       period_modifier: { choice: "none", confidence: 0.52 },
+      counted: { choice: "none", confidence: 1 },
+      unit: { choice: "none", confidence: 0.63 },
     };
 
     expect(treeFromAnswers(answers)?.confidence).toBe(1);
+  });
+
+  test("a count with no number written is unreadable, not read as a period", () => {
+    // `next two weeks`: code finds no number, and Jev also sees `next week` in it.
+    const answers = answersFor("", {
+      period: { choice: "week", confidence: 0.9 },
+      period_modifier: { choice: "next", confidence: 1 },
+      counted: { choice: "span_forward", confidence: 1 },
+      unit: { choice: "week", confidence: 1 },
+    });
+
+    expect(readAnswers(answers, false)).toBeNull();
   });
 
   test("a range whose end cannot be read is unreadable, not read whole", () => {

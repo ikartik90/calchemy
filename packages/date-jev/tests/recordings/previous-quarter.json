@@ -229,6 +229,93 @@
             ]
           }
         }
+      },
+      "counted": {
+        "type": "choice",
+        "instructions": "Does `phrase` count a number of days, weeks, months, or years from today?",
+        "criteria": {
+          "span_back": {
+            "what": "A number of days, weeks, months, or years counted back to today",
+            "examples": [
+              "last 90 days",
+              "past 2 weeks",
+              "previous 3 months"
+            ]
+          },
+          "span_forward": {
+            "what": "A number of days, weeks, months, or years counted forward from today",
+            "examples": [
+              "next 10 days",
+              "within 2 weeks",
+              "upcoming 3 months"
+            ]
+          },
+          "day_back": {
+            "what": "One day that many days, weeks, months, or years before today",
+            "examples": [
+              "2 months ago",
+              "3 days ago"
+            ]
+          },
+          "day_forward": {
+            "what": "One day that many days, weeks, months, or years after today",
+            "examples": [
+              "in 10 days",
+              "3 weeks from now"
+            ]
+          },
+          "none": {
+            "what": "No number of days, weeks, months, or years",
+            "examples": [
+              "next week",
+              "next month",
+              "tomorrow",
+              "friday",
+              "june 5"
+            ]
+          }
+        }
+      },
+      "unit": {
+        "type": "choice",
+        "instructions": "What does `phrase` count?",
+        "criteria": {
+          "day": {
+            "what": "Days",
+            "examples": [
+              "last 90 days",
+              "in 10 days"
+            ]
+          },
+          "week": {
+            "what": "Weeks",
+            "examples": [
+              "next 2 weeks",
+              "3 weeks from now"
+            ]
+          },
+          "month": {
+            "what": "Months",
+            "examples": [
+              "last 3 months",
+              "2 months ago"
+            ]
+          },
+          "year": {
+            "what": "Years",
+            "examples": [
+              "next 2 years"
+            ]
+          },
+          "none": {
+            "what": "It counts nothing",
+            "examples": [
+              "tomorrow",
+              "next friday",
+              "june 5"
+            ]
+          }
+        }
       }
     },
     "model": "jev-latest"
@@ -328,25 +415,25 @@
       "modifier": {
         "type": "choice",
         "choice": "last",
-        "confidence": 0.55,
+        "confidence": 0.47,
         "probabilities": {
           "this": 0,
           "next": 0,
           "after_next": 0,
-          "last": 0.64,
-          "none": 0.36
+          "last": 0.58,
+          "none": 0.42
         }
       },
       "shift": {
         "type": "choice",
         "choice": "none",
-        "confidence": 0.96,
+        "confidence": 0.95,
         "probabilities": {
-          "none": 0.97,
+          "none": 0.96,
           "day_later": 0,
           "day_earlier": 0.01,
           "week_later": 0,
-          "week_earlier": 0.02
+          "week_earlier": 0.03
         }
       },
       "period": {
@@ -364,18 +451,42 @@
       "period_modifier": {
         "type": "choice",
         "choice": "last",
-        "confidence": 0.97,
+        "confidence": 0.99,
         "probabilities": {
           "this": 0,
           "next": 0,
-          "last": 0.98,
-          "none": 0.02
+          "last": 0.99,
+          "none": 0.01
+        }
+      },
+      "counted": {
+        "type": "choice",
+        "choice": "none",
+        "confidence": 0.44,
+        "probabilities": {
+          "span_back": 0.44,
+          "span_forward": 0,
+          "day_back": 0.01,
+          "day_forward": 0,
+          "none": 0.55
+        }
+      },
+      "unit": {
+        "type": "choice",
+        "choice": "month",
+        "confidence": 0.52,
+        "probabilities": {
+          "day": 0.01,
+          "week": 0.01,
+          "month": 0.62,
+          "year": 0.01,
+          "none": 0.35
         }
       }
     },
     "usage": {
-      "input_tokens": 1876,
-      "output_tokens": 751
+      "input_tokens": 2416,
+      "output_tokens": 855
     }
   }
 }
