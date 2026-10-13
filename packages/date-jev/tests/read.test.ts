@@ -70,21 +70,4 @@ describe("treeFromAnswers", () => {
 
     expect(readAnswers(answers, true)).toBeNull();
   });
-
-  test("an end that names an earlier day of the month takes no month from the start", () => {
-    // `dec 28-3`: date-core rejects it, so the 3rd does not become December 3.
-    const date = { choice: "date", confidence: 1 } as const;
-    const answers = {
-      ...answersFor("", {}),
-      ...answersFor("start_", {
-        day: date,
-        month: { choice: "december", confidence: 1 },
-        day_of_month: { choice: "28", confidence: 1 },
-      }),
-      ...answersFor("end_", { day: date, day_of_month: { choice: "3", confidence: 1 } }),
-      is_range: { type: "noul", noul: 0.9 },
-    };
-
-    expect(readAnswers(answers, true)).toBeNull();
-  });
 });

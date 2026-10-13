@@ -26,6 +26,7 @@ describe("parseDate", () => {
     ["jan 5", { kind: "single", date: "2026-01-05" }], // this year, even though it has passed
     ["march 15 2020", { kind: "single", date: "2020-03-15" }],
     ["6 mar 27", { kind: "single", date: "2027-03-06" }], // a written 27 is the year nearest the reference date
+    ["the 15th", { kind: "single", date: "2026-05-15" }], // the 15th of this month, even though it has passed
     ["next month", { kind: "range", start: "2026-06-01", end: "2026-06-30" }],
     ["this week", { kind: "range", start: "2026-05-24", end: "2026-05-30" }],
     ["previous quarter", { kind: "range", start: "2026-01-01", end: "2026-03-31" }],
@@ -41,6 +42,8 @@ describe("parseDate", () => {
     ["monday through friday", { kind: "range", start: "2026-06-01", end: "2026-06-05" }],
     ["dec 20 until jan 3", { kind: "range", start: "2026-12-20", end: "2027-01-03" }],
     ["aug 10-14", { kind: "range", start: "2026-08-10", end: "2026-08-14" }],
+    // The 3rd before the 28th has no month of its own, so it counts forward from the start.
+    ["dec 28-3", { kind: "range", start: "2026-12-28", end: "2027-01-03" }],
   ])("%s", async (input, expected) => {
     const jev = await createJevParser({ client: replayClient(input) });
     const result = await jev.parseDate(input, context);

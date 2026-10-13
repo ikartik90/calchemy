@@ -377,8 +377,8 @@ export function rangeFromAnswers(start: DateAnswers, end: DateAnswers, isRange: 
 }
 
 // Example: in `aug 10-14` the end names only the 14th, so it takes August, and any year, from the
-// start. An earlier day, as in `dec 28-3`, or an end with its own year keeps no month and the range
-// stays unreadable, as it is in date-core.
+// start. An earlier day keeps no month and counts forward from the start, so `dec 28-3` ends on
+// January 3. An end with its own year, as in `aug 10-14 2027`, keeps no month and is unreadable.
 function withStartMonth(end: DateAnswers, start: DateAnswers): DateAnswers {
   const endDay = end.day_of_month.choice;
   const startDay = start.day_of_month.choice;
@@ -509,14 +509,24 @@ function dayBoundary(answers: DateAnswers): { boundary: BoundarySlice; used: Ans
 
 // Example: `calendarDateBoundary(answers)` returns `jul 1` as day 1 of July this year, the tree
 // date-core builds for `1st of july`. A written year stays as written; date-core's math expands `27`.
+// Without a month, `the 15th` is the 15th of this month, as in date-core.
 function calendarDateBoundary(answers: DateAnswers): { boundary: BoundarySlice; used: Answer[] } | null {
   const month = answers.month.choice;
   const dayOfMonth = answers.day_of_month.choice;
-  if (month === "none" || dayOfMonth === "none") {
+  const year = answers.year;
+  if (dayOfMonth === "none") {
     return null;
   }
 
-  const year = answers.year;
+  if (month === "none") {
+    return !year || year.choice === "none"
+      ? {
+          boundary: { kind: "day-of-month", day: Number(dayOfMonth) },
+          used: [answers.day, answers.month, answers.day_of_month, ...(year ? [year] : [])],
+        }
+      : null;
+  }
+
   return {
     boundary: {
       kind: "ordinal-day-in-range",
