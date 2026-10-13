@@ -442,8 +442,9 @@ function sliceUpperBoundRange(
   }
 
   // A whole week, month, or year before `until` starts the range at its beginning, as the user
-  // decided; a written side, as in `end of next week`, wins.
-  const startChunks = trimCommandAndArticle(split.leftChunks);
+  // decided; a written side, as in `end of next week`, wins. A leading `from` only names where the
+  // range begins: `from june until august` starts on June 1, like `june until august`.
+  const startChunks = trimCommandAndArticle(startsWithFrom(split.leftChunks) ? split.leftChunks.slice(1) : split.leftChunks);
   const start = parseTypedBoundaryEndpoint(chunkText(startChunks), lookups, boundarySideFromChunks(startChunks) ?? "start", {
     preferDay: true,
   });
@@ -922,13 +923,8 @@ function findUpperBoundConnector(chunks: readonly StandardChunk[]): { index: num
   return null;
 }
 
-// Example: `shouldDeferUpperBoundRange(chunksFor("from christmas to july"), 2, lookups)` preserves existing range parsing.
+// Example: `shouldDeferUpperBoundRange(chunksFor("mondays from tomorrow until march"), 3, lookups)` leaves a scoped sampler to its own slicer.
 function shouldDeferUpperBoundRange(chunks: readonly StandardChunk[], upperBoundIndex: number, lookups: DateVocabularyLookups): boolean {
-  const first = chunks[0];
-  if (first?.kind === "connector" && first.value === "from") {
-    return true;
-  }
-
   const scopedConnectorIndex = findScopedSamplerConnectorIndex(chunks.slice(0, upperBoundIndex));
   return scopedConnectorIndex > 0 && Boolean(parseSamplerFromChunks(chunks.slice(0, scopedConnectorIndex), lookups));
 }
@@ -992,6 +988,11 @@ function isRecurrenceMarkerPrefix(chunks: readonly StandardChunk[]): boolean {
 // Example: `trimLeadingArticle(chunksFor("the next month"))` returns chunks for `next month`.
 function trimLeadingArticle(chunks: readonly StandardChunk[]): readonly StandardChunk[] {
   return chunks[0]?.kind === "word" && chunks[0].value === "the" ? chunks.slice(1) : chunks;
+}
+
+// Example: `startsWithFrom(chunksFor("from today"))` returns `true`.
+function startsWithFrom(chunks: readonly StandardChunk[]): boolean {
+  return chunks[0]?.kind === "connector" && chunks[0].value === "from";
 }
 
 // Example: `chunkText(chunksFor("q 4"))` returns normalized phrase text `q4`.

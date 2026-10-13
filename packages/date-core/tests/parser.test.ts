@@ -126,6 +126,8 @@ describe("parseDate", () => {
     ["25 days from tomorrow upto the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
     ["25 days from tomorrow to the end of june 27", { kind: "range", start: "2026-06-22", end: "2027-06-30" }],
     ["tomorrow until end of next month", { kind: "range", start: "2026-05-28", end: "2026-06-30" }],
+    ["today until next month", { kind: "range", start: "2026-05-27", end: "2026-06-30" }],
+    ["tomorrow until aug 15", { kind: "range", start: "2026-05-28", end: "2026-08-15" }],
     // Mondays from 28 Dec 2026 to Easter Sunday 28 Mar 2027.
     ["mondays between christmas this year and easter next year", { kind: "multiple", dates: ["2026-12-28", "2027-01-04", "2027-01-11", "2027-01-18", "2027-01-25", "2027-02-01", "2027-02-08", "2027-02-15", "2027-02-22", "2027-03-01", "2027-03-08", "2027-03-15", "2027-03-22"] }],
     ["3rd quarter until the end of the year.", { kind: "range", start: "2026-07-01", end: "2026-12-31" }],
@@ -157,6 +159,8 @@ describe("parseDate", () => {
     ["between christmas and jul 1 2027", { kind: "range", start: "2026-12-25", end: "2027-07-01" }],
     ["between aug 15 and sep 30", { kind: "range", start: "2026-08-15", end: "2026-09-30" }],
     ["from aug 15 to sep 30", { kind: "range", start: "2026-08-15", end: "2026-09-30" }],
+    // `from` names where the range begins, so a whole month starts on its first day.
+    ["from june to august", { kind: "range", start: "2026-06-01", end: "2026-08-31" }],
     ["Q1", { kind: "range", start: "2026-01-01", end: "2026-03-31" }],
     ["q2", { kind: "range", start: "2026-04-01", end: "2026-06-30" }],
     ["Q3 2027", { kind: "range", start: "2027-07-01", end: "2027-09-30" }],
@@ -2936,6 +2940,12 @@ describe("phrasing variants", () => {
     ["fortnight from now", { kind: "single", date: "2026-06-10" }], // = `2 weeks from now`
     ["in a fortnight", { kind: "single", date: "2026-06-10" }],
     ["in 2 business days", { kind: "single", date: "2026-05-29" }], // = `2 weekdays from now`
+    ["from today till next month", { kind: "range", start: "2026-05-27", end: "2026-06-30" }], // = `today until next month`
+    ["from today until next month", { kind: "range", start: "2026-05-27", end: "2026-06-30" }],
+    ["from june until august", { kind: "range", start: "2026-06-01", end: "2026-08-31" }], // = `from june to august`
+    ["from today to next month", { kind: "range", start: "2026-05-27", end: "2026-06-30" }], // = `today until next month`
+    // The example the `from tomorrow` error message suggests.
+    ["from tomorrow until aug 15", { kind: "range", start: "2026-05-28", end: "2026-08-15" }], // = `tomorrow until aug 15`
     // Reversed word orders: the same known words, with the year or the sampler
     // on the other side of the range.
     ["2020 august", { kind: "range", start: "2020-08-01", end: "2020-08-31" }], // = `august 2020`
