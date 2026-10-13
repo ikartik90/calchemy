@@ -293,13 +293,16 @@ describe("parseDate", () => {
   });
 
   // Decided by the user: an end with no year, month, or week of its own counts forward from the
-  // start, so it lands on the first matching day, month, or quarter on or after it.
+  // start, so it is the first matching day, month, or quarter on or after it.
   test.each<[string, DateValueJSON]>([
     ["12 weeks from tomorrow until the end of Q2", { kind: "range", start: "2026-08-20", end: "2027-06-30" }],
     ["tomorrow until march", { kind: "range", start: "2026-05-28", end: "2027-03-31" }],
     ["dec 20 until jan 3", { kind: "range", start: "2026-12-20", end: "2027-01-03" }],
     ["from dec 20 to jan 3", { kind: "range", start: "2026-12-20", end: "2027-01-03" }],
     ["tomorrow until the 5th", { kind: "range", start: "2026-05-28", end: "2026-06-05" }],
+    // The first match on or after the start, even when today's would also come after it.
+    ["apr 1 until the 20th", { kind: "range", start: "2026-04-01", end: "2026-04-20" }],
+    ["from jan 2025 to march", { kind: "range", start: "2025-01-01", end: "2025-03-31" }],
   ])("counts the floating end of %s forward from its start", (input, expected) => {
     const result = calchemy.parseDate(input, context);
 
@@ -2370,10 +2373,11 @@ describe("parseDate", () => {
         end: "2026-06-30",
       });
       expect(monthYear?.id).toBe("nested-month-year");
+      // The end counts forward from the start, decided by the user: the first June after April 2015.
       expect(monthYear && calchemy.toJSON(monthYear.value)).toEqual({
         kind: "range",
         start: "2015-04-14",
-        end: "2026-06-30",
+        end: "2015-06-30",
       });
     }
   });
@@ -2440,7 +2444,7 @@ describe("parseDate", () => {
       [
         { kind: "range", start: "2026-06-03", end: "2026-09-30" },
         { kind: "range", start: "2026-03-06", end: "2026-09-30" },
-        { kind: "range", start: "2003-06-26", end: "2026-09-30" },
+        { kind: "range", start: "2003-06-26", end: "2003-09-30" }, // the first q3 after the start, decided by the user
       ],
     ],
   ])("returns ambiguity for nested numeric dates: %s", (input, expected) => {
