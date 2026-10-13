@@ -23,6 +23,9 @@ describe("parseDate", () => {
     ["day after tomorrow", { kind: "single", date: "2026-05-29" }],
     ["day before yesterday", { kind: "single", date: "2026-05-25" }],
     ["next month", { kind: "range", start: "2026-06-01", end: "2026-06-30" }],
+    ["this week", { kind: "range", start: "2026-05-24", end: "2026-05-30" }],
+    ["previous quarter", { kind: "range", start: "2026-01-01", end: "2026-03-31" }],
+    ["next year", { kind: "range", start: "2027-01-01", end: "2027-12-31" }],
   ])("%s", async (input, expected) => {
     const jev = await createJevParser({ client: replayClient(input) });
     const result = await jev.parseDate(input, context);
