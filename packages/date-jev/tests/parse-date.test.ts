@@ -33,6 +33,10 @@ describe("parseDate", () => {
     // Two-ended ranges: each end is a pinned single day (`today`, `this friday` = the coming friday).
     ["today until friday", { kind: "range", start: "2026-05-27", end: "2026-05-29" }],
     ["tomorrow to next friday", { kind: "range", start: "2026-05-28", end: "2026-06-05" }],
+    // A floating end counts forward from the start, decided by the user: the upcoming friday falls
+    // before the upcoming monday, so the range ends on the friday after it.
+    ["monday through friday", { kind: "range", start: "2026-06-01", end: "2026-06-05" }],
+    ["dec 20 until jan 3", { kind: "range", start: "2026-12-20", end: "2027-01-03" }],
   ])("%s", async (input, expected) => {
     const jev = await createJevParser({ client: replayClient(input) });
     const result = await jev.parseDate(input, context);
