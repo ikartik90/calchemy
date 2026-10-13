@@ -40,3 +40,19 @@ due friday
 next month
 excluding holidays
 banana
+
+# Calendar periods
+this week
+next week
+last week
+last month
+next quarter
+this year
+
+# Two-ended ranges
+today until friday
+tomorrow to next friday
+from today till next month
+monday through friday
+from next monday to next friday
+tomorrow until end of next month
