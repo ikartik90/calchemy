@@ -2342,6 +2342,20 @@ describe("parseDate", () => {
     }
   });
 
+  // Decided by the user: an ordinal such as `27th` always names a day, so only bare digits can be a year.
+  test.each([
+    ["june 27th", "2026-06-27"],
+    ["june the 27th", "2026-06-27"],
+    ["apr 15th", "2026-04-15"],
+  ])("reads %s as the day alone", (input, date) => {
+    const result = calchemy.parseDate(input, context);
+
+    expect(result.status).toBe("valid");
+    if (result.status === "valid") {
+      expect(calchemy.toJSON(result.value)).toEqual({ kind: "single", date });
+    }
+  });
+
   test("returns ambiguity for scoped sampler ranges with a past two-digit year shorthand", () => {
     const result = calchemy.parseDate("second tuesday from apr 15 until end of june", context);
 
