@@ -127,43 +127,64 @@ export type DateAnswers = {
   period_modifier: { choice: PeriodModifierOption; confidence: number };
 };
 
-// Example: `dateQuestions()` asks Jev which day or calendar period the phrase in `state.phrase` names.
-export function dateQuestions() {
+/** A text field of the state Jev reads: the whole phrase, or one end of a range. */
+export type Field = "phrase" | "start" | "end";
+
+// Example: `dateQuestions("start")` asks Jev which day or calendar period `state.start` names,
+// under keys prefixed `start_`. The whole phrase keeps unprefixed keys.
+export function dateQuestions(field: Field = "phrase") {
+  const prefix = field === "phrase" ? "" : `${field}_`;
   return {
-    day: {
-      type: "choice",
-      instructions: "Which day does `phrase` name?",
+    [`${prefix}day`]: {
+      type: "choice" as const,
+      instructions: `Which day does \`${field}\` name?`,
       criteria: DayOptions,
     },
-    weekday: {
-      type: "choice",
-      instructions: "Which day of the week does `phrase` name?",
+    [`${prefix}weekday`]: {
+      type: "choice" as const,
+      instructions: `Which day of the week does \`${field}\` name?`,
       criteria: WeekdayOptions,
     },
-    modifier: {
-      type: "choice",
-      instructions: "Which word in `phrase` picks out which occurrence of the day of the week?",
+    [`${prefix}modifier`]: {
+      type: "choice" as const,
+      instructions: `Which word in \`${field}\` picks out which occurrence of the day of the week?`,
       criteria: ModifierOptions,
     },
-    shift: {
-      type: "choice",
+    [`${prefix}shift`]: {
+      type: "choice" as const,
       instructions: {
-        question: "Does `phrase` shift its day by an extra amount, on top of the day it names?",
+        question: `Does \`${field}\` shift its day by an extra amount, on top of the day it names?`,
         note: "Words that name a day by themselves are not a shift: today, tomorrow, yesterday, the day after tomorrow, the day before yesterday, a weekday, and a weekday with this, next, or last.",
       },
       criteria: ShiftOptions,
     },
-    period: {
-      type: "choice",
-      instructions: "Which whole calendar period does `phrase` name?",
+    [`${prefix}period`]: {
+      type: "choice" as const,
+      instructions: `Which whole calendar period does \`${field}\` name?`,
       criteria: PeriodOptions,
     },
-    period_modifier: {
-      type: "choice",
-      instructions: "Which word in `phrase` picks out which calendar period?",
+    [`${prefix}period_modifier`]: {
+      type: "choice" as const,
+      instructions: `Which word in \`${field}\` picks out which calendar period?`,
       criteria: PeriodModifierOptions,
     },
-  } as const;
+  };
+}
+
+// Example: `rangeQuestions()` asks about each end of a split phrase, and whether it is a range at all.
+export function rangeQuestions() {
+  return {
+    ...dateQuestions("start"),
+    ...dateQuestions("end"),
+    is_range: {
+      type: "noul" as const,
+      instructions: "Does `phrase` name a stretch of days that runs from `start` to `end`?",
+      criteria: {
+        true: "A span with a start and an end, as in `today until friday`",
+        false: "Not a span from `start` to `end`",
+      },
+    },
+  };
 }
 
 /** A tree plus how sure Jev was: the weakest of the answers that built it. */
@@ -172,19 +193,59 @@ export type Reading = {
   confidence: number;
 };
 
+// A split phrase that Jev confirms as a stretch of days reads as a range of its two ends. Without
+// a split, or when Jev says it is not a range, the phrase reads whole.
+export function readAnswers(answers: Readonly<Record<string, unknown>>, split: boolean): Reading | null {
+  const isRange = split ? (answers.is_range as { noul: number }).noul : 0;
+  return isRange >= 0.5
+    ? rangeFromAnswers(answersFor(answers, "start"), answersFor(answers, "end"), isRange)
+    : treeFromAnswers(answersFor(answers, "phrase"));
+}
+
+// The SDK cannot type answers under computed keys; each one is an answer to a question built
+// from this module's own options.
+function answersFor(answers: Readonly<Record<string, unknown>>, field: Field): DateAnswers {
+  const prefix = field === "phrase" ? "" : `${field}_`;
+  const names = ["day", "weekday", "modifier", "shift", "period", "period_modifier"] as const;
+  return Object.fromEntries(names.map((name) => [name, answers[`${prefix}${name}`]])) as DateAnswers;
+}
+
 // Example: `treeFromAnswers({ day: { choice: "tomorrow", confidence: 1 }, ... })` reads `tomorrow` with confidence 1.
-// A phrase is read as a day when Jev names one, and as a calendar period otherwise.
 export function treeFromAnswers(answers: DateAnswers): Reading | null {
+  const found = boundaryFromAnswers(answers);
+  return found ? reading(found.boundary, found.used) : null;
+}
+
+// Example: `rangeFromAnswers(today, friday, 0.98)` reads `today until friday` from its two ends.
+// The range is only as sure as Jev's answer that it is one, and as each end.
+export function rangeFromAnswers(start: DateAnswers, end: DateAnswers, isRange: number): Reading | null {
+  const from = boundaryFromAnswers(start);
+  const to = boundaryFromAnswers(end);
+  if (!from || !to) {
+    return null;
+  }
+
+  return reading(
+    {
+      kind: "range",
+      start: { kind: "boundary", boundary: from.boundary, side: "start" },
+      end: { kind: "boundary", boundary: to.boundary, side: "end" },
+    },
+    [...from.used, ...to.used, { confidence: isRange }],
+  );
+}
+
+// A piece is read as a day when Jev names one, and as a calendar period otherwise.
+function boundaryFromAnswers(answers: DateAnswers): { boundary: BoundarySlice; used: Answer[] } | null {
   const day = dayBoundary(answers);
   if (day) {
     const shift = answers.shift.choice;
     const boundary: BoundarySlice =
       shift === "none" ? day.boundary : { kind: "duration-near-boundary", ...Shifts[shift], anchor: day.boundary };
-    return reading(boundary, [...day.used, answers.shift]);
+    return { boundary, used: [...day.used, answers.shift] };
   }
 
-  const period = periodBoundary(answers);
-  return period ? reading(period.boundary, period.used) : null;
+  return periodBoundary(answers);
 }
 
 function reading(boundary: BoundarySlice, used: readonly Answer[]): Reading {

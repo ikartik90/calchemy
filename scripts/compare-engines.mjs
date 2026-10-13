@@ -94,7 +94,9 @@ function withWeekday(date) {
 
 function summarizeAnswers(response) {
   return Object.entries(response.answers)
-    .map(([name, answer]) => `${name}=${answer.choice} ${answer.confidence.toFixed(2)}`)
+    .map(([name, answer]) =>
+      answer.type === "noul" ? `${name}=${answer.noul.toFixed(2)}` : `${name}=${answer.choice} ${answer.confidence.toFixed(2)}`,
+    )
     .join("  ");
 }
 

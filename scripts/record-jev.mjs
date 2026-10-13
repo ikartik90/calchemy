@@ -71,8 +71,8 @@ function recordedPhrases() {
 
 // Example: `summarize(response)` returns `day=weekday (0.95)  weekday=friday (0.98)  [jev-1.13.0]`.
 function summarize(response) {
-  const answers = Object.entries(response.answers).map(
-    ([name, answer]) => `${name}=${answer.choice} (${answer.confidence.toFixed(2)})`,
+  const answers = Object.entries(response.answers).map(([name, answer]) =>
+    answer.type === "noul" ? `${name}=${answer.noul.toFixed(2)}` : `${name}=${answer.choice} (${answer.confidence.toFixed(2)})`,
   );
   return `${answers.join("  ")}  [${response.model}]`;
 }
