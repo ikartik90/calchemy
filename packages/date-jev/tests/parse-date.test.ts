@@ -27,6 +27,8 @@ describe("parseDate", () => {
     ["march 15 2020", { kind: "single", date: "2020-03-15" }],
     ["6 mar 27", { kind: "single", date: "2027-03-06" }], // a written 27 is the year nearest the reference date
     ["the 15th", { kind: "single", date: "2026-05-15" }], // the 15th of this month, even though it has passed
+    ["april", { kind: "range", start: "2026-04-01", end: "2026-04-30" }], // = `this april`
+    ["august 2020", { kind: "range", start: "2020-08-01", end: "2020-08-31" }],
     ["next month", { kind: "range", start: "2026-06-01", end: "2026-06-30" }],
     ["this week", { kind: "range", start: "2026-05-24", end: "2026-05-30" }],
     ["previous quarter", { kind: "range", start: "2026-01-01", end: "2026-03-31" }],

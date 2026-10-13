@@ -1,6 +1,6 @@
 import { boundaryToExpression } from "./core/parser/expression/from-slice";
 import type { DateSlice } from "./core/parser/expression/types";
-import type { BoundarySlice, RelativeExpressionSlice } from "./core/parser/slice/types";
+import type { BoundarySlice, RelativeExpressionSlice, YearReferenceSlice } from "./core/parser/slice/types";
 import type { DurationUnit, RelationDirection, RelativeDateValue, RelativeModifier } from "./core/parser/types";
 import type { RangeSplit } from "./split";
 
@@ -399,7 +399,8 @@ function withStartMonth(end: DateAnswers, start: DateAnswers): DateAnswers {
   return { ...end, month: start.month, ...(startYear ? { year: startYear } : {}) };
 }
 
-// A piece is read as a day when Jev names one, then as a count from today, then as a calendar period.
+// A piece is read as a day when Jev names one, then as a count from today, then as a named month,
+// then as a calendar period.
 // A count date-jev cannot read makes the piece unreadable rather than falling through: `next 2 weeks`
 // must not read as `next week`.
 function boundaryFromAnswers(answers: DateAnswers): { boundary: BoundarySlice; used: Answer[] } | null {
@@ -415,7 +416,29 @@ function boundaryFromAnswers(answers: DateAnswers): { boundary: BoundarySlice; u
     return countedBoundary(answers);
   }
 
-  return periodBoundary(answers);
+  return monthBoundary(answers) ?? periodBoundary(answers);
+}
+
+// Example: `monthBoundary(answers)` returns `april` as the whole of April this year, and `august 2020`
+// as August 2020. date-core reads `this april` the same as `april`. A month with `next` or `last` is
+// not read yet, so it is unreadable rather than this year's. Jev's day answer decides that no day
+// is named: for `august 2020` it also offers the 20th of `2020` as a day of the month.
+function monthBoundary(answers: DateAnswers): { boundary: BoundarySlice; used: Answer[] } | null {
+  const month = answers.month.choice;
+  const modifier = answers.period_modifier.choice;
+  if (month === "none" || answers.day.choice !== "none") {
+    return null;
+  }
+
+  if (modifier !== "none" && modifier !== "this") {
+    return null;
+  }
+
+  const year = answers.year;
+  return {
+    boundary: { kind: "month-range", month: Months[month], year: yearReference(year) },
+    used: [answers.day, answers.month, answers.period_modifier, ...(year ? [year] : [])],
+  };
 }
 
 // Example: `countedBoundary(answers)` returns `last 90 days` as date-core's `last` with a count of 90 days.
@@ -531,14 +554,15 @@ function calendarDateBoundary(answers: DateAnswers): { boundary: BoundarySlice; 
     boundary: {
       kind: "ordinal-day-in-range",
       day: Number(dayOfMonth),
-      range: {
-        kind: "month-range",
-        month: Months[month],
-        year: !year || year.choice === "none" ? { kind: "anchor" } : { kind: "explicit", year: Number(year.choice) },
-      },
+      range: { kind: "month-range", month: Months[month], year: yearReference(year) },
     },
     used: [answers.day, answers.month, answers.day_of_month, ...(year ? [year] : [])],
   };
+}
+
+// A written year stays as written, so date-core's math expands `27` to 2027; no year means this year.
+function yearReference(year: DateAnswers["year"]): YearReferenceSlice {
+  return !year || year.choice === "none" ? { kind: "anchor" } : { kind: "explicit", year: Number(year.choice) };
 }
 
 function relative(expression: RelativeExpressionSlice): BoundarySlice {
