@@ -41,6 +41,8 @@ describe("parseDate", () => {
     ["last 90 days", { kind: "range", start: "2026-02-27", end: "2026-05-27" }],
     ["next 10 days", { kind: "range", start: "2026-05-27", end: "2026-06-05" }],
     ["within 2 weeks", { kind: "range", start: "2026-05-27", end: "2026-06-09" }], // = `next 2 weeks`
+    ["in 10 days", { kind: "single", date: "2026-06-06" }], // = `10 days from now`
+    ["2 months ago", { kind: "single", date: "2026-03-27" }], // = `2 months before today`
     // Two-ended ranges: each end is a pinned single day (`today`, `this friday` = the coming friday).
     ["today until friday", { kind: "range", start: "2026-05-27", end: "2026-05-29" }],
     ["tomorrow to next friday", { kind: "range", start: "2026-05-28", end: "2026-06-05" }],

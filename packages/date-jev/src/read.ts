@@ -138,9 +138,8 @@ const PeriodModifiers = {
   last: "last",
 } as const satisfies Record<Exclude<PeriodModifierOption, "none">, RelativeModifier>;
 
-// A count of days, weeks, months, or years from today: a stretch, or one day that far away.
-// The single-day shapes are listed so Jev can tell `in 10 days` from `next 10 days`; date-jev
-// reads only the stretches so far.
+// A count of days, weeks, months, or years from today: a stretch, or one day that far away, so
+// Jev can tell `in 10 days` from `next 10 days`.
 const CountedOptions = {
   span_back: {
     what: "A number of days, weeks, months, or years counted back to today",
@@ -498,23 +497,44 @@ function monthBoundary(answers: DateAnswers): { boundary: BoundarySlice; used: A
     : null;
 }
 
-// Example: `countedBoundary(answers)` returns `last 90 days` as date-core's `last` with a count of 90 days.
+// Example: `countedBoundary(answers)` returns `last 90 days` as date-core's `last` with a count of
+// 90 days, `in 10 days` as 10 days from now, and `2 months ago` as 2 months before today: the trees
+// date-core builds for each.
 function countedBoundary(answers: DateAnswers): { boundary: BoundarySlice; used: Answer[] } | null {
   const counted = answers.counted.choice;
   const unit = answers.unit.choice;
   const count = answers.count;
-  if ((counted !== "span_back" && counted !== "span_forward") || unit === "none" || !count || count.choice === "none") {
+  if (counted === "none" || unit === "none" || !count || count.choice === "none") {
     return null;
   }
 
-  return {
-    boundary: relative({
-      kind: "modifier",
-      modifier: CountedModifiers[counted],
-      target: { kind: "counted-duration", count: Number(count.choice), unit },
-    }),
-    used: [answers.day, answers.counted, answers.unit, count],
-  };
+  const amount = Number(count.choice);
+  const used = [answers.day, answers.counted, answers.unit, count];
+  switch (counted) {
+    case "span_back":
+    case "span_forward":
+      return {
+        boundary: relative({
+          kind: "modifier",
+          modifier: CountedModifiers[counted],
+          target: { kind: "counted-duration", count: amount, unit },
+        }),
+        used,
+      };
+    case "day_forward":
+      return { boundary: relative({ kind: "from-now", amount, unit }), used };
+    case "day_back":
+      return {
+        boundary: {
+          kind: "duration-near-boundary",
+          amount,
+          unit,
+          direction: "before",
+          anchor: relative({ kind: "bare", value: "today" }),
+        },
+        used,
+      };
+  }
 }
 
 function reading(boundary: BoundarySlice, used: readonly Answer[]): Reading {
