@@ -429,10 +429,10 @@ function resolveBoundaryEndpoint(
 }
 
 // Example: `resolveRangeEndEndpoint(endOfMarch, MayStart, anchor, ...)` returns the end of the
-// first March on or after the start. An end with no year, month, or week of its own counts forward
-// from the start: `monday until friday` ends on the friday after that monday, `tomorrow until the
-// 5th` on the next 5th, and `dec 20 until jan 3` in the following year. An end fixed to the
-// reference date, such as `yesterday`, does not.
+// first March on or after the start. An end with no year, month, or week of its own is the first
+// match on or after the start: `monday until friday` ends on the friday after that monday,
+// `apr 1 until the 20th` on April 20, and `dec 20 until jan 3` in the following year. An end fixed
+// to the reference date, such as `yesterday`, is read as written and must not precede the start.
 function resolveRangeEndEndpoint(
   endpoint: BoundaryEndpointSlice,
   start: PlainDate,
@@ -441,19 +441,9 @@ function resolveRangeEndEndpoint(
   context: ResolvedParseDateContext,
   lookups: DateVocabularyLookups,
 ): PlainDate | null {
-  const end = resolveBoundaryEndpoint(
-    endpoint,
-    anchorDate,
-    Temporal,
-    context,
-    lookups,
-  );
-  if (!end || comparePlainDate(start, end) <= 0) {
-    return end;
-  }
-
   if (!floatsFromStart(endpoint.boundary)) {
-    return null;
+    const end = resolveBoundaryEndpoint(endpoint, anchorDate, Temporal, context, lookups);
+    return end && comparePlainDate(start, end) <= 0 ? end : null;
   }
 
   for (const anchor of [start, start.add({ months: 1 }), start.add({ years: 1 })]) {
