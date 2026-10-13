@@ -56,3 +56,27 @@ from today till next month
 monday through friday
 from next monday to next friday
 tomorrow until end of next month
+
+# Calendar dates
+jul 1
+jan 5
+march 15 2020
+6 mar 27
+5th nov
+nov 5th
+the 5th of november
+november fifth
+3rd of jan 2027
+15 march, 2020
+sept 3
+feburary 14
+novmber 5
+june 27
+feb 30
+can we meet on june 5?
+
+# Calendar date ranges
+june 5 to june 10
+aug 15 to sep 30
+from dec 20 until jan 3
+aug 10-14
