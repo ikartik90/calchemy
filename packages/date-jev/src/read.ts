@@ -419,10 +419,10 @@ function boundaryFromAnswers(answers: DateAnswers): { boundary: BoundarySlice; u
   return monthBoundary(answers) ?? periodBoundary(answers);
 }
 
-// Example: `monthBoundary(answers)` returns `april` as the whole of April this year, and `august 2020`
-// as August 2020. date-core reads `this april` the same as `april`. A month with `next` or `last` is
-// not read yet, so it is unreadable rather than this year's. Jev's day answer decides that no day
-// is named: for `august 2020` it also offers the 20th of `2020` as a day of the month.
+// Example: `monthBoundary(answers)` returns `april` as the whole of April this year, `august 2020` as
+// August 2020, and `next april` as date-core's relative month, the coming April after this one.
+// date-core reads `this april` the same as `april`. Jev's day answer decides that no day is named:
+// for `august 2020` it also offers the 20th of `2020` as a day of the month.
 function monthBoundary(answers: DateAnswers): { boundary: BoundarySlice; used: Answer[] } | null {
   const month = answers.month.choice;
   const modifier = answers.period_modifier.choice;
@@ -430,15 +430,16 @@ function monthBoundary(answers: DateAnswers): { boundary: BoundarySlice; used: A
     return null;
   }
 
-  if (modifier !== "none" && modifier !== "this") {
-    return null;
+  const year = answers.year;
+  const used = [answers.day, answers.month, answers.period_modifier, ...(year ? [year] : [])];
+  if (modifier === "none" || modifier === "this") {
+    return { boundary: { kind: "month-range", month: Months[month], year: yearReference(year) }, used };
   }
 
-  const year = answers.year;
-  return {
-    boundary: { kind: "month-range", month: Months[month], year: yearReference(year) },
-    used: [answers.day, answers.month, answers.period_modifier, ...(year ? [year] : [])],
-  };
+  // `next april 2027` names its year twice; date-jev does not guess which one counts.
+  return !year || year.choice === "none"
+    ? { boundary: { kind: "relative-month", month: Months[month], modifier: PeriodModifiers[modifier] }, used }
+    : null;
 }
 
 // Example: `countedBoundary(answers)` returns `last 90 days` as date-core's `last` with a count of 90 days.

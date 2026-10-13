@@ -29,6 +29,9 @@ describe("parseDate", () => {
     ["the 15th", { kind: "single", date: "2026-05-15" }], // the 15th of this month, even though it has passed
     ["april", { kind: "range", start: "2026-04-01", end: "2026-04-30" }], // = `this april`
     ["august 2020", { kind: "range", start: "2020-08-01", end: "2020-08-31" }],
+    ["next april", { kind: "range", start: "2027-04-01", end: "2027-04-30" }], // = `april next year`
+    ["next june", { kind: "range", start: "2026-06-01", end: "2026-06-30" }], // the upcoming June
+    ["last june", { kind: "range", start: "2025-06-01", end: "2025-06-30" }], // = `june last year`
     ["next month", { kind: "range", start: "2026-06-01", end: "2026-06-30" }],
     ["this week", { kind: "range", start: "2026-05-24", end: "2026-05-30" }],
     ["previous quarter", { kind: "range", start: "2026-01-01", end: "2026-03-31" }],
