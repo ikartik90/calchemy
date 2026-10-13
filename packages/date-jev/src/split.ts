@@ -4,10 +4,11 @@ export type RangeSplit = {
   end: string;
 };
 
-// Words that join the two ends of a range, as in `today until friday`.
-const RangeConnector = /\s+(?:until|till|through|thru|to)\s+/i;
+// Words or a dash that join the two ends of a range, as in `today until friday` or `aug 10-14`.
+const RangeConnector = /\s+(?:until|till|through|thru|to)\s+|\s*[-–]\s*/i;
 
-// Example: `splitRange("from today until friday")` returns `{ start: "today", end: "friday" }`.
+// Example: `splitRange("from today until friday")` returns `{ start: "today", end: "friday" }`, and
+// `splitRange("aug 10-14")` returns `{ start: "aug 10", end: "14" }`.
 export function splitRange(input: string): RangeSplit | null {
   const match = RangeConnector.exec(input);
   if (!match) {

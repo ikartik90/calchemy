@@ -295,7 +295,7 @@ export function treeFromAnswers(answers: DateAnswers): Reading | null {
 // The range is only as sure as Jev's answer that it is one, and as each end.
 export function rangeFromAnswers(start: DateAnswers, end: DateAnswers, isRange: number): Reading | null {
   const from = boundaryFromAnswers(start);
-  const to = boundaryFromAnswers(end);
+  const to = boundaryFromAnswers(withStartMonth(end, start));
   if (!from || !to) {
     return null;
   }
@@ -308,6 +308,29 @@ export function rangeFromAnswers(start: DateAnswers, end: DateAnswers, isRange: 
     },
     [...from.used, ...to.used, { confidence: isRange }],
   );
+}
+
+// Example: in `aug 10-14` the end names only the 14th, so it takes August, and any year, from the
+// start. An earlier day, as in `dec 28-3`, or an end with its own year keeps no month and the range
+// stays unreadable, as it is in date-core.
+function withStartMonth(end: DateAnswers, start: DateAnswers): DateAnswers {
+  const endDay = end.day_of_month.choice;
+  const startDay = start.day_of_month.choice;
+  const borrows =
+    end.day.choice === "date" &&
+    end.month.choice === "none" &&
+    (end.year?.choice ?? "none") === "none" &&
+    start.month.choice !== "none" &&
+    endDay !== "none" &&
+    startDay !== "none" &&
+    Number(endDay) >= Number(startDay);
+
+  if (!borrows) {
+    return end;
+  }
+
+  const startYear = start.year?.choice === "none" ? undefined : start.year;
+  return { ...end, month: start.month, ...(startYear ? { year: startYear } : {}) };
 }
 
 // A piece is read as a day when Jev names one, and as a calendar period otherwise.

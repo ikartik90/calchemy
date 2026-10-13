@@ -37,6 +37,7 @@ describe("parseDate", () => {
     // before the upcoming monday, so the range ends on the friday after it.
     ["monday through friday", { kind: "range", start: "2026-06-01", end: "2026-06-05" }],
     ["dec 20 until jan 3", { kind: "range", start: "2026-12-20", end: "2027-01-03" }],
+    ["aug 10-14", { kind: "range", start: "2026-08-10", end: "2026-08-14" }],
   ])("%s", async (input, expected) => {
     const jev = await createJevParser({ client: replayClient(input) });
     const result = await jev.parseDate(input, context);
