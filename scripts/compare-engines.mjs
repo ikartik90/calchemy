@@ -21,7 +21,16 @@ const { createJevParser } = await import(new URL("../packages/date-jev/dist/inde
 
 const cacheDir = new URL("../node_modules/.cache/calchemy-jev/", import.meta.url);
 const WeekdayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const VerdictOrder = ["disagree", "jev error", "date-core ambiguous", "only date-jev", "only date-core", "neither", "agree"];
+const VerdictOrder = [
+  "disagree",
+  "jev error",
+  "date-core ambiguous",
+  "date-jev ambiguous",
+  "only date-jev",
+  "only date-core",
+  "neither",
+  "agree",
+];
 const { phrases, referenceDate, fresh } = parseArgs(process.argv.slice(2));
 
 let lastJevResponse = null;
@@ -60,15 +69,20 @@ for (const phrase of phrases) {
 
 printReport(rows, context.referenceDate);
 
-// Example: `verdictFor(valid, valid)` returns "disagree" when the two dates differ.
+// Example: `verdictFor(valid, valid)` returns "disagree" when the two dates differ. Two ambiguous
+// results agree when they offer the same readings in the same order.
 function verdictFor(coreResult, jevResult) {
   if (jevResult.status === "error") return "jev error";
   if (coreResult.status === "valid" && jevResult.status === "valid") {
     return sameValue(coreResult.value, jevResult.value) ? "agree" : "disagree";
   }
+  if (coreResult.status === "ambiguous" && jevResult.status === "ambiguous") {
+    return sameValues(coreResult.candidates, jevResult.candidates) ? "agree" : "disagree";
+  }
   if (coreResult.status === "ambiguous" && jevResult.status === "valid") return "date-core ambiguous";
+  if (coreResult.status === "valid" && jevResult.status === "ambiguous") return "date-jev ambiguous";
   if (coreResult.status !== "invalid" && jevResult.status === "invalid") return "only date-core";
-  if (coreResult.status === "invalid" && jevResult.status === "valid") return "only date-jev";
+  if (coreResult.status === "invalid" && jevResult.status !== "invalid") return "only date-jev";
   return "neither";
 }
 
@@ -76,11 +90,21 @@ function sameValue(a, b) {
   return JSON.stringify(toJSON(a)) === JSON.stringify(toJSON(b));
 }
 
-// Example: `describe(result)` returns "Fri 2026-06-05", "Mon 2026-06-01..Sun 2026-06-07", or "invalid".
+function sameValues(a, b) {
+  return a.length === b.length && a.every((candidate, index) => sameValue(candidate.value, b[index].value));
+}
+
+// Example: `describe(result)` returns "Fri 2026-06-05", "Mon 2026-06-01..Sun 2026-06-07", "invalid", or
+// "either Sat 2026-06-27 or Tue 2027-06-01..Wed 2027-06-30".
 function describe(result) {
-  if (result.status === "ambiguous") return `ambiguous (${result.candidates.length} readings)`;
-  if (result.status !== "valid") return "invalid";
-  const value = toJSON(result.value);
+  if (result.status === "ambiguous") {
+    return `either ${result.candidates.map((candidate) => describeValue(candidate.value)).join(" or ")}`;
+  }
+  return result.status === "valid" ? describeValue(result.value) : "invalid";
+}
+
+function describeValue(dateValue) {
+  const value = toJSON(dateValue);
   if (value.kind === "single") return withWeekday(value.date);
   if (value.kind === "range") return `${withWeekday(value.start)}..${withWeekday(value.end)}`;
   return value.dates.length <= 2

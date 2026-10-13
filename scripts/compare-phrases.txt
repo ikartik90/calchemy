@@ -73,6 +73,19 @@ feburary 14
 novmber 5
 june 27
 feb 30
+jan 15
+nov 30
+june 31
+27 june
+june 27th
+the 15th
+
+# Months on their own
+april
+august 2020
+next april
+last june
+this april
 can we meet on june 5?
 
 # Calendar date ranges
