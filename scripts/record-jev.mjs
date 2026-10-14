@@ -23,13 +23,15 @@ const phrases = process.argv.length > 2 ? process.argv.slice(2) : recordedPhrase
 let failures = 0;
 
 for (const phrase of phrases) {
-  const exchange = {};
+  // One call, or two when Jev says a split phrase is not a range.
+  const calls = [];
   const client = new TypeSafeClient({
     apiKey: process.env.TYPESAFE_API_KEY,
     fetch: async (url, init) => {
-      exchange.request = JSON.parse(String(init.body));
+      const call = { request: JSON.parse(String(init.body)) };
+      calls.push(call);
       const response = await fetch(url, init);
-      exchange.response = await response.clone().json();
+      call.response = await response.clone().json();
       return response;
     },
   });
@@ -43,21 +45,17 @@ for (const phrase of phrases) {
     continue;
   }
 
-  const recording = {
-    phrase,
-    recordedAt: new Date().toISOString().slice(0, 10),
-    request: exchange.request,
-    response: exchange.response,
-  };
+  const recording = { phrase, recordedAt: new Date().toISOString().slice(0, 10), calls };
   writeFileSync(new URL(recordingFile(phrase), recordingsDir), `${JSON.stringify(recording, null, 2)}\n`);
-  console.log(`✓ ${phrase.padEnd(16)} ${summarize(exchange.response)}`);
+  console.log(`✓ ${phrase.padEnd(16)} ${calls.map((call) => summarize(call.response)).join("  |  ")}`);
 }
 
 process.exit(failures > 0 ? 1 : 0);
 
 // Example: `recordingFile("next friday")` returns `next-friday.json`. Matches tests/support/replay.ts.
+// Escaped because the file is found by URL, where a `?` in `can we meet next tuesday?` would start a query.
 function recordingFile(phrase) {
-  return `${phrase.replaceAll(" ", "-")}.json`;
+  return `${encodeURIComponent(phrase.replaceAll(" ", "-"))}.json`;
 }
 
 function recordedPhrases() {

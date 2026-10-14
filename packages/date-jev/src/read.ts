@@ -130,8 +130,9 @@ const PeriodModifiers = {
   last: "last",
 } as const satisfies Record<Exclude<PeriodModifierOption, "none">, RelativeModifier>;
 
-// A count of days, weeks, months, or years from today: a stretch, or one day that far away, so
-// Jev can tell `in 10 days` from `next 10 days`.
+// A count of days, weeks, months, or years from today: a stretch, one day that far away, or the
+// whole period that an ordinal names, so Jev can tell `in 10 days` from `next 10 days`, and
+// `9 weeks from today` (one day) from `ninth week from today` (a whole week).
 const CountedOptions = {
   span_back: {
     what: "A number of days, weeks, months, or years counted back to today",
@@ -144,7 +145,11 @@ const CountedOptions = {
   day_back: { what: "One day that many days, weeks, months, or years before today", examples: ["2 months ago", "3 days ago"] },
   day_forward: {
     what: "One day that many days, weeks, months, or years after today",
-    examples: ["in 10 days", "3 weeks from now"],
+    examples: ["in 10 days", "3 weeks from now", "3 quarters from now"],
+  },
+  ordinal: {
+    what: "The whole day, week, month, quarter, or year that an ordinal such as ninth or 3rd counts to from today",
+    examples: ["ninth week from today", "third quarter from today", "2nd year from today"],
   },
   none: {
     what: "No count: a single day, or one whole calendar week, month, quarter, or year",
@@ -290,7 +295,7 @@ export function dateQuestions(field: Field, text: string) {
       type: "choice" as const,
       instructions: {
         question: `How many days, weeks, months, or years does \`${field}\` count?`,
-        note: "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, `the day after friday` is 1, `90 days` is 90, and `a fortnight` is 2 weeks.",
+        note: "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, `the day after friday` is 1, `90 days` is 90, `ninth week` is 9, and `a fortnight` is 2 weeks.",
       },
       criteria: countOptions(text),
     },
@@ -328,7 +333,9 @@ function writtenNumbers(text: string): string[] {
   return [...new Set(text.match(/\d+/g))];
 }
 
-// Example: `rangeQuestions(split)` asks about each end of a split phrase, and whether it is a range at all.
+// Example: `rangeQuestions(split)` asks about each end of a split phrase, whether it is a range at
+// all, and whether its end counts from its start. The whole phrase is asked about only when Jev
+// says it is not a range.
 export function rangeQuestions(split: RangeSplit) {
   return {
     ...dateQuestions("start", split.start),
@@ -339,6 +346,16 @@ export function rangeQuestions(split: RangeSplit) {
       criteria: {
         true: "A span with a start and an end, as in `today until friday`",
         false: "Not a span from `start` to `end`",
+      },
+    },
+    // Jev answers the end questions the same for `15 days later` and `15 days from today`: no day
+    // written, counted later. Only this says which day the count starts from.
+    end_from_start: {
+      type: "noul" as const,
+      instructions: "Does `end` count from `start`, as in `15 days later` or `a week after that`?",
+      criteria: {
+        true: "It counts from `start`, as in `tomorrow until 15 days later`",
+        false: "It names its own day, or counts from today, as in `friday`, `next month`, or `15 days from today`",
       },
     },
   };
@@ -352,16 +369,25 @@ export type Reading = {
   alternative?: { id: string; weight: number };
 };
 
-// A split phrase that Jev confirms as a stretch of days reads as a range of its two ends. Without
-// a split, or when Jev says it is not a range, the phrase reads whole, sometimes two ways at once.
-// An empty list means date-jev cannot read the phrase.
-export function readAnswers(answers: Readonly<Record<string, unknown>>, input: string, split: boolean): Reading[] {
-  const isRange = split ? (answers.is_range as { noul: number }).noul : 0;
-  if (isRange >= 0.5) {
-    const range = rangeFromAnswers(answersFor(answers, "start"), answersFor(answers, "end"), isRange);
-    return range ? [range] : [];
+type Noul = { noul: number };
+
+// Example: `readRangeAnswers(answers)` reads `today until friday` from its two ends. A split phrase
+// that Jev confirms as a stretch of days reads as a range; null means Jev says it is not one, so
+// the caller asks about the whole phrase. An empty list means a range date-jev cannot read.
+export function readRangeAnswers(answers: Readonly<Record<string, unknown>>): Reading[] | null {
+  const isRange = (answers.is_range as Noul).noul;
+  if (isRange < 0.5) {
+    return null;
   }
 
+  const fromStart = answers.end_from_start as Noul;
+  const range = rangeFromAnswers(answersFor(answers, "start"), answersFor(answers, "end"), isRange, fromStart.noul);
+  return range ? [range] : [];
+}
+
+// Example: `readPhraseAnswers(answers, "next friday")` reads a phrase whole, sometimes two ways at
+// once, as in `june 27`. An empty list means date-jev cannot read the phrase.
+export function readPhraseAnswers(answers: Readonly<Record<string, unknown>>, input: string): Reading[] {
   const whole = answersFor(answers, "phrase");
   const tree = treeFromAnswers(whole);
   return dayOrYearReadings(whole, input) ?? (tree ? [tree] : []);
@@ -413,12 +439,13 @@ export function treeFromAnswers(answers: DateAnswers): Reading | null {
   return found ? reading(found.boundary, found.used) : null;
 }
 
-// Example: `rangeFromAnswers(today, friday, 0.98)` reads `today until friday` from its two ends.
-// The range is only as sure as Jev's answer that it is one, and as each end.
-export function rangeFromAnswers(start: DateAnswers, end: DateAnswers, isRange: number): Reading | null {
+// Example: `rangeFromAnswers(today, friday, 0.98, 0.1)` reads `today until friday` from its two ends.
+// The range is only as sure as Jev's answer that it is one, and as each end. When Jev says the end
+// counts from the start, as in `15 days later`, it does: a floating end, decided by the user.
+export function rangeFromAnswers(start: DateAnswers, end: DateAnswers, isRange: number, fromStart: number): Reading | null {
   const pieces = shareMonth(start, end);
   const from = pieces && boundaryFromAnswers(pieces.start);
-  const to = pieces && boundaryFromAnswers(pieces.end);
+  const to = pieces && from && (fromStart >= 0.5 ? countedFromStart(from.boundary, pieces.end, fromStart) : boundaryFromAnswers(pieces.end));
   if (!from || !to) {
     return null;
   }
@@ -431,6 +458,26 @@ export function rangeFromAnswers(start: DateAnswers, end: DateAnswers, isRange: 
     },
     [...from.used, ...to.used, { confidence: isRange }],
   );
+}
+
+// Example: in `tomorrow until 15 days later`, `countedFromStart(tomorrow, end, 0.9)` returns date-core's
+// `15 days after <tomorrow>`, the tree it builds for `15 days after tomorrow`.
+function countedFromStart(
+  start: BoundarySlice,
+  end: DateAnswers,
+  fromStart: number,
+): { boundary: BoundarySlice; used: Answer[] } | null {
+  const shift = end.shift.choice;
+  const unit = end.unit.choice;
+  const count = end.count.choice;
+  if (shift === "none" || unit === "none" || count === "none") {
+    return null;
+  }
+
+  return {
+    boundary: { kind: "duration-near-boundary", amount: Number(count), unit, direction: ShiftDirections[shift], anchor: start },
+    used: [{ confidence: fromStart }, end.shift, end.unit, end.count],
+  };
 }
 
 // Example: in `aug 10-14` the end names only the 14th, so it takes August, and any year, from the
@@ -543,8 +590,8 @@ function monthBoundary(answers: DateAnswers): { boundary: BoundarySlice; used: A
 }
 
 // Example: `countedBoundary(answers)` returns `last 90 days` as date-core's `last` with a count of
-// 90 days, `in 10 days` as 10 days from now, and `2 months ago` as 2 months before today: the trees
-// date-core builds for each.
+// 90 days, `in 10 days` as 10 days from now, `2 months ago` as 2 months before today, and
+// `ninth week from today` as the ninth whole week from today: the trees date-core builds for each.
 function countedBoundary(answers: DateAnswers): { boundary: BoundarySlice; used: Answer[] } | null {
   const counted = answers.counted.choice;
   const unit = answers.unit.choice;
@@ -577,6 +624,11 @@ function countedBoundary(answers: DateAnswers): { boundary: BoundarySlice; used:
           direction: "before",
           anchor: relative({ kind: "bare", value: "today" }),
         },
+        used,
+      };
+    case "ordinal":
+      return {
+        boundary: { kind: "ordinal-unit-from-anchor", ordinal: amount, unit, anchor: relative({ kind: "bare", value: "today" }) },
         used,
       };
   }

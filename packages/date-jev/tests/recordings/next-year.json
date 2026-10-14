@@ -1,724 +1,738 @@
 {
   "phrase": "next year",
-  "recordedAt": "2026-10-13",
-  "request": {
-    "state": {
-      "phrase": "next year"
-    },
-    "questions": {
-      "day": {
-        "type": "choice",
-        "instructions": {
-          "question": "Which day is written in `phrase`?",
-          "note": "Answer with the day as written, not a day counted from it: in `two weeks after tomorrow` it is tomorrow, and in `the day after friday` it is a weekday. `the day after tomorrow` and `the day before yesterday` are written days of their own."
+  "recordedAt": "2026-10-14",
+  "calls": [
+    {
+      "request": {
+        "state": {
+          "phrase": "next year"
         },
-        "criteria": {
-          "today": "The current day",
-          "tomorrow": "The day after today",
-          "yesterday": "The day before today",
-          "day_after_tomorrow": "Two days after today, as in `the day after tomorrow`",
-          "day_before_yesterday": "Two days before today, as in `the day before yesterday`",
-          "weekday": "A named day of the week, such as Tuesday",
-          "date": "A date on the calendar, named by its month and day, as in `june 5` or `5th nov`",
-          "none": "Some other day, or no day at all"
-        }
-      },
-      "weekday": {
-        "type": "choice",
-        "instructions": {
-          "question": "Which day of the week is written in `phrase`?",
-          "note": "As written, not counted from: `the day after friday` and `3 days before next friday` are both friday."
-        },
-        "criteria": {
-          "monday": null,
-          "tuesday": null,
-          "wednesday": null,
-          "thursday": null,
-          "friday": null,
-          "saturday": null,
-          "sunday": null,
-          "none": "The phrase names no day of the week"
-        }
-      },
-      "month": {
-        "type": "choice",
-        "instructions": {
-          "question": "Which month is written in `phrase`?",
-          "note": "As written, not counted from: `a week after june 28` is june."
-        },
-        "criteria": {
-          "january": null,
-          "february": null,
-          "march": null,
-          "april": null,
-          "may": null,
-          "june": null,
-          "july": null,
-          "august": null,
-          "september": null,
-          "october": null,
-          "november": null,
-          "december": null,
-          "none": "The phrase names no month"
-        }
-      },
-      "day_of_month": {
-        "type": "choice",
-        "instructions": {
-          "question": "Which day of the month is written in `phrase`?",
-          "note": "As written, not counted from: `10 days after june 5` is 5. A year is not a day of the month: `august 2020` names none."
-        },
-        "criteria": {
-          "1": null,
-          "2": null,
-          "3": null,
-          "4": null,
-          "5": null,
-          "6": null,
-          "7": null,
-          "8": null,
-          "9": null,
-          "10": null,
-          "11": null,
-          "12": null,
-          "13": null,
-          "14": null,
-          "15": null,
-          "16": null,
-          "17": null,
-          "18": null,
-          "19": null,
-          "20": null,
-          "21": null,
-          "22": null,
-          "23": null,
-          "24": null,
-          "25": null,
-          "26": null,
-          "27": null,
-          "28": null,
-          "29": null,
-          "30": null,
-          "31": null,
-          "none": "The phrase names no day of the month"
-        }
-      },
-      "modifier": {
-        "type": "choice",
-        "instructions": "Which word in `phrase` picks out which occurrence of the day of the week?",
-        "criteria": {
-          "this": "This week's, as in `this friday`",
-          "next": "The following one, as in `next friday`",
-          "after_next": "The one after the coming one, as in `the friday after next`",
-          "last": "The one before, as in `last friday`",
-          "none": "No word picks which one, as in a bare `friday`"
-        }
-      },
-      "shift": {
-        "type": "choice",
-        "instructions": {
-          "question": "Does `phrase` count some days, weeks, months, or years after or before the day written in it?",
-          "note": "A day written by itself is not counted from: today, tomorrow, yesterday, the day after tomorrow, the day before yesterday, a weekday, a weekday with this, next, last, or after next (as in `the friday after next`), a date such as june 5, and a whole week, month, quarter, or year (as in `previous quarter`)."
-        },
-        "criteria": {
-          "none": {
-            "what": "Nothing is counted from the day written",
-            "examples": [
-              "today",
-              "tomorrow",
-              "the day after tomorrow",
-              "friday",
-              "next friday",
-              "the friday after next",
-              "june 5",
-              "previous quarter"
-            ]
-          },
-          "later": {
-            "what": "Some days, weeks, months, or years after the day written",
-            "examples": [
-              "the day after friday",
-              "a week on friday",
-              "two weeks after tomorrow",
-              "25 days from tomorrow",
-              "10 days after june 5"
-            ]
-          },
-          "earlier": {
-            "what": "Some days, weeks, months, or years before the day written",
-            "examples": [
-              "the day before friday",
-              "3 days before next friday",
-              "a week before june 5"
-            ]
-          }
-        }
-      },
-      "period": {
-        "type": "choice",
-        "instructions": "Which whole calendar period does `phrase` name?",
-        "criteria": {
-          "week": {
-            "what": "A whole calendar week",
-            "examples": [
-              "this week",
-              "next week",
-              "last week"
-            ]
-          },
-          "month": {
-            "what": "A whole calendar month",
-            "examples": [
-              "this month",
-              "next month",
-              "last month"
-            ]
-          },
-          "quarter": {
-            "what": "A quarter of the year",
-            "examples": [
-              "this quarter",
-              "next quarter",
-              "last quarter"
-            ]
-          },
-          "year": {
-            "what": "A whole calendar year",
-            "examples": [
-              "this year",
-              "next year",
-              "last year"
-            ]
-          },
-          "none": {
-            "what": "No whole period: a single day, or not a date",
-            "examples": [
-              "tomorrow",
-              "next friday",
-              "banana"
-            ]
-          }
-        }
-      },
-      "period_modifier": {
-        "type": "choice",
-        "instructions": "Which word in `phrase` picks out which calendar period?",
-        "criteria": {
-          "this": {
-            "what": "The current one",
-            "examples": [
-              "this month",
-              "this year"
-            ]
-          },
-          "next": {
-            "what": "The following one",
-            "examples": [
-              "next month",
-              "next year"
-            ]
-          },
-          "last": {
-            "what": "The one before",
-            "examples": [
-              "last month",
-              "previous year"
-            ]
-          },
-          "none": {
-            "what": "No word picks which one",
-            "examples": [
-              "month",
-              "a year"
-            ]
-          }
-        }
-      },
-      "counted": {
-        "type": "choice",
-        "instructions": "Does `phrase` count a number of days, weeks, months, or years from today?",
-        "criteria": {
-          "span_back": {
-            "what": "A number of days, weeks, months, or years counted back to today",
-            "examples": [
-              "last 90 days",
-              "past 2 weeks",
-              "previous 3 months"
-            ]
-          },
-          "span_forward": {
-            "what": "A number of days, weeks, months, or years counted forward from today",
-            "examples": [
-              "next 10 days",
-              "within 2 weeks",
-              "upcoming 3 months"
-            ]
-          },
-          "day_back": {
-            "what": "One day that many days, weeks, months, or years before today",
-            "examples": [
-              "2 months ago",
-              "3 days ago"
-            ]
-          },
-          "day_forward": {
-            "what": "One day that many days, weeks, months, or years after today",
-            "examples": [
-              "in 10 days",
-              "3 weeks from now"
-            ]
-          },
-          "none": {
-            "what": "No count: a single day, or one whole calendar week, month, quarter, or year",
-            "examples": [
-              "next week",
-              "next month",
-              "previous quarter",
-              "this year",
-              "tomorrow",
-              "friday",
-              "june 5"
-            ]
-          }
-        }
-      },
-      "unit": {
-        "type": "choice",
-        "instructions": "What does `phrase` count?",
-        "criteria": {
+        "questions": {
           "day": {
-            "what": "Days",
-            "examples": [
-              "last 90 days",
-              "in 10 days",
-              "the day after friday"
-            ]
+            "type": "choice",
+            "instructions": {
+              "question": "Which day is written in `phrase`?",
+              "note": "Answer with the day as written, not a day counted from it: in `two weeks after tomorrow` it is tomorrow, and in `the day after friday` it is a weekday. `the day after tomorrow` and `the day before yesterday` are written days of their own."
+            },
+            "criteria": {
+              "today": "The current day",
+              "tomorrow": "The day after today",
+              "yesterday": "The day before today",
+              "day_after_tomorrow": "Two days after today, as in `the day after tomorrow`",
+              "day_before_yesterday": "Two days before today, as in `the day before yesterday`",
+              "weekday": "A named day of the week, such as Tuesday",
+              "date": "A date on the calendar, named by its month and day, as in `june 5` or `5th nov`",
+              "none": "Some other day, or no day at all"
+            }
           },
-          "week": {
-            "what": "Weeks",
-            "examples": [
-              "next 2 weeks",
-              "3 weeks from now",
-              "in a fortnight"
-            ]
+          "weekday": {
+            "type": "choice",
+            "instructions": {
+              "question": "Which day of the week is written in `phrase`?",
+              "note": "As written, not counted from: `the day after friday` and `3 days before next friday` are both friday."
+            },
+            "criteria": {
+              "monday": null,
+              "tuesday": null,
+              "wednesday": null,
+              "thursday": null,
+              "friday": null,
+              "saturday": null,
+              "sunday": null,
+              "none": "The phrase names no day of the week"
+            }
           },
           "month": {
-            "what": "Months",
-            "examples": [
-              "last 3 months",
-              "2 months ago"
-            ]
+            "type": "choice",
+            "instructions": {
+              "question": "Which month is written in `phrase`?",
+              "note": "As written, not counted from: `a week after june 28` is june."
+            },
+            "criteria": {
+              "january": null,
+              "february": null,
+              "march": null,
+              "april": null,
+              "may": null,
+              "june": null,
+              "july": null,
+              "august": null,
+              "september": null,
+              "october": null,
+              "november": null,
+              "december": null,
+              "none": "The phrase names no month"
+            }
           },
-          "quarter": {
-            "what": "Quarters of a year",
-            "examples": [
-              "3 quarters from now",
-              "last 2 quarters"
-            ]
+          "day_of_month": {
+            "type": "choice",
+            "instructions": {
+              "question": "Which day of the month is written in `phrase`?",
+              "note": "As written, not counted from: `10 days after june 5` is 5. A year is not a day of the month: `august 2020` names none."
+            },
+            "criteria": {
+              "1": null,
+              "2": null,
+              "3": null,
+              "4": null,
+              "5": null,
+              "6": null,
+              "7": null,
+              "8": null,
+              "9": null,
+              "10": null,
+              "11": null,
+              "12": null,
+              "13": null,
+              "14": null,
+              "15": null,
+              "16": null,
+              "17": null,
+              "18": null,
+              "19": null,
+              "20": null,
+              "21": null,
+              "22": null,
+              "23": null,
+              "24": null,
+              "25": null,
+              "26": null,
+              "27": null,
+              "28": null,
+              "29": null,
+              "30": null,
+              "31": null,
+              "none": "The phrase names no day of the month"
+            }
           },
-          "year": {
-            "what": "Years",
-            "examples": [
-              "next 2 years"
-            ]
+          "modifier": {
+            "type": "choice",
+            "instructions": "Which word in `phrase` picks out which occurrence of the day of the week?",
+            "criteria": {
+              "this": "This week's, as in `this friday`",
+              "next": "The following one, as in `next friday`",
+              "after_next": "The one after the coming one, as in `the friday after next`",
+              "last": "The one before, as in `last friday`",
+              "none": "No word picks which one, as in a bare `friday`"
+            }
           },
-          "none": {
-            "what": "It counts nothing",
-            "examples": [
-              "tomorrow",
-              "next friday",
-              "june 5"
-            ]
+          "shift": {
+            "type": "choice",
+            "instructions": {
+              "question": "Does `phrase` count some days, weeks, months, or years after or before the day written in it?",
+              "note": "A day written by itself is not counted from: today, tomorrow, yesterday, the day after tomorrow, the day before yesterday, a weekday, a weekday with this, next, last, or after next (as in `the friday after next`), a date such as june 5, and a whole week, month, quarter, or year (as in `previous quarter`)."
+            },
+            "criteria": {
+              "none": {
+                "what": "Nothing is counted from the day written",
+                "examples": [
+                  "today",
+                  "tomorrow",
+                  "the day after tomorrow",
+                  "friday",
+                  "next friday",
+                  "the friday after next",
+                  "june 5",
+                  "previous quarter"
+                ]
+              },
+              "later": {
+                "what": "Some days, weeks, months, or years after the day written",
+                "examples": [
+                  "the day after friday",
+                  "a week on friday",
+                  "two weeks after tomorrow",
+                  "25 days from tomorrow",
+                  "10 days after june 5"
+                ]
+              },
+              "earlier": {
+                "what": "Some days, weeks, months, or years before the day written",
+                "examples": [
+                  "the day before friday",
+                  "3 days before next friday",
+                  "a week before june 5"
+                ]
+              }
+            }
+          },
+          "period": {
+            "type": "choice",
+            "instructions": "Which whole calendar period does `phrase` name?",
+            "criteria": {
+              "week": {
+                "what": "A whole calendar week",
+                "examples": [
+                  "this week",
+                  "next week",
+                  "last week"
+                ]
+              },
+              "month": {
+                "what": "A whole calendar month",
+                "examples": [
+                  "this month",
+                  "next month",
+                  "last month"
+                ]
+              },
+              "quarter": {
+                "what": "A quarter of the year",
+                "examples": [
+                  "this quarter",
+                  "next quarter",
+                  "last quarter"
+                ]
+              },
+              "year": {
+                "what": "A whole calendar year",
+                "examples": [
+                  "this year",
+                  "next year",
+                  "last year"
+                ]
+              },
+              "none": {
+                "what": "No whole period: a single day, or not a date",
+                "examples": [
+                  "tomorrow",
+                  "next friday",
+                  "banana"
+                ]
+              }
+            }
+          },
+          "period_modifier": {
+            "type": "choice",
+            "instructions": "Which word in `phrase` picks out which calendar period?",
+            "criteria": {
+              "this": {
+                "what": "The current one",
+                "examples": [
+                  "this month",
+                  "this year"
+                ]
+              },
+              "next": {
+                "what": "The following one",
+                "examples": [
+                  "next month",
+                  "next year"
+                ]
+              },
+              "last": {
+                "what": "The one before",
+                "examples": [
+                  "last month",
+                  "previous year"
+                ]
+              },
+              "none": {
+                "what": "No word picks which one",
+                "examples": [
+                  "month",
+                  "a year"
+                ]
+              }
+            }
+          },
+          "counted": {
+            "type": "choice",
+            "instructions": "Does `phrase` count a number of days, weeks, months, or years from today?",
+            "criteria": {
+              "span_back": {
+                "what": "A number of days, weeks, months, or years counted back to today",
+                "examples": [
+                  "last 90 days",
+                  "past 2 weeks",
+                  "previous 3 months"
+                ]
+              },
+              "span_forward": {
+                "what": "A number of days, weeks, months, or years counted forward from today",
+                "examples": [
+                  "next 10 days",
+                  "within 2 weeks",
+                  "upcoming 3 months"
+                ]
+              },
+              "day_back": {
+                "what": "One day that many days, weeks, months, or years before today",
+                "examples": [
+                  "2 months ago",
+                  "3 days ago"
+                ]
+              },
+              "day_forward": {
+                "what": "One day that many days, weeks, months, or years after today",
+                "examples": [
+                  "in 10 days",
+                  "3 weeks from now",
+                  "3 quarters from now"
+                ]
+              },
+              "ordinal": {
+                "what": "The whole day, week, month, quarter, or year that an ordinal such as ninth or 3rd counts to from today",
+                "examples": [
+                  "ninth week from today",
+                  "third quarter from today",
+                  "2nd year from today"
+                ]
+              },
+              "none": {
+                "what": "No count: a single day, or one whole calendar week, month, quarter, or year",
+                "examples": [
+                  "next week",
+                  "next month",
+                  "previous quarter",
+                  "this year",
+                  "tomorrow",
+                  "friday",
+                  "june 5"
+                ]
+              }
+            }
+          },
+          "unit": {
+            "type": "choice",
+            "instructions": "What does `phrase` count?",
+            "criteria": {
+              "day": {
+                "what": "Days",
+                "examples": [
+                  "last 90 days",
+                  "in 10 days",
+                  "the day after friday"
+                ]
+              },
+              "week": {
+                "what": "Weeks",
+                "examples": [
+                  "next 2 weeks",
+                  "3 weeks from now",
+                  "in a fortnight"
+                ]
+              },
+              "month": {
+                "what": "Months",
+                "examples": [
+                  "last 3 months",
+                  "2 months ago"
+                ]
+              },
+              "quarter": {
+                "what": "Quarters of a year",
+                "examples": [
+                  "3 quarters from now",
+                  "last 2 quarters"
+                ]
+              },
+              "year": {
+                "what": "Years",
+                "examples": [
+                  "next 2 years"
+                ]
+              },
+              "none": {
+                "what": "It counts nothing",
+                "examples": [
+                  "tomorrow",
+                  "next friday",
+                  "june 5"
+                ]
+              }
+            }
+          },
+          "count": {
+            "type": "choice",
+            "instructions": {
+              "question": "How many days, weeks, months, or years does `phrase` count?",
+              "note": "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, `the day after friday` is 1, `90 days` is 90, `ninth week` is 9, and `a fortnight` is 2 weeks."
+            },
+            "criteria": {
+              "1": null,
+              "2": null,
+              "3": null,
+              "4": null,
+              "5": null,
+              "6": null,
+              "7": null,
+              "8": null,
+              "9": null,
+              "10": null,
+              "11": null,
+              "12": null,
+              "13": null,
+              "14": null,
+              "15": null,
+              "16": null,
+              "17": null,
+              "18": null,
+              "19": null,
+              "20": null,
+              "21": null,
+              "22": null,
+              "23": null,
+              "24": null,
+              "25": null,
+              "26": null,
+              "27": null,
+              "28": null,
+              "29": null,
+              "30": null,
+              "31": null,
+              "32": null,
+              "33": null,
+              "34": null,
+              "35": null,
+              "36": null,
+              "37": null,
+              "38": null,
+              "39": null,
+              "40": null,
+              "41": null,
+              "42": null,
+              "43": null,
+              "44": null,
+              "45": null,
+              "46": null,
+              "47": null,
+              "48": null,
+              "49": null,
+              "50": null,
+              "51": null,
+              "52": null,
+              "53": null,
+              "54": null,
+              "55": null,
+              "56": null,
+              "57": null,
+              "58": null,
+              "59": null,
+              "60": null,
+              "61": null,
+              "62": null,
+              "63": null,
+              "64": null,
+              "65": null,
+              "66": null,
+              "67": null,
+              "68": null,
+              "69": null,
+              "70": null,
+              "71": null,
+              "72": null,
+              "73": null,
+              "74": null,
+              "75": null,
+              "76": null,
+              "77": null,
+              "78": null,
+              "79": null,
+              "80": null,
+              "81": null,
+              "82": null,
+              "83": null,
+              "84": null,
+              "85": null,
+              "86": null,
+              "87": null,
+              "88": null,
+              "89": null,
+              "90": null,
+              "91": null,
+              "92": null,
+              "93": null,
+              "94": null,
+              "95": null,
+              "96": null,
+              "97": null,
+              "98": null,
+              "99": null,
+              "100": null,
+              "none": "It counts nothing"
+            }
           }
-        }
-      },
-      "count": {
-        "type": "choice",
-        "instructions": {
-          "question": "How many days, weeks, months, or years does `phrase` count?",
-          "note": "Give the number the phrase says, before its unit, not a total in days: `two weeks` is 2, `a week` is 1, `the day after friday` is 1, `90 days` is 90, and `a fortnight` is 2 weeks."
         },
-        "criteria": {
-          "1": null,
-          "2": null,
-          "3": null,
-          "4": null,
-          "5": null,
-          "6": null,
-          "7": null,
-          "8": null,
-          "9": null,
-          "10": null,
-          "11": null,
-          "12": null,
-          "13": null,
-          "14": null,
-          "15": null,
-          "16": null,
-          "17": null,
-          "18": null,
-          "19": null,
-          "20": null,
-          "21": null,
-          "22": null,
-          "23": null,
-          "24": null,
-          "25": null,
-          "26": null,
-          "27": null,
-          "28": null,
-          "29": null,
-          "30": null,
-          "31": null,
-          "32": null,
-          "33": null,
-          "34": null,
-          "35": null,
-          "36": null,
-          "37": null,
-          "38": null,
-          "39": null,
-          "40": null,
-          "41": null,
-          "42": null,
-          "43": null,
-          "44": null,
-          "45": null,
-          "46": null,
-          "47": null,
-          "48": null,
-          "49": null,
-          "50": null,
-          "51": null,
-          "52": null,
-          "53": null,
-          "54": null,
-          "55": null,
-          "56": null,
-          "57": null,
-          "58": null,
-          "59": null,
-          "60": null,
-          "61": null,
-          "62": null,
-          "63": null,
-          "64": null,
-          "65": null,
-          "66": null,
-          "67": null,
-          "68": null,
-          "69": null,
-          "70": null,
-          "71": null,
-          "72": null,
-          "73": null,
-          "74": null,
-          "75": null,
-          "76": null,
-          "77": null,
-          "78": null,
-          "79": null,
-          "80": null,
-          "81": null,
-          "82": null,
-          "83": null,
-          "84": null,
-          "85": null,
-          "86": null,
-          "87": null,
-          "88": null,
-          "89": null,
-          "90": null,
-          "91": null,
-          "92": null,
-          "93": null,
-          "94": null,
-          "95": null,
-          "96": null,
-          "97": null,
-          "98": null,
-          "99": null,
-          "100": null,
-          "none": "It counts nothing"
+        "model": "jev-latest"
+      },
+      "response": {
+        "model": "jev-1.13.0",
+        "answers": {
+          "day": {
+            "type": "choice",
+            "choice": "none",
+            "confidence": 1,
+            "probabilities": {
+              "today": 0,
+              "tomorrow": 0,
+              "yesterday": 0,
+              "day_after_tomorrow": 0,
+              "day_before_yesterday": 0,
+              "weekday": 0,
+              "date": 0,
+              "none": 1
+            }
+          },
+          "weekday": {
+            "type": "choice",
+            "choice": "none",
+            "confidence": 0.99,
+            "probabilities": {
+              "monday": 0,
+              "tuesday": 0,
+              "wednesday": 0,
+              "thursday": 0,
+              "friday": 0.01,
+              "saturday": 0,
+              "sunday": 0,
+              "none": 0.99
+            }
+          },
+          "month": {
+            "type": "choice",
+            "choice": "none",
+            "confidence": 1,
+            "probabilities": {
+              "january": 0,
+              "february": 0,
+              "march": 0,
+              "april": 0,
+              "may": 0,
+              "june": 0,
+              "july": 0,
+              "august": 0,
+              "september": 0,
+              "october": 0,
+              "november": 0,
+              "december": 0,
+              "none": 1
+            }
+          },
+          "day_of_month": {
+            "type": "choice",
+            "choice": "none",
+            "confidence": 1,
+            "probabilities": {
+              "1": 0,
+              "2": 0,
+              "3": 0,
+              "4": 0,
+              "5": 0,
+              "6": 0,
+              "7": 0,
+              "8": 0,
+              "9": 0,
+              "10": 0,
+              "11": 0,
+              "12": 0,
+              "13": 0,
+              "14": 0,
+              "15": 0,
+              "16": 0,
+              "17": 0,
+              "18": 0,
+              "19": 0,
+              "20": 0,
+              "21": 0,
+              "22": 0,
+              "23": 0,
+              "24": 0,
+              "25": 0,
+              "26": 0,
+              "27": 0,
+              "28": 0,
+              "29": 0,
+              "30": 0,
+              "31": 0,
+              "none": 1
+            }
+          },
+          "modifier": {
+            "type": "choice",
+            "choice": "next",
+            "confidence": 0.76,
+            "probabilities": {
+              "this": 0,
+              "next": 0.81,
+              "after_next": 0,
+              "last": 0,
+              "none": 0.19
+            }
+          },
+          "shift": {
+            "type": "choice",
+            "choice": "none",
+            "confidence": 0.77,
+            "probabilities": {
+              "none": 0.85,
+              "later": 0.15,
+              "earlier": 0
+            }
+          },
+          "period": {
+            "type": "choice",
+            "choice": "year",
+            "confidence": 1,
+            "probabilities": {
+              "week": 0,
+              "month": 0,
+              "quarter": 0,
+              "year": 1,
+              "none": 0
+            }
+          },
+          "period_modifier": {
+            "type": "choice",
+            "choice": "next",
+            "confidence": 1,
+            "probabilities": {
+              "this": 0,
+              "next": 1,
+              "last": 0,
+              "none": 0
+            }
+          },
+          "counted": {
+            "type": "choice",
+            "choice": "none",
+            "confidence": 0.94,
+            "probabilities": {
+              "span_back": 0,
+              "span_forward": 0.02,
+              "day_back": 0,
+              "day_forward": 0.01,
+              "ordinal": 0.02,
+              "none": 0.95
+            }
+          },
+          "unit": {
+            "type": "choice",
+            "choice": "year",
+            "confidence": 0.87,
+            "probabilities": {
+              "day": 0,
+              "week": 0,
+              "month": 0,
+              "quarter": 0,
+              "year": 0.89,
+              "none": 0.11
+            }
+          },
+          "count": {
+            "type": "choice",
+            "choice": "1",
+            "confidence": 0.99,
+            "probabilities": {
+              "1": 0.99,
+              "2": 0,
+              "3": 0,
+              "4": 0,
+              "5": 0,
+              "6": 0,
+              "7": 0,
+              "8": 0,
+              "9": 0,
+              "10": 0,
+              "11": 0,
+              "12": 0,
+              "13": 0,
+              "14": 0,
+              "15": 0,
+              "16": 0,
+              "17": 0,
+              "18": 0,
+              "19": 0,
+              "20": 0,
+              "21": 0,
+              "22": 0,
+              "23": 0,
+              "24": 0,
+              "25": 0,
+              "26": 0,
+              "27": 0,
+              "28": 0,
+              "29": 0,
+              "30": 0,
+              "31": 0,
+              "32": 0,
+              "33": 0,
+              "34": 0,
+              "35": 0,
+              "36": 0,
+              "37": 0,
+              "38": 0,
+              "39": 0,
+              "40": 0,
+              "41": 0,
+              "42": 0,
+              "43": 0,
+              "44": 0,
+              "45": 0,
+              "46": 0,
+              "47": 0,
+              "48": 0,
+              "49": 0,
+              "50": 0,
+              "51": 0,
+              "52": 0,
+              "53": 0,
+              "54": 0,
+              "55": 0,
+              "56": 0,
+              "57": 0,
+              "58": 0,
+              "59": 0,
+              "60": 0,
+              "61": 0,
+              "62": 0,
+              "63": 0,
+              "64": 0,
+              "65": 0,
+              "66": 0,
+              "67": 0,
+              "68": 0,
+              "69": 0,
+              "70": 0,
+              "71": 0,
+              "72": 0,
+              "73": 0,
+              "74": 0,
+              "75": 0,
+              "76": 0,
+              "77": 0,
+              "78": 0,
+              "79": 0,
+              "80": 0,
+              "81": 0,
+              "82": 0,
+              "83": 0,
+              "84": 0,
+              "85": 0,
+              "86": 0,
+              "87": 0,
+              "88": 0,
+              "89": 0,
+              "90": 0,
+              "91": 0,
+              "92": 0,
+              "93": 0,
+              "94": 0,
+              "95": 0,
+              "96": 0,
+              "97": 0,
+              "98": 0,
+              "99": 0,
+              "100": 0,
+              "none": 0.01
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 3592,
+          "output_tokens": 1659
         }
       }
-    },
-    "model": "jev-latest"
-  },
-  "response": {
-    "model": "jev-1.13.0",
-    "answers": {
-      "day": {
-        "type": "choice",
-        "choice": "none",
-        "confidence": 1,
-        "probabilities": {
-          "today": 0,
-          "tomorrow": 0,
-          "yesterday": 0,
-          "day_after_tomorrow": 0,
-          "day_before_yesterday": 0,
-          "weekday": 0,
-          "date": 0,
-          "none": 1
-        }
-      },
-      "weekday": {
-        "type": "choice",
-        "choice": "none",
-        "confidence": 1,
-        "probabilities": {
-          "monday": 0,
-          "tuesday": 0,
-          "wednesday": 0,
-          "thursday": 0,
-          "friday": 0,
-          "saturday": 0,
-          "sunday": 0,
-          "none": 1
-        }
-      },
-      "month": {
-        "type": "choice",
-        "choice": "none",
-        "confidence": 1,
-        "probabilities": {
-          "january": 0,
-          "february": 0,
-          "march": 0,
-          "april": 0,
-          "may": 0,
-          "june": 0,
-          "july": 0,
-          "august": 0,
-          "september": 0,
-          "october": 0,
-          "november": 0,
-          "december": 0,
-          "none": 1
-        }
-      },
-      "day_of_month": {
-        "type": "choice",
-        "choice": "none",
-        "confidence": 1,
-        "probabilities": {
-          "1": 0,
-          "2": 0,
-          "3": 0,
-          "4": 0,
-          "5": 0,
-          "6": 0,
-          "7": 0,
-          "8": 0,
-          "9": 0,
-          "10": 0,
-          "11": 0,
-          "12": 0,
-          "13": 0,
-          "14": 0,
-          "15": 0,
-          "16": 0,
-          "17": 0,
-          "18": 0,
-          "19": 0,
-          "20": 0,
-          "21": 0,
-          "22": 0,
-          "23": 0,
-          "24": 0,
-          "25": 0,
-          "26": 0,
-          "27": 0,
-          "28": 0,
-          "29": 0,
-          "30": 0,
-          "31": 0,
-          "none": 1
-        }
-      },
-      "modifier": {
-        "type": "choice",
-        "choice": "next",
-        "confidence": 0.76,
-        "probabilities": {
-          "this": 0,
-          "next": 0.81,
-          "after_next": 0,
-          "last": 0,
-          "none": 0.19
-        }
-      },
-      "shift": {
-        "type": "choice",
-        "choice": "none",
-        "confidence": 0.72,
-        "probabilities": {
-          "none": 0.81,
-          "later": 0.19,
-          "earlier": 0
-        }
-      },
-      "period": {
-        "type": "choice",
-        "choice": "year",
-        "confidence": 1,
-        "probabilities": {
-          "week": 0,
-          "month": 0,
-          "quarter": 0,
-          "year": 1,
-          "none": 0
-        }
-      },
-      "period_modifier": {
-        "type": "choice",
-        "choice": "next",
-        "confidence": 1,
-        "probabilities": {
-          "this": 0,
-          "next": 1,
-          "last": 0,
-          "none": 0
-        }
-      },
-      "counted": {
-        "type": "choice",
-        "choice": "none",
-        "confidence": 0.96,
-        "probabilities": {
-          "span_back": 0,
-          "span_forward": 0.02,
-          "day_back": 0,
-          "day_forward": 0.01,
-          "none": 0.97
-        }
-      },
-      "unit": {
-        "type": "choice",
-        "choice": "year",
-        "confidence": 0.89,
-        "probabilities": {
-          "day": 0,
-          "week": 0,
-          "month": 0,
-          "quarter": 0,
-          "year": 0.91,
-          "none": 0.09
-        }
-      },
-      "count": {
-        "type": "choice",
-        "choice": "1",
-        "confidence": 0.99,
-        "probabilities": {
-          "1": 0.99,
-          "2": 0,
-          "3": 0,
-          "4": 0,
-          "5": 0,
-          "6": 0,
-          "7": 0,
-          "8": 0,
-          "9": 0,
-          "10": 0,
-          "11": 0,
-          "12": 0,
-          "13": 0,
-          "14": 0,
-          "15": 0,
-          "16": 0,
-          "17": 0,
-          "18": 0,
-          "19": 0,
-          "20": 0,
-          "21": 0,
-          "22": 0,
-          "23": 0,
-          "24": 0,
-          "25": 0,
-          "26": 0,
-          "27": 0,
-          "28": 0,
-          "29": 0,
-          "30": 0,
-          "31": 0,
-          "32": 0,
-          "33": 0,
-          "34": 0,
-          "35": 0,
-          "36": 0,
-          "37": 0,
-          "38": 0,
-          "39": 0,
-          "40": 0,
-          "41": 0,
-          "42": 0,
-          "43": 0,
-          "44": 0,
-          "45": 0,
-          "46": 0,
-          "47": 0,
-          "48": 0,
-          "49": 0,
-          "50": 0,
-          "51": 0,
-          "52": 0,
-          "53": 0,
-          "54": 0,
-          "55": 0,
-          "56": 0,
-          "57": 0,
-          "58": 0,
-          "59": 0,
-          "60": 0,
-          "61": 0,
-          "62": 0,
-          "63": 0,
-          "64": 0,
-          "65": 0,
-          "66": 0,
-          "67": 0,
-          "68": 0,
-          "69": 0,
-          "70": 0,
-          "71": 0,
-          "72": 0,
-          "73": 0,
-          "74": 0,
-          "75": 0,
-          "76": 0,
-          "77": 0,
-          "78": 0,
-          "79": 0,
-          "80": 0,
-          "81": 0,
-          "82": 0,
-          "83": 0,
-          "84": 0,
-          "85": 0,
-          "86": 0,
-          "87": 0,
-          "88": 0,
-          "89": 0,
-          "90": 0,
-          "91": 0,
-          "92": 0,
-          "93": 0,
-          "94": 0,
-          "95": 0,
-          "96": 0,
-          "97": 0,
-          "98": 0,
-          "99": 0,
-          "100": 0,
-          "none": 0.01
-        }
-      }
-    },
-    "usage": {
-      "input_tokens": 3504,
-      "output_tokens": 1652
     }
-  }
+  ]
 }

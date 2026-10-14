@@ -33,7 +33,8 @@ const VerdictOrder = [
 ];
 const { phrases, referenceDate, fresh } = parseArgs(process.argv.slice(2));
 
-let lastJevResponse = null;
+// Jev's responses for the phrase being read: one, or two when a split phrase is not a range.
+let jevResponses = [];
 const client = new TypeSafeClient({
   apiKey: process.env.TYPESAFE_API_KEY ?? "cache-only",
   fetch: cachedFetch,
@@ -51,7 +52,7 @@ const context = {
 const rows = [];
 for (const phrase of phrases) {
   const coreResult = calchemy.parseDate(phrase, context);
-  lastJevResponse = null;
+  jevResponses = [];
   let jevResult;
   try {
     jevResult = await jev.parseDate(phrase, context);
@@ -62,7 +63,7 @@ for (const phrase of phrases) {
     phrase,
     core: describe(coreResult),
     jev: jevResult.status === "error" ? `error: ${jevResult.message}` : describe(jevResult),
-    jevAnswers: lastJevResponse ? summarizeAnswers(lastJevResponse) : "",
+    jevAnswers: jevResponses.map(summarizeAnswers).join("  |  "),
     verdict: verdictFor(coreResult, jevResult),
   });
 }
@@ -147,14 +148,14 @@ async function cachedFetch(url, init) {
   const file = new URL(`${createHash("sha256").update(body).digest("hex").slice(0, 24)}.json`, cacheDir);
   if (!fresh && existsSync(file)) {
     const cached = readFileSync(file, "utf8");
-    lastJevResponse = JSON.parse(cached);
+    jevResponses.push(JSON.parse(cached));
     return new Response(cached, { status: 200, headers: { "content-type": "application/json" } });
   }
 
   const response = await fetch(url, init);
   if (response.ok) {
     const text = await response.clone().text();
-    lastJevResponse = JSON.parse(text);
+    jevResponses.push(JSON.parse(text));
     mkdirSync(cacheDir, { recursive: true });
     writeFileSync(file, text);
   }

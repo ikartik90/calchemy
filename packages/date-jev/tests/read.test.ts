@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { AnswerNames, readAnswers, treeFromAnswers, type DateAnswers } from "../src/read";
+import { AnswerNames, readPhraseAnswers, readRangeAnswers, treeFromAnswers, type DateAnswers } from "../src/read";
 
 const unread = { choice: "none", confidence: 1 };
 
@@ -57,14 +57,13 @@ describe("treeFromAnswers", () => {
       unit: { choice: "week", confidence: 1 },
     });
 
-    expect(readAnswers(answers, "next few weeks", false)).toEqual([]);
+    expect(readPhraseAnswers(answers, "next few weeks")).toEqual([]);
   });
 
   test("a start that names a later day than its end takes no month from it", () => {
     // `28-3 jan`: the 28th cannot be in January before the 3rd, and nothing else names its month.
     const date = { choice: "date", confidence: 1 } as const;
     const answers = {
-      ...answersFor("", {}),
       ...answersFor("start_", { day: date, day_of_month: { choice: "28", confidence: 1 } }),
       ...answersFor("end_", {
         day: date,
@@ -72,21 +71,50 @@ describe("treeFromAnswers", () => {
         day_of_month: { choice: "3", confidence: 1 },
       }),
       is_range: { type: "noul", noul: 0.9 },
+      end_from_start: { type: "noul", noul: 0.1 },
     };
 
-    expect(readAnswers(answers, "28-3 jan", true)).toEqual([]);
+    expect(readRangeAnswers(answers)).toEqual([]);
   });
 
   test("a range whose end cannot be read is unreadable, not read whole", () => {
-    // The whole phrase reads as `today`, but Jev says it is a range and its end names nothing.
-    const today = { day: { choice: "today", confidence: 1 } } as const;
+    // Jev says it is a range and its end names nothing. An empty list, not null, so date-jev
+    // doesn't go on to ask about the whole phrase.
     const answers = {
-      ...answersFor("", today),
-      ...answersFor("start_", today),
+      ...answersFor("start_", { day: { choice: "today", confidence: 1 } }),
       ...answersFor("end_", {}),
       is_range: { type: "noul", noul: 0.95 },
+      end_from_start: { type: "noul", noul: 0.1 },
     };
 
-    expect(readAnswers(answers, "today until friday", true)).toEqual([]);
+    expect(readRangeAnswers(answers)).toEqual([]);
+  });
+
+  test("a split phrase Jev says is not a range has no range reading", () => {
+    // null tells date-jev to ask about the whole phrase in a second call.
+    const answers = {
+      ...answersFor("start_", { day: { choice: "weekday", confidence: 1 }, weekday: { choice: "friday", confidence: 1 } }),
+      ...answersFor("end_", {}),
+      is_range: { type: "noul", noul: 0.2 },
+      end_from_start: { type: "noul", noul: 0.1 },
+    };
+
+    expect(readRangeAnswers(answers)).toBeNull();
+  });
+
+  test("an end that counts from the start is as sure as Jev's answer that it does", () => {
+    // `tomorrow until 15 days later`
+    const answers = {
+      ...answersFor("start_", { day: { choice: "tomorrow", confidence: 1 } }),
+      ...answersFor("end_", {
+        shift: { choice: "later", confidence: 0.9 },
+        unit: { choice: "day", confidence: 1 },
+        count: { choice: "15", confidence: 1 },
+      }),
+      is_range: { type: "noul", noul: 0.95 },
+      end_from_start: { type: "noul", noul: 0.72 },
+    };
+
+    expect(readRangeAnswers(answers)?.[0]?.confidence).toBe(0.72);
   });
 });

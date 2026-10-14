@@ -2,7 +2,7 @@
 
 `@calchemy/date-jev` reads natural language date phrases with [TypeSafe](https://docs.typesafe.ai)'s Jev model and returns the same Temporal values as [`@calchemy/date-core`](https://www.npmjs.com/package/@calchemy/date-core). It reads wording a fixed grammar trips over: typos (`wensday`), dates inside a sentence (`can we meet next tuesday?`), spelled-out numbers (`next two weeks`, `november fifth`), and everyday phrasing (`the friday after next`, `a week on friday`, `sunday just gone`).
 
-Jev only reads the words. It answers questions such as "which weekday is written here?" and "is this a range?", and date-jev builds the result with date-core's own date math. Each phrase costs one call to TypeSafe, paid with your own key.
+Jev only reads the words. It answers questions such as "which weekday is written here?" and "is this a range?", and date-jev builds the result with date-core's own date math. Each phrase costs one call to TypeSafe, paid with your own key, or two for the rare phrase with a word like `to` that isn't a range.
 
 ## Install
 
@@ -100,8 +100,8 @@ You can also ask date-jev after an `ambiguous` result, or for every phrase.
 | Counted from a day | `a week on friday`, `the day after friday`, `two weeks after tomorrow`, `3 days before next friday` |
 | Calendar dates | `jul 1`, `5th nov`, `november fifth`, `march 15 2020`, `6 mar 27`, `the 15th` |
 | Months and periods | `april`, `next april`, `august 2020`, `next month`, `previous quarter`, `this year` |
-| Ranges | `today until friday`, `monday through friday`, `aug 10-14`, `10-14 aug`, `dec 20 until jan 3` |
-| Counts from today | `last 90 days`, `next two weeks`, `over the next 30 days`, `in 10 days`, `2 months ago`, `3 quarters from now` |
+| Ranges | `today until friday`, `monday through friday`, `aug 10-14`, `10-14 aug`, `dec 20 until jan 3`, `tomorrow until 15 days later` |
+| Counts from today | `last 90 days`, `next two weeks`, `over the next 30 days`, `in 10 days`, `2 months ago`, `3 quarters from now`, `ninth week from today` |
 
 date-jev follows date-core's rules for what a phrase means. A bare weekday is the coming one, `this friday` is Friday of this week, and a range end without its own year or month is the first match on or after the start, so `dec 20 until jan 3` ends in the following year.
 
@@ -109,12 +109,12 @@ date-jev doesn't read holidays and other named dates (`christmas`), exclusions (
 
 ## Cost and model versions
 
-Every `parseDate` call sends one request to TypeSafe, except for empty input. TypeSafe answers with its current Jev model, and `result.model` names the version. A new model version can read a phrase differently, so check `model` when a result changes.
+Every `parseDate` call sends one request to TypeSafe, except for empty input. A phrase with `until`, `to`, or a dash that Jev says isn't a range, such as `can we meet next friday to talk it over?`, sends a second request about the whole phrase. TypeSafe answers with its current Jev model, and `result.model` names the version. A new model version can read a phrase differently, so check `model` when a result changes.
 
 ## How it works
 
 1. Split: when a phrase has a connector such as `until`, `to`, or a dash, code cuts it into a start and an end.
-2. Ask: one TypeSafe call asks Jev a set of questions about the whole phrase and each end: which day, weekday, month, or day of the month is written; which number is the year or the count; whether the phrase counts days from another day; and, for a split phrase, whether it names a range at all.
+2. Ask: one TypeSafe call asks Jev a set of questions about each end of a split phrase, or about the whole phrase: which day, weekday, month, or day of the month is written; which number is the year or the count; and whether the phrase counts days from another day. For a split phrase it also asks whether the phrase names a range at all, and whether the end counts from the start, as in `15 days later`. When Jev says a split phrase isn't a range, a second call asks about the whole phrase.
 3. Build: code turns the answers into the same tree date-core builds for that phrase.
 4. Resolve: a copy of date-core's date math turns the tree into Temporal values.
 5. Return: `valid`, `ambiguous`, or `invalid`, with Jev's confidence and model version.

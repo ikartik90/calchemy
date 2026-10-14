@@ -140,3 +140,18 @@ two weeks after friday
 3 days before next friday
 the day after friday
 a week before june 5
+
+# Ordinal periods counted from today
+ninth week from today
+9th week from today
+twelfth month from today
+third quarter from today
+second year from today
+46th day from today
+
+# Range ends that count from the start
+tomorrow until 15 days later
+tomorrow until 15 days from today
+
+# A connector that isn't a range
+can we meet next friday to talk it over?
