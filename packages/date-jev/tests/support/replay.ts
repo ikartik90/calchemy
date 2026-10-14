@@ -2,21 +2,31 @@ import { readFileSync } from "node:fs";
 import { isDeepStrictEqual } from "node:util";
 import { TypeSafeClient } from "@typesafe-ai/sdk";
 
+type Request = { state: unknown; questions: unknown };
+
+/** Each call date-jev made for a phrase, in order: one, or two when a split phrase is not a range. */
 type Recording = {
-  request?: { state: unknown; questions: unknown };
-  response: unknown;
+  calls: Array<{ request: Request; response: unknown }>;
 };
 
-// Example: `replayClient("next friday")` answers every request with `tests/recordings/next-friday.json`.
+// Example: `replayClient("next friday")` answers date-jev's calls with those in
+// `tests/recordings/next-friday.json`, in order.
 export function replayClient(phrase: string): TypeSafeClient {
-  const recording = readRecording(phrase);
+  const { calls } = readRecording(phrase);
+  let next = 0;
 
   return new TypeSafeClient({
     apiKey: "replay",
     retry: { maxRetries: 0 },
     fetch: async (_url, init) => {
-      assertSameRequest(phrase, recording, JSON.parse(String(init?.body)));
-      return new Response(JSON.stringify(recording.response), {
+      const call = calls[next];
+      next += 1;
+      if (!call) {
+        throw new Error(`date-jev made more calls for "${phrase}" than were recorded. Re-record it: pnpm record-jev "${phrase}"`);
+      }
+
+      assertSameRequest(phrase, call.request, JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify(call.response), {
         status: 200,
         headers: { "content-type": "application/json" },
       });
@@ -37,17 +47,14 @@ export function unusedClient(): TypeSafeClient {
 
 // A live recording only answers the questions it was recorded with. When date-jev asks something
 // else, replaying it would test stale answers, so fail and say how to re-record.
-function assertSameRequest(phrase: string, recording: Recording, sent: { state: unknown; questions: unknown }) {
-  if (!recording.request) {
-    return;
-  }
-
-  if (!isDeepStrictEqual(sent.state, recording.request.state) || !isDeepStrictEqual(sent.questions, recording.request.questions)) {
+function assertSameRequest(phrase: string, recorded: Request, sent: Request) {
+  if (!isDeepStrictEqual(sent.state, recorded.state) || !isDeepStrictEqual(sent.questions, recorded.questions)) {
     throw new Error(`date-jev's questions changed since "${phrase}" was recorded. Re-record it: pnpm record-jev "${phrase}"`);
   }
 }
 
 function readRecording(phrase: string): Recording {
-  const file = new URL(`../recordings/${phrase.replaceAll(" ", "-")}.json`, import.meta.url);
+  // Escaped as scripts/record-jev.mjs does, so a `?` in the phrase stays part of the file name.
+  const file = new URL(`../recordings/${encodeURIComponent(phrase.replaceAll(" ", "-"))}.json`, import.meta.url);
   return JSON.parse(readFileSync(file, "utf8")) as Recording;
 }

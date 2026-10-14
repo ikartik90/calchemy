@@ -4,7 +4,7 @@ import type { TemporalApi, TemporalGlobal } from "./core/temporal/types";
 import { resolveContext } from "./context";
 import { labelDateValue } from "./core/parser/primitives/shared";
 import type { DateValue } from "./core/types";
-import { dateQuestions, rangeQuestions, readAnswers, type Reading } from "./read";
+import { dateQuestions, rangeQuestions, readPhraseAnswers, readRangeAnswers, type Reading } from "./read";
 import { splitRange } from "./split";
 import type { Candidate, CreateJevParserOptions, JevParser } from "./types";
 
@@ -20,14 +20,9 @@ export async function createJevParser(options: CreateJevParserOptions): Promise<
       }
 
       const resolved = resolveContext(context, Temporal);
-      // One call asks about the whole phrase and, when it splits at a connector, about each end too.
-      const split = splitRange(input);
-      const { answers, model } = await options.client.systemOne({
-        state: split ? { phrase: input, ...split } : { phrase: input },
-        questions: split ? { ...dateQuestions("phrase", input), ...rangeQuestions(split) } : dateQuestions("phrase", input),
-      });
+      const { readings, model } = await readPhrase(options.client, input);
       // Keep the readings that name real dates: `feb 30` has no day reading, only February 2030.
-      const found = readAnswers(answers, input, split !== null).flatMap((reading) => {
+      const found = readings.flatMap((reading) => {
         const value = resolveDateSlice(reading.slice, resolved.referenceDate, Temporal, resolved, lookups);
         return value ? [{ reading, value }] : [];
       });
@@ -50,6 +45,26 @@ export async function createJevParser(options: CreateJevParserOptions): Promise<
       return { status: "ambiguous", input, candidates, confidence: sum(candidates), model };
     },
   };
+}
+
+// Example: `await readPhrase(client, "today until friday")` asks Jev about the phrase's two ends in
+// one call. A phrase with no connector, or one Jev says is not a range, as in `can we meet next
+// friday to talk it over?`, is asked about whole: one call, or a second after the range call.
+async function readPhrase(
+  client: CreateJevParserOptions["client"],
+  input: string,
+): Promise<{ readings: Reading[]; model: string }> {
+  const split = splitRange(input);
+  if (split) {
+    const { answers, model } = await client.systemOne({ state: { phrase: input, ...split }, questions: rangeQuestions(split) });
+    const readings = readRangeAnswers(answers);
+    if (readings) {
+      return { readings, model };
+    }
+  }
+
+  const { answers, model } = await client.systemOne({ state: { phrase: input }, questions: dateQuestions("phrase", input) });
+  return { readings: readPhraseAnswers(answers, input), model };
 }
 
 // Example: `june 27` returns June 27 and June 2027. Together they are as sure as Jev's reading of the
